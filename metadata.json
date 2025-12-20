@@ -1,0 +1,7 @@
+{
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "name": "Orbital Sniper: Void Defense",
+  "description": "High-precision hand-tracked space combat simulator."
+}
