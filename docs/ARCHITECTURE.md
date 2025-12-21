@@ -30,10 +30,18 @@ A static singleton service wrapping `@mediapipe/tasks-vision`.
 ## 3. Modular Systems
 To maintain code cleanliness and separation of concerns, logic is split into specialized classes in the `systems/` directory:
 
-1.  **`AssetManager`**: Handles the creation, storage, and disposal of shared Three.js Geometries and Materials (Kitbashing resources).
+1.  **`AssetManager`**: Handles the creation, storage, and disposal of shared Three.js Geometries and Materials (Kitbashing resources). It also owns pooled menu target prefabs and a reusable starfield geometry so resets and mode switches can recycle objects without reallocating WebGL resources.
 2.  **`EnemyFactory`**: Uses the AssetManager to assemble complex enemy ships from primitive shapes based on `EnemyType`.
 3.  **`ParticleSystem`**: Manages a high-performance, ring-buffered point cloud for explosions, trails, and shockwaves.
 4.  **`InputProcessor`**: Translates raw MediaPipe landmarks into smoothed game controls (Yaw/Pitch) and gesture flags (Fire, Missile, Pause).
+
+### Resource Pooling & Lifecycle
+
+The render core leans on pooling to keep allocations predictable and frame times stable:
+
+- **Geometries/Materials**: `AssetManager` builds all reusable primitives once (including menu targets and the starfield) and exposes methods to acquire/release instances instead of constructing on demand.
+- **Dynamic Objects**: `EnemyFactory`, `BulletPool`, `MissilePool`, and the menu targets retrieved in `SceneComposer` return meshes back to their pools when removed from the scene.
+- **Lifecycle Hooks**: `ResourceLifecycle` tracks disposables; unmounting or mode switches trigger asset releases before geometries/materials are finally disposed, ensuring GPU buffers are reclaimed cleanly.
 
 ## 4. Data Flow: The "Ref Bridge" Pattern
 

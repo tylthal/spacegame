@@ -7,9 +7,17 @@ export interface GameAssets {
 
 export class AssetManager {
     public assets: GameAssets;
+    private menuTargetGeos: Map<number, { shell: THREE.BufferGeometry; core: THREE.BufferGeometry }> = new Map();
+    private menuTargetMats: Map<number, THREE.Material> = new Map();
+    private menuTargetPool: Map<string, THREE.Group[]> = new Map();
+    private starfieldGeometry: THREE.BufferGeometry;
+    private starfieldMaterial: THREE.PointsMaterial;
 
     constructor() {
         this.assets = this.createAssets();
+        const { geometry, material } = this.createStarfieldAssets();
+        this.starfieldGeometry = geometry;
+        this.starfieldMaterial = material;
     }
 
     private createAssets(): GameAssets {
@@ -31,6 +39,10 @@ export class AssetManager {
             engineBlock: new THREE.CylinderGeometry(4, 5, 10, 8),
             bridge: new THREE.BoxGeometry(8, 6, 12),
             spike: new THREE.ConeGeometry(1, 8, 4),
+            interceptorStrut: new THREE.CylinderGeometry(0.5, 0.5, 20),
+            dreadnoughtGlow: new THREE.CircleGeometry(4, 8),
+            interceptorGlass: new THREE.SphereGeometry(2.5),
+            scoutEngineCone: new THREE.ConeGeometry(2, 5, 8),
         };
 
         // Shared Material Settings for consistency
@@ -100,8 +112,94 @@ export class AssetManager {
         return { geos, mats };
     }
 
+    private createStarfieldAssets() {
+        const starGeo = new THREE.BufferGeometry();
+        const starPos = new Float32Array(15000 * 3);
+        for (let i = 0; i < 15000; i++) {
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(Math.random() * 2 - 1);
+            const r = 5000 + Math.random() * 5000;
+            starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+            starPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+            starPos[i * 3 + 2] = r * Math.cos(phi);
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        const starMat = new THREE.PointsMaterial({ color: 0x888888, size: 1.5, transparent: true, opacity: 0.5, fog: false });
+        return { geometry: starGeo, material: starMat };
+    }
+
+    private getMenuTargetGeometries(size: number) {
+        const cached = this.menuTargetGeos.get(size);
+        if (cached) return cached;
+
+        const shell = new THREE.IcosahedronGeometry(size, 1);
+        const core = new THREE.SphereGeometry(size * 0.4, 16, 16);
+        this.menuTargetGeos.set(size, { shell, core });
+        return { shell, core };
+    }
+
+    private getMenuTargetMaterial(color: number) {
+        let mat = this.menuTargetMats.get(color);
+        if (!mat) {
+            mat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 2.5, wireframe: true });
+            this.menuTargetMats.set(color, mat);
+        }
+        return mat;
+    }
+
+    public acquireMenuTarget(size: number, color: number) {
+        const key = `${size}:${color}`;
+        const pool = this.menuTargetPool.get(key) ?? [];
+        const existing = pool.pop();
+        if (existing) return existing;
+
+        const group = new THREE.Group();
+        const { shell, core } = this.getMenuTargetGeometries(size);
+        const targetMat = this.getMenuTargetMaterial(color);
+        const coreMat = this.menuTargetMats.get(0xffffff) ?? new THREE.MeshBasicMaterial({ color: 0xffffff });
+        this.menuTargetMats.set(0xffffff, coreMat);
+
+        group.add(new THREE.Mesh(shell, targetMat));
+        group.add(new THREE.Mesh(core, coreMat));
+        group.matrixAutoUpdate = false;
+        group.updateMatrix();
+        this.menuTargetPool.set(key, pool);
+        return group;
+    }
+
+    public releaseMenuTarget(group: THREE.Group, size: number, color: number) {
+        const key = `${size}:${color}`;
+        const pool = this.menuTargetPool.get(key) ?? [];
+        group.position.set(0, 0, 0);
+        group.rotation.set(0, 0, 0);
+        group.visible = true;
+        group.updateMatrix();
+        pool.push(group);
+        this.menuTargetPool.set(key, pool);
+    }
+
+    public createStarfieldInstance() {
+        const starfield = new THREE.Points(this.starfieldGeometry, this.starfieldMaterial);
+        starfield.matrixAutoUpdate = false;
+        starfield.updateMatrix();
+        return starfield;
+    }
+
+    public releaseStarfieldInstance(starfield: THREE.Points) {
+        starfield.visible = false;
+    }
+
+    public resetPools() {
+        this.menuTargetPool.clear();
+    }
+
     public dispose() {
         Object.values(this.assets.geos).forEach(g => g.dispose());
         Object.values(this.assets.mats).forEach(m => m.dispose());
+        this.menuTargetGeos.forEach(({ shell, core }) => { shell.dispose(); core.dispose(); });
+        this.menuTargetMats.forEach(m => m.dispose());
+        this.menuTargetPool.clear();
+        this.starfieldGeometry.dispose();
+        this.starfieldMaterial.dispose();
     }
 }

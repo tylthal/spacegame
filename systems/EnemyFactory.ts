@@ -45,8 +45,7 @@ export class EnemyFactory {
                 const lEng = new THREE.Mesh(geos.engineBlock, mats.chrome); // Contrast
                 lEng.position.set(-15, 0, 20); group.add(lEng);
                 const rEng = lEng.clone(); rEng.position.set(15, 0, 20); group.add(rEng);
-                const glowGeo = new THREE.CircleGeometry(4, 8);
-                const lGlow = new THREE.Mesh(glowGeo, mats.redGlow);
+                const lGlow = new THREE.Mesh(geos.dreadnoughtGlow, mats.redGlow);
                 lGlow.position.set(0, -6, 0); lGlow.rotateX(Math.PI/2); lEng.add(lGlow);
                 const rGlow = lGlow.clone(); rEng.add(rGlow);
                 const bridge = new THREE.Mesh(geos.bridge, mats.chrome);
@@ -67,7 +66,7 @@ export class EnemyFactory {
                 // RED THEME
                 const pod = new THREE.Mesh(geos.pod, mats.metalRed);
                 group.add(pod);
-                const glass = new THREE.Mesh(new THREE.SphereGeometry(2.5), mats.glassRed);
+                const glass = new THREE.Mesh(geos.interceptorGlass, mats.glassRed);
                 glass.position.set(0, 1, 3);
                 pod.add(glass);
                 const lWing = new THREE.Mesh(geos.hexPanel, mats.chrome); // Contrast with Silver wings
@@ -75,8 +74,7 @@ export class EnemyFactory {
                 group.add(lWing);
                 const rWing = lWing.clone(); rWing.position.set(10, 0, 0);
                 group.add(rWing);
-                const strutGeo = new THREE.CylinderGeometry(0.5, 0.5, 20);
-                const strut = new THREE.Mesh(strutGeo, mats.detailDark);
+                const strut = new THREE.Mesh(geos.interceptorStrut, mats.detailDark);
                 strut.rotateZ(Math.PI/2);
                 group.add(strut);
                 break;
@@ -91,7 +89,7 @@ export class EnemyFactory {
                 const wingGroup = new THREE.Group();
                 wingGroup.add(wings);
                 group.add(wingGroup);
-                const glow = new THREE.Mesh(new THREE.ConeGeometry(2, 5, 8), mats.engineGlow);
+                const glow = new THREE.Mesh(geos.scoutEngineCone, mats.engineGlow);
                 glow.rotateX(-Math.PI/2); glow.position.set(0, 0, 14);
                 group.add(glow);
                 break;

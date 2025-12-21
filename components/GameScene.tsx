@@ -105,13 +105,13 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     if (!mountRef.current) return;
     const lifecycle = new ResourceLifecycle();
 
-    const composer = new SceneComposer(mountRef.current, lifecycle);
-    const { scene, camera, renderer, gunAnchor, gunPivot, muzzle, reticle, laser, enemyGroup, startGroup, pauseGroup, helpGroup, helpSpotlight, gameOverGroup, targets } = composer.graph;
-    sceneComposerRef.current = composer;
-
     const assets = new AssetManager();
     assetManagerRef.current = assets;
     lifecycle.add(assets);
+
+    const composer = new SceneComposer(mountRef.current, lifecycle, assets);
+    const { scene, camera, renderer, gunAnchor, gunPivot, muzzle, reticle, laser, enemyGroup, startGroup, pauseGroup, helpGroup, helpSpotlight, gameOverGroup, targets } = composer.graph;
+    sceneComposerRef.current = composer;
 
     const particles = new ParticleSystem(scene);
     particleSystemRef.current = particles;
