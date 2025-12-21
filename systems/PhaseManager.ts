@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CALIBRATION_HOLD_TIME_MS, PAUSE_HOLD_TIME_MS } from '../config/constants';
+import { PAUSE_HOLD_TIME_MS } from '../config/constants';
 import { GamePhase } from '../types';
 
 export type HelpState = { page: number; enemyIndex: number };
@@ -23,13 +23,10 @@ interface PhaseManagerOptions {
   phaseHandlers?: Partial<Record<GamePhase, () => void>>;
 }
 
-const ACTIVATION_DELAY_MS = 800;
-
 export class PhaseManager {
   private current: GamePhase;
   private transitionTime: number;
   private pauseHoldStart: number;
-  private calibrationHoldStart: number;
   private helpState: HelpState;
   private helpShowcase: THREE.Group | null;
   private readonly visibilityTargets: VisibilityTargets;
@@ -54,7 +51,6 @@ export class PhaseManager {
     this.current = initialPhase;
     this.transitionTime = performance.now();
     this.pauseHoldStart = 0;
-    this.calibrationHoldStart = 0;
     this.helpState = { page: 0, enemyIndex: 0 };
     this.helpShowcase = null;
     this.onPhaseChange = onPhaseChange;
@@ -105,7 +101,6 @@ export class PhaseManager {
     this.current = next;
     this.transitionTime = performance.now();
     this.pauseHoldStart = 0;
-    this.calibrationHoldStart = 0;
 
     this.applyVisibility(next);
 
@@ -146,24 +141,6 @@ export class PhaseManager {
 
   resetPauseHold(): void {
     this.pauseHoldStart = 0;
-  }
-
-  updateCalibrationHold(isPinching: boolean, now: number): { progress: number; completed: boolean } {
-    if (this.current !== 'CALIBRATING' || !isPinching || now - this.transitionTime < ACTIVATION_DELAY_MS) {
-      this.calibrationHoldStart = 0;
-      return { progress: 0, completed: false };
-    }
-
-    if (this.calibrationHoldStart === 0) this.calibrationHoldStart = now;
-    const elapsed = now - this.calibrationHoldStart;
-    const progress = Math.min(elapsed / CALIBRATION_HOLD_TIME_MS, 1.0);
-
-    if (progress >= 1) {
-      this.calibrationHoldStart = 0;
-      return { progress: 1, completed: true };
-    }
-
-    return { progress, completed: false };
   }
 
   toggleHelpPage(): HelpState {

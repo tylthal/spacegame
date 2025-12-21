@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CALIBRATION_HOLD_TIME_MS, PAUSE_HOLD_TIME_MS } from '../../config/constants';
+import { PAUSE_HOLD_TIME_MS } from '../../config/constants';
 import { PhaseManager, HelpState } from '../PhaseManager';
 import { describe, expect, it } from 'vitest';
 
@@ -67,7 +67,7 @@ describe('PhaseManager transitions', () => {
     expect(manager.getHelpShowcase()).toBeNull();
   });
 
-  it('honors hold timers for pause and calibration interactions', () => {
+  it('honors hold timers for pause interactions', () => {
     const { manager } = createManager();
 
     manager.transitionTo('READY');
@@ -76,24 +76,5 @@ describe('PhaseManager transitions', () => {
     const pauseStart = manager.getLastTransitionTime();
     expect(manager.updatePauseHold(true, pauseStart + 10)).toBe(false);
     expect(manager.updatePauseHold(true, pauseStart + PAUSE_HOLD_TIME_MS + 20)).toBe(true);
-
-    manager.transitionTo('PAUSED');
-    manager.transitionTo('CALIBRATING');
-
-    const calibrationStart = manager.getLastTransitionTime();
-    const early = manager.updateCalibrationHold(true, calibrationStart + 100);
-    expect(early).toEqual({ progress: 0, completed: false });
-
-    const activationTime = calibrationStart + 900;
-    const activation = manager.updateCalibrationHold(true, activationTime);
-    expect(activation.progress).toBe(0);
-
-    const during = manager.updateCalibrationHold(true, activationTime + 500);
-    expect(during.progress).toBeGreaterThan(0);
-    expect(during.completed).toBe(false);
-
-    const finished = manager.updateCalibrationHold(true, activationTime + CALIBRATION_HOLD_TIME_MS + 10);
-    expect(finished.completed).toBe(true);
-    expect(finished.progress).toBe(1);
   });
 });

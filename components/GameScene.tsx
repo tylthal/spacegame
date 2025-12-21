@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { GamePhase, EnemyData, MissileData } from '../types';
+import { GamePhase, EnemyData, MissileData, InputSnapshot, TrackingStatus } from '../types';
 import SceneOverlays from './SceneOverlays';
 import { DIFFICULTY, MISSILE, SCENE_CONFIG, BULLET_SPEED } from '../config/constants';
 import { AssetManager } from '../systems/AssetManager';
@@ -13,6 +13,7 @@ import { PhaseManager } from '../systems/PhaseManager';
 import { WeaponController } from '../systems/WeaponController';
 import { BulletPool } from '../systems/BulletPool';
 import { MissilePool } from '../systems/MissilePool';
+import { CalibrationService } from '../services/CalibrationService';
 
 /**
  * GameScene
@@ -67,7 +68,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   
   const [phase, setPhase] = useState<GamePhase>('CALIBRATING');
   const [calibrationProgress, setCalibrationProgress] = useState(0);
-  const [trackingStatus, setTrackingStatus] = useState({ aimer: false, trigger: false });
+  const [trackingStatus, setTrackingStatus] = useState<TrackingStatus>({ aimer: false, trigger: false, health: 0 });
   const [weaponStatus, setWeaponStatus] = useState({ heat: 0, isOverheated: false, missileProgress: 1.0 });
   const weaponStatusRef = useRef({ heat: 0, isOverheated: false, missileProgress: 1.0 });
   const [helpState, setHelpState] = useState({ page: 0, enemyIndex: 0 });
@@ -84,9 +85,8 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const inputProcessorRef = useRef<InputProcessor>(new InputProcessor());
   const sceneComposerRef = useRef<SceneComposer | null>(null);
   const gameLoopRef = useRef<GameLoop | null>(null);
-  const handInputRef = useRef<{ aimer: any; trigger: any } | null>(null);
-
-  const calibrationPoint = useRef({ x: 0.5, y: 0.5 });
+  const inputSnapshotRef = useRef<InputSnapshot | null>(null);
+  const calibrationServiceRef = useRef<CalibrationService>(new CalibrationService());
   const shakeRef = useRef(0);
   const pauseGestureCooldown = useRef(0);
 
@@ -291,10 +291,11 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
     if (DEBUG_PERF) console.log("Performance Profiler Initialized");
 
-    const handleInputStage = (_context: FrameContext) => {
-      const handData = inputProcessorRef.current.getHandData(handResultRef.current);
-      handInputRef.current = handData;
-      setTrackingStatus({ aimer: !!handData?.aimer, trigger: !!handData?.trigger });
+    const handleInputStage = ({ now }: FrameContext) => {
+      const calibrationPoint = calibrationServiceRef.current.getCalibrationPoint();
+      const snapshot = inputProcessorRef.current.processFrame(handResultRef.current, calibrationPoint, now);
+      inputSnapshotRef.current = snapshot;
+      setTrackingStatus(snapshot.tracking);
     };
 
     const handleParticleStage = ({ timeScale }: FrameContext) => {
@@ -302,8 +303,9 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     };
 
     const handleSimulationStage = ({ deltaMs, timeScale, now }: FrameContext) => {
-      const input = handInputRef.current || {};
-      const { aimer, trigger } = input as any;
+      const inputSnapshot = inputSnapshotRef.current;
+      const gestures = inputSnapshot?.gestures;
+      const aimData = inputSnapshot?.aim;
 
       const phaseManager = phaseManagerRef.current;
       const currentPhase = phaseManager?.getPhase() ?? 'CALIBRATING';
@@ -478,70 +480,76 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
       missilePool.update(timeScale, now, shouldDetonate, detonateMissile);
 
-      if (aimer) {
-          const { isPauseGesture, isPinching, isFist, tip } = inputProcessorRef.current.detectGestures(aimer, trigger);
+      if (currentPhase === 'CALIBRATING') {
+          if (gestures && aimData) {
+              const { progress, completed } = calibrationServiceRef.current.update(gestures.pinch, aimData.tip, now);
+              setCalibrationProgress(progress);
+              if (completed) transitionPhase('READY');
+          } else {
+              calibrationServiceRef.current.resetHold();
+              setCalibrationProgress(0);
+          }
+      } else {
+          calibrationServiceRef.current.resetHold();
+      }
+
+      if (gestures) {
           if (phaseManager && currentPhase === 'PLAYING' && now - pauseGestureCooldown.current > 0) {
-              if (phaseManager.updatePauseHold(isPauseGesture, now)) transitionPhase('PAUSED');
+              if (phaseManager.updatePauseHold(gestures.pause, now)) transitionPhase('PAUSED');
           } else if (phaseManager) phaseManager.resetPauseHold();
-          if (trigger) {
-              if (phaseManager && currentPhase === 'CALIBRATING') {
-                  const { progress, completed } = phaseManager.updateCalibrationHold(isPinching, now);
-                  setCalibrationProgress(progress);
-                  if (completed) { calibrationPoint.current = { x: tip.x, y: tip.y }; transitionPhase('READY'); }
-              }
-              if (currentPhase !== 'CALIBRATING') {
-                  if (isFist && weaponController.canFireMissile(now)) {
-                      weaponController.recordMissileFire(now);
-                      gunPivot.getWorldQuaternion(_q1); _v1.setFromMatrixPosition(muzzle.matrixWorld); _v2.copy(_forward).applyQuaternion(_q1);
-                      missilePool.spawn(_v1, _q1, _v2.clone().multiplyScalar(MISSILE.SPEED), now);
-                      particles.spawnImpact(_v1, 0xff8800, 120, 20, 0.035);
-                      const updatedStatus = weaponController.getStatus();
-                      weaponStatusRef.current = updatedStatus;
-                      setWeaponStatus(updatedStatus);
-                  }
-                  if (weaponController.canFirePrimary(now)) {
-                      weaponController.recordPrimaryFire(now);
+      } else if (phaseManager) phaseManager.resetPauseHold();
 
-                      const jitterX = (Math.random() - 0.5) * 0.005;
-                      const jitterY = (Math.random() - 0.5) * 0.005;
-
-                      raycaster.setFromCamera({ x: (tip.x - calibrationPoint.current.x) * 1.3 + jitterX, y: (tip.y - calibrationPoint.current.y) * 1.1 + jitterY }, camera);
-                      raycaster.ray.at(200, _v1);
-                      raycaster.ray.direction.addScaledVector(_right, (Math.random() - 0.5) * 0.03);
-                      raycaster.ray.direction.normalize();
-
-                      muzzle.getWorldPosition(_v2);
-                      raycaster.ray.origin.copy(_v2);
-                      raycaster.ray.direction.normalize();
-                      raycaster.ray.at(1000, _v3);
-
-                      bulletPool.spawn(_v2, raycaster.ray.quaternion(), _v3.sub(_v2).normalize().multiplyScalar(BULLET_SPEED), now);
-
-                      particles.spawnMuzzleFlash(_v2, raycaster.ray.direction);
-                      const updatedStatus = weaponController.getStatus();
-                      weaponStatusRef.current = updatedStatus;
-                      setWeaponStatus(updatedStatus);
-                  }
-              }
+      if (currentPhase !== 'CALIBRATING' && aimData && gestures) {
+          if (gestures.fist && weaponController.canFireMissile(now)) {
+              weaponController.recordMissileFire(now);
+              gunPivot.getWorldQuaternion(_q1); _v1.setFromMatrixPosition(muzzle.matrixWorld); _v2.copy(_forward).applyQuaternion(_q1);
+              missilePool.spawn(_v1, _q1, _v2.clone().multiplyScalar(MISSILE.SPEED), now);
+              particles.spawnImpact(_v1, 0xff8800, 120, 20, 0.035);
+              const updatedStatus = weaponController.getStatus();
+              weaponStatusRef.current = updatedStatus;
+              setWeaponStatus(updatedStatus);
           }
 
-          if (currentPhase !== 'CALIBRATING') {
-              const q = aimer.quaternion; _euler.setFromQuaternion(q);
-              _euler.y += (Math.PI/4) * (aimer.gestures.roll ? aimer.gestures.roll : 0);
-              _euler.y = THREE.MathUtils.clamp(_euler.y, SCENE_CONFIG.GUN_TILT_MIN, SCENE_CONFIG.GUN_TILT_MAX);
+          if (aimData.tip && weaponController.canFirePrimary(now)) {
+              weaponController.recordPrimaryFire(now);
 
-              gunAnchor.rotation.set(_euler.x * 0.55, 0, 0);
-              gunPivot.rotation.set(_euler.x * 0.55, _euler.y, 0);
+              const jitterX = (Math.random() - 0.5) * 0.005;
+              const jitterY = (Math.random() - 0.5) * 0.005;
 
-              gunAnchor.updateMatrixWorld(true);
+              raycaster.setFromCamera({ x: aimData.offset.x * 1.3 + jitterX, y: aimData.offset.y * 1.1 + jitterY }, camera);
+              raycaster.ray.at(200, _v1);
+              raycaster.ray.direction.addScaledVector(_right, (Math.random() - 0.5) * 0.03);
+              raycaster.ray.direction.normalize();
 
-              _v1.setFromMatrixPosition(muzzle.matrixWorld); gunPivot.getWorldQuaternion(_q1); _v2.copy(_forward).applyQuaternion(_q1);
-              raycaster.set(_v1, _v2);
-              if (raycaster.ray.intersectPlane(menuPlane, _v3)) {
-                  reticle.position.copy(_v3); reticle.lookAt(camera.position); reticle.visible = true;
-                  const pos = laser.geometry.attributes.position;
-                  pos.setXYZ(0, _v1.x, _v1.y, _v1.z); pos.setXYZ(1, _v3.x, _v3.y, _v3.z); pos.needsUpdate = true; laser.visible = true;
-              }
+              muzzle.getWorldPosition(_v2);
+              raycaster.ray.origin.copy(_v2);
+              raycaster.ray.direction.normalize();
+              raycaster.ray.at(1000, _v3);
+
+              bulletPool.spawn(_v2, raycaster.ray.quaternion(), _v3.sub(_v2).normalize().multiplyScalar(BULLET_SPEED), now);
+
+              particles.spawnMuzzleFlash(_v2, raycaster.ray.direction);
+              const updatedStatus = weaponController.getStatus();
+              weaponStatusRef.current = updatedStatus;
+              setWeaponStatus(updatedStatus);
+          }
+      }
+
+      if (currentPhase !== 'CALIBRATING' && aimData?.tip) {
+          _euler.copy(aimData.rotation);
+          _euler.y = THREE.MathUtils.clamp(_euler.y, SCENE_CONFIG.GUN_TILT_MIN, SCENE_CONFIG.GUN_TILT_MAX);
+
+          gunAnchor.rotation.set(_euler.x * 0.55, 0, 0);
+          gunPivot.rotation.set(_euler.x * 0.55, _euler.y, 0);
+
+          gunAnchor.updateMatrixWorld(true);
+
+          _v1.setFromMatrixPosition(muzzle.matrixWorld); gunPivot.getWorldQuaternion(_q1); _v2.copy(_forward).applyQuaternion(_q1);
+          raycaster.set(_v1, _v2);
+          if (raycaster.ray.intersectPlane(menuPlane, _v3)) {
+              reticle.position.copy(_v3); reticle.lookAt(camera.position); reticle.visible = true;
+              const pos = laser.geometry.attributes.position;
+              pos.setXYZ(0, _v1.x, _v1.y, _v1.z); pos.setXYZ(1, _v3.x, _v3.y, _v3.z); pos.needsUpdate = true; laser.visible = true;
           }
       } else { reticle.visible = laser.visible = false; if (phaseManager) phaseManager.resetPauseHold(); if (currentPhase === 'CALIBRATING') { setCalibrationProgress(0); } }
     };

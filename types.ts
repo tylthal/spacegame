@@ -12,6 +12,27 @@ export type EnemyType = 'STANDARD' | 'ELITE' | 'SCOUT' | 'INTERCEPTOR' | 'WRAITH
 export interface TrackingStatus {
   aimer: boolean;   // Right Hand
   trigger: boolean; // Left Hand
+  health: number;
+}
+
+export interface AimSnapshot {
+  rotation: THREE.Euler;
+  direction: THREE.Vector3;
+  offset: { x: number; y: number };
+  tip: { x: number; y: number } | null;
+}
+
+export interface GestureSnapshot {
+  pause: boolean;
+  pinch: boolean;
+  fist: boolean;
+  tip: { x: number; y: number } | null;
+}
+
+export interface InputSnapshot {
+  aim: AimSnapshot;
+  gestures: GestureSnapshot;
+  tracking: TrackingStatus;
 }
 
 export interface EnemyData {
