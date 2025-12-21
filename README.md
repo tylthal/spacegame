@@ -95,5 +95,6 @@ The game flows through six distinct states managed by `phaseRef`:
 - **`docs/ARCHITECTURE.md`**: High-level system design and rendering/data-flow model.
 - **`docs/TECHNICAL_REFERENCE.md`**: File-by-file structure, configuration references, and performance notes.
 - **`docs/DEVELOPER_GUIDE.md`**: Practical walkthrough of the frame pipeline, phase management, and contribution tips.
+- **`docs/DEPLOYMENT.md`**: Steps for configuring GitHub Pages to deploy the built site from GitHub Actions on the `main` branch.
 - **`docs/UI_STYLE_GUIDE.md`**: Visual language, colors, and component styling conventions.
 - **`docs/USER_GUIDE.md`**: Player-facing instructions and troubleshooting.
