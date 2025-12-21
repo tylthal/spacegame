@@ -17,7 +17,7 @@ export class HandTracker {
 
     private static readonly CDN_ASSETS: AssetSource = {
         label: 'cdn',
-        wasmPath: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/",
+        wasmPath: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm",
         modelPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
     };
 
@@ -48,13 +48,17 @@ export class HandTracker {
 
     private static getAssetSources(): AssetSource[] {
         const baseUrl = this.buildAssetPath('mediapipe');
+        const wasmPath = this.ensureTrailingSlash(`${baseUrl}/wasm`);
         return [
             {
                 label: 'local',
-                wasmPath: this.ensureTrailingSlash(`${baseUrl}/wasm`),
+                wasmPath,
                 modelPath: `${baseUrl}/hand_landmarker.task`
             },
-            this.CDN_ASSETS
+            {
+                ...this.CDN_ASSETS,
+                wasmPath: this.ensureTrailingSlash(this.CDN_ASSETS.wasmPath)
+            }
         ];
     }
 
@@ -66,7 +70,8 @@ export class HandTracker {
     }
 
     private static ensureTrailingSlash(path: string) {
-        return path.endsWith('/') ? path : `${path}/`;
+        const normalized = path.replace(/\/+$/, '');
+        return `${normalized}/`;
     }
 
     private static async verifyAssetAvailability(source: AssetSource, timeoutMs = 5000) {
@@ -119,8 +124,22 @@ export class HandTracker {
     private static async initializeWithSource(source: AssetSource) {
         let lastError: unknown;
         let vision: Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>;
+        const wasmPath = this.ensureTrailingSlash(source.wasmPath);
+        const modelPath = source.modelPath;
+
+        console.info('HandTracker resolving MediaPipe assets', {
+            source: source.label,
+            wasmPath,
+            modelPath,
+            baseUrl: import.meta.env.BASE_URL
+        });
         try {
-            vision = await FilesetResolver.forVisionTasks(source.wasmPath);
+            vision = await FilesetResolver.forVisionTasks(wasmPath);
+            console.info('FilesetResolver ready', {
+                wasmCoreUrl: `${wasmPath}vision_wasm_internal.wasm`,
+                wasmJsUrl: `${wasmPath}vision_wasm_internal.js`,
+                wasmLoaderUrl: `${wasmPath}vision_wasm_nosimd_internal.wasm`
+            });
         } catch (resolverError) {
             throw new Error(`Unable to load WASM assets from ${source.label}: ${resolverError instanceof Error ? resolverError.message : String(resolverError)}`);
         }
@@ -128,7 +147,7 @@ export class HandTracker {
         try {
             this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
-                    modelAssetPath: source.modelPath,
+                    modelAssetPath: modelPath,
                     delegate: "GPU"
                 },
                 runningMode: "VIDEO",
@@ -143,7 +162,7 @@ export class HandTracker {
             try {
                 this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
                     baseOptions: {
-                        modelAssetPath: source.modelPath,
+                        modelAssetPath: modelPath,
                         delegate: "CPU",
                     },
                     runningMode: "VIDEO",
