@@ -92,6 +92,10 @@ const GameScene: React.FC<Props> = ({
     calibrationStatus: { stalled: false, cameraReady: cameraPermissionGranted, fallbackCta: false },
   });
 
+  const calibrationStartRef = useRef<number | null>(null);
+  const lastLandmarkTimeRef = useRef<number | null>(null);
+  const fallbackReadyTriggeredRef = useRef(false);
+  const manualGestureBypassRef = useRef(false);
   const phaseManagerRef = useRef<PhaseManager | null>(null);
   const totalPlayTimeRef = useRef(0);
   const TARGET_FPS = 60;
@@ -205,6 +209,9 @@ const GameScene: React.FC<Props> = ({
     overlayStateRef.current.phase = initialPhase;
     overlayStateRef.current.calibrationProgress = 0;
     calibrationStartRef.current = performance.now();
+    lastLandmarkTimeRef.current = null;
+    fallbackReadyTriggeredRef.current = false;
+    manualGestureBypassRef.current = noGestureDevBypass;
 
     if (!mountRef.current) return;
     const lifecycle = new ResourceLifecycle();
@@ -775,7 +782,13 @@ const GameScene: React.FC<Props> = ({
     lifecycle.add(() => loop.stop());
     loop.start();
 
-    return () => lifecycle.disposeAll();
+    return () => {
+      calibrationStartRef.current = null;
+      lastLandmarkTimeRef.current = null;
+      fallbackReadyTriggeredRef.current = false;
+      manualGestureBypassRef.current = false;
+      lifecycle.disposeAll();
+    };
   }, [benchmarkModeEnabled, handTrackingEnabled, cameraPermissionGranted, noGestureDevBypass]);
 
   const handleStartWithoutTracking = () => {
