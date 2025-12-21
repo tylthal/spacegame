@@ -1,2 +1,1 @@
-public/mediapipe/wasm/*.wasm filter=lfs diff=lfs merge=lfs -text
-public/mediapipe/*.task filter=lfs diff=lfs merge=lfs -text
+# MediaPipe assets are loaded from the CDN; LFS filters remain disabled to avoid binary PR upload issues.
