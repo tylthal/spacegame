@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { GamePhase, EnemyData, MissileData, InputSnapshot } from '../types';
 import SceneOverlays from './SceneOverlays';
-import { DIFFICULTY, MISSILE, SCENE_CONFIG, BULLET_SPEED } from '../config/constants';
+import { DIFFICULTY, MISSILE, SCENE_CONFIG, BULLET_SPEED, AIM } from '../config/constants';
 import { AssetManager } from '../systems/AssetManager';
 import { ParticleSystem } from '../systems/ParticleSystem';
 import { InputProcessor } from '../systems/InputProcessor';
@@ -41,6 +41,7 @@ interface Props {
   score: number;
   hull: number;
   lives: number;
+  handTrackingEnabled: boolean;
 }
 
 // Memory Optimization Globals - Pooled strictly to avoid GC and per-frame allocations
@@ -56,7 +57,7 @@ const _menuZVec = new THREE.Vector3(0, 0, 1);
 const _forward = new THREE.Vector3(0, 0, -1);
 const _right = new THREE.Vector3(1, 0, 0);
 
-const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, onReset, score, hull, lives }) => {
+const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, onReset, score, hull, lives, handTrackingEnabled }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   
   const enemiesRef = useRef<EnemyData[]>([]);
@@ -68,11 +69,13 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const weaponControllerRef = useRef<WeaponController | null>(null);
   
   const weaponStatusRef = useRef<WeaponStatus>({ heat: 0, isOverheated: false, missileProgress: 1.0 });
+  const initialPhase: GamePhase = handTrackingEnabled ? 'CALIBRATING' : 'READY';
+
   const overlayStateRef = useRef<OverlayState>({
-    phase: 'CALIBRATING',
+    phase: initialPhase,
     score,
     calibrationProgress: 0,
-    trackingStatus: { aimer: false, trigger: false, health: 0 },
+    trackingStatus: { aimer: handTrackingEnabled, trigger: handTrackingEnabled, health: handTrackingEnabled ? 0 : 1 },
     weaponStatus: weaponStatusRef.current,
     helpState: { page: 0, enemyIndex: 0 },
   });
@@ -98,11 +101,86 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const gameLoopRef = useRef<GameLoop | null>(null);
   const inputSnapshotRef = useRef<InputSnapshot | null>(null);
   const calibrationServiceRef = useRef<CalibrationService>(new CalibrationService());
+  const fallbackInputSnapshotRef = useRef<InputSnapshot>({
+    aim: { rotation: new THREE.Euler(0, 0, 0), direction: new THREE.Vector3(0, 0, -1), offset: { x: 0, y: 0 }, tip: { x: 0.5, y: 0.5 } },
+    gestures: { pause: false, pinch: false, fist: false, tip: { x: 0.5, y: 0.5 } },
+    tracking: { aimer: true, trigger: true, health: 1 },
+  });
+  const fallbackControlState = useRef({
+    offset: { x: 0, y: 0 },
+    tip: { x: 0.5, y: 0.5 },
+    pause: false,
+    firePrimary: false,
+    fireMissile: false,
+  });
   const shakeRef = useRef(0);
   const pauseGestureCooldown = useRef(0);
 
+  useEffect(() => {
+    if (handTrackingEnabled) return;
+
+    const updatePointer = (x: number, y: number) => {
+      const nx = Math.min(1, Math.max(0, x / window.innerWidth));
+      const ny = Math.min(1, Math.max(0, y / window.innerHeight));
+      fallbackControlState.current.tip = { x: nx, y: ny };
+      fallbackControlState.current.offset = { x: (nx - 0.5) * 2, y: (ny - 0.5) * 2 };
+    };
+
+    const handleMouseMove = (event: MouseEvent) => updatePointer(event.clientX, event.clientY);
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button === 0) fallbackControlState.current.firePrimary = true;
+      if (event.button === 2) fallbackControlState.current.fireMissile = true;
+    };
+    const handleMouseUp = (event: MouseEvent) => {
+      if (event.button === 0) fallbackControlState.current.firePrimary = false;
+      if (event.button === 2) fallbackControlState.current.fireMissile = false;
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Space') fallbackControlState.current.firePrimary = true;
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') fallbackControlState.current.fireMissile = true;
+      if (event.code === 'Escape') fallbackControlState.current.pause = true;
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space') fallbackControlState.current.firePrimary = false;
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') fallbackControlState.current.fireMissile = false;
+      if (event.code === 'Escape') fallbackControlState.current.pause = false;
+    };
+
+    const preventContextMenu = (event: MouseEvent) => {
+      if (event.button === 2) event.preventDefault();
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('contextmenu', preventContextMenu);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('contextmenu', preventContextMenu);
+      fallbackControlState.current = {
+        offset: { x: 0, y: 0 },
+        tip: { x: 0.5, y: 0.5 },
+        pause: false,
+        firePrimary: false,
+        fireMissile: false,
+      };
+    };
+  }, [handTrackingEnabled]);
+
   // Scene bootstrap: one-time construction of renderer, systems, and the animation loop
   useEffect(() => {
+    overlayStateRef.current.phase = initialPhase;
+    overlayStateRef.current.calibrationProgress = 0;
+
     if (!mountRef.current) return;
     const lifecycle = new ResourceLifecycle();
 
@@ -290,6 +368,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     const phaseManager = new PhaseManager({
       visibilityTargets: { startGroup, pauseGroup, gameOverGroup, enemyGroup, helpGroup, helpSpotlight },
       scene,
+      initialPhase,
       onPhaseChange: newPhase => {
         overlayStateRef.current.phase = newPhase;
         pauseGestureCooldown.current = performance.now() + 1500;
@@ -314,9 +393,32 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
     if (benchmarkModeEnabled) console.log("Performance Profiler Initialized");
 
+    const buildFallbackSnapshot = () => {
+      const snapshot = fallbackInputSnapshotRef.current;
+      const { offset, tip, pause, firePrimary, fireMissile } = fallbackControlState.current;
+
+      snapshot.aim.offset = offset;
+      snapshot.aim.tip = tip;
+      snapshot.aim.rotation.set(-offset.y * AIM.MAX_PITCH, offset.x * AIM.MAX_YAW, 0);
+      snapshot.aim.direction.set(0, 0, -1).applyEuler(snapshot.aim.rotation);
+
+      snapshot.gestures.pause = pause;
+      snapshot.gestures.fist = fireMissile;
+      snapshot.gestures.pinch = firePrimary;
+      snapshot.gestures.tip = tip;
+
+      snapshot.tracking.aimer = true;
+      snapshot.tracking.trigger = true;
+      snapshot.tracking.health = 1;
+
+      return snapshot;
+    };
+
     const handleInputStage = ({ now }: FrameContext) => {
       const calibrationPoint = calibrationServiceRef.current.getCalibrationPoint();
-      const snapshot = inputProcessorRef.current.processFrame(handResultRef.current, calibrationPoint, now);
+      const snapshot = handTrackingEnabled
+        ? inputProcessorRef.current.processFrame(handResultRef.current, calibrationPoint, now)
+        : buildFallbackSnapshot();
       inputSnapshotRef.current = snapshot;
       overlayStateRef.current.trackingStatus = snapshot.tracking;
     };
@@ -427,6 +529,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
         let hit = false;
 
         const attemptTransition = (next: GamePhase) => {
+          if (next === 'CALIBRATING' && !handTrackingEnabled) return false;
           const manager = phaseManagerRef.current;
           return manager ? manager.transitionTo(next) : false;
         };
@@ -503,7 +606,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
       missilePool.update(timeScale, now, shouldDetonate, detonateMissile);
 
-      if (currentPhase === 'CALIBRATING') {
+      if (handTrackingEnabled && currentPhase === 'CALIBRATING') {
           if (gestures && aimData) {
               const { progress, completed } = calibrationServiceRef.current.update(gestures.pinch, aimData.tip, now);
               overlayStateRef.current.calibrationProgress = progress;
@@ -598,7 +701,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     loop.start();
 
     return () => lifecycle.disposeAll();
-  }, [benchmarkModeEnabled]);
+  }, [benchmarkModeEnabled, handTrackingEnabled]);
 
   return (
     <div className="relative w-full h-full">

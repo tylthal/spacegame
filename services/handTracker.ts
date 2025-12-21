@@ -7,6 +7,7 @@ import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
  */
 export class HandTracker {
     private static handLandmarker: HandLandmarker | null = null;
+    private static delegate: 'GPU' | 'CPU' | null = null;
 
     /**
      * init
@@ -14,14 +15,16 @@ export class HandTracker {
      * numHands is set to 2 to support the dual-hand aiming/firing protocol.
      */
     static async init() {
-        if (this.handLandmarker) return;
+        if (this.handLandmarker) return { delegate: this.delegate };
 
         const wasmPath = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
         const modelPath = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
+        let lastError: unknown;
+
         try {
             const vision = await FilesetResolver.forVisionTasks(wasmPath);
-            
+
             this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
                     modelAssetPath: modelPath,
@@ -30,8 +33,11 @@ export class HandTracker {
                 runningMode: "VIDEO",
                 numHands: 2
             });
+            this.delegate = 'GPU';
             console.log("HandTracker initialized (GPU)");
+            return { delegate: 'GPU' as const };
         } catch (error) {
+            lastError = error;
             console.warn("HandTracker GPU initialization failed, attempting CPU fallback:", error);
             try {
                 const vision = await FilesetResolver.forVisionTasks(wasmPath);
@@ -43,7 +49,9 @@ export class HandTracker {
                     runningMode: "VIDEO",
                     numHands: 2
                 });
+                this.delegate = 'CPU';
                 console.log("HandTracker initialized (CPU)");
+                return { delegate: 'CPU' as const };
             } catch (cpuError) {
                 console.error("Failed to initialize HandTracker (CPU):", cpuError);
                 // Log detailed error for debugging
@@ -52,8 +60,13 @@ export class HandTracker {
                 } else {
                      console.error(JSON.stringify(cpuError));
                 }
+                lastError = cpuError;
             }
         }
+
+        this.handLandmarker = null;
+        this.delegate = null;
+        throw lastError ?? new Error('Unknown HandTracker initialization failure');
     }
 
     /**

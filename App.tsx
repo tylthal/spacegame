@@ -15,6 +15,9 @@ const App: React.FC = () => {
   const [score, setScore] = useState(0);
   const [fps, setFps] = useState(0);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [useFallbackControls, setUseFallbackControls] = useState(false);
+  const [handTrackingReady, setHandTrackingReady] = useState(false);
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
 
@@ -28,20 +31,43 @@ const App: React.FC = () => {
   const frameCount = useRef(0);
   const lastFpsTime = useRef(performance.now());
 
-  // Initialization: Boot hand tracking engine
-  useEffect(() => {
-    async function setup() {
+  const initializeHandTracking = useCallback(async () => {
+    setIsInitializing(true);
+    setInitError(null);
+    setUseFallbackControls(false);
+
+    try {
       await HandTracker.init();
+      setHandTrackingReady(true);
+    } catch (error) {
+      console.error('Hand tracking failed to initialize:', error);
+      setHandTrackingReady(false);
+      const message = error instanceof Error ? error.message : 'Failed to initialize hand tracking.';
+      setInitError(message);
+    } finally {
       setIsInitializing(false);
     }
-    setup();
   }, []);
+
+  // Initialization: Boot hand tracking engine
+  useEffect(() => {
+    initializeHandTracking();
+  }, [initializeHandTracking]);
+
+  useEffect(() => {
+    if (!handTrackingReady || useFallbackControls) {
+      handResultRef.current = null;
+    }
+  }, [handTrackingReady, useFallbackControls]);
 
   // Neural Link Loop: High-frequency hand detection
   useEffect(() => {
-    let animationId: number;
+    let animationId: number | null = null;
+
+    const handTrackingActive = handTrackingReady && !useFallbackControls;
 
     const detect = async () => {
+      if (!handTrackingActive) return;
       if (videoRef.current && !isDetecting.current) {
         const now = performance.now();
         // Target ~30Hz detection to balance accuracy and CPU overhead
@@ -70,12 +96,14 @@ const App: React.FC = () => {
       animationId = requestAnimationFrame(detect);
     };
 
-    if (!isInitializing) {
+    if (!isInitializing && handTrackingActive) {
       animationId = requestAnimationFrame(detect);
     }
 
-    return () => cancelAnimationFrame(animationId);
-  }, [isInitializing, telemetryEnabled]);
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+    };
+  }, [isInitializing, telemetryEnabled, handTrackingReady, useFallbackControls]);
 
   /**
    * handleDamage
@@ -107,17 +135,43 @@ const App: React.FC = () => {
     setScore(s => s + p);
   }, []);
 
+  const handTrackingActive = handTrackingReady && !useFallbackControls;
+
   return (
     <div className="relative w-screen h-screen bg-black overflow-hidden font-mono text-cyan-400 select-none">
-      {isInitializing ? (
+      {isInitializing && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black">
           <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-8" />
           <h1 className="text-xl md:text-2xl font-black tracking-[0.5em] uppercase animate-pulse text-center px-4">Initializing Neural Link...</h1>
           <p className="mt-4 text-cyan-700 uppercase tracking-widest text-xs">Loading Hand Tracking Engine</p>
         </div>
-      ) : (
+      )}
+      {initError && !useFallbackControls && !isInitializing && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 px-4">
+          <div className="max-w-xl w-full bg-gray-900 border border-red-500/40 rounded-lg p-6 shadow-2xl text-center space-y-4">
+            <h2 className="text-2xl font-black tracking-[0.3em] uppercase text-red-400">Hand Tracking Offline</h2>
+            <p className="text-sm text-red-200/80">{initError}</p>
+            <p className="text-xs text-white/50 uppercase tracking-[0.2em]">You can retry loading the model or continue with mouse + keyboard controls.</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                className="px-4 py-2 rounded bg-red-600/80 text-white font-bold tracking-widest uppercase hover:bg-red-600 transition"
+                onClick={initializeHandTracking}
+              >
+                Retry Hand Tracking
+              </button>
+              <button
+                className="px-4 py-2 rounded border border-cyan-400 text-cyan-300 font-bold tracking-widest uppercase hover:bg-cyan-500/20 transition"
+                onClick={() => setUseFallbackControls(true)}
+              >
+                Play with Mouse/Keyboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {!isInitializing && (
         <>
-          <GameSceneMemo 
+          <GameSceneMemo
             handResultRef={handResultRef}
             onScoreUpdate={handleScoreUpdate}
             onDamage={handleDamage}
@@ -125,6 +179,7 @@ const App: React.FC = () => {
             score={score}
             hull={hull}
             lives={lives}
+            handTrackingEnabled={handTrackingActive}
           />
 
           {/* Top HUD: Tactical Information Display */}
