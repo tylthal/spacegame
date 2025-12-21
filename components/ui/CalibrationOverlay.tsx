@@ -13,6 +13,7 @@ const CalibrationOverlay: React.FC<Props> = ({ progress, trackingStatus, calibra
     const stalled = calibrationStatus?.stalled ?? false;
     const cameraReady = calibrationStatus?.cameraReady ?? true;
     const showFallbackCta = calibrationStatus?.fallbackCta && !!onStartWithoutTracking;
+    const pointerEventsClass = showFallbackCta ? 'pointer-events-auto' : 'pointer-events-none';
 
     const guidanceText = (() => {
       if (!cameraReady) return 'Allow camera access to continue calibration.';
@@ -23,9 +24,7 @@ const CalibrationOverlay: React.FC<Props> = ({ progress, trackingStatus, calibra
 
     return (
         <div
-          className={`absolute inset-0 flex items-center justify-center ${
-            showFallbackCta ? 'pointer-events-auto' : 'pointer-events-none'
-          } bg-black/60 backdrop-blur-md z-50 p-4`}
+          className={`absolute inset-0 flex items-center justify-center ${pointerEventsClass} bg-black/60 backdrop-blur-md z-50 p-4`}
         >
           <div className="text-center relative w-full max-w-lg">
             <div className="mb-8 md:mb-12 relative flex flex-col items-center justify-center scale-75 md:scale-100">
