@@ -10,6 +10,12 @@ A high-fidelity space combat simulator utilizing Three.js for 3D rendering and M
 
 For production-style checks, run `npm run build` to type-check and bundle the project.
 
+## Deployment
+
+The project ships with `.github/workflows/deploy.yml`, which builds the site via `npm run build` on pushes to `main` and publishes the generated `dist/` bundle to GitHub Pages. Once the repository's Pages source is set to **GitHub Actions**, deployments are automatic from the workflow output.
+
+[![Deploy status](https://github.com/OWNER/REPO/actions/workflows/deploy.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/deploy.yml)
+
 ## Project Architecture
 
 ### 1. Neural Link (Hand Tracking)
