@@ -45,16 +45,43 @@ export interface SceneGraph {
 export class SceneComposer {
   private readonly mount: HTMLElement;
   private resizeHandler: () => void;
+  private resizeObserver?: ResizeObserver;
+  private pausedOverlay: HTMLDivElement;
+  private renderPausedReason: string | null = null;
   public readonly graph: SceneGraph;
 
   constructor(mount: HTMLElement, lifecycle: ResourceLifecycle, assets: AssetManager) {
     this.mount = mount;
 
+    this.pausedOverlay = document.createElement('div');
+    if (getComputedStyle(this.mount).position === 'static') {
+      this.mount.style.position = 'relative';
+    }
+    Object.assign(this.pausedOverlay.style, {
+      position: 'absolute',
+      inset: '0px',
+      display: 'none',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(180deg, rgba(5,16,40,0.6), rgba(5,16,40,0.85))',
+      color: '#7dd3fc',
+      fontFamily: 'monospace',
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      zIndex: '10',
+      pointerEvents: 'none',
+    });
+    this.pausedOverlay.textContent = 'Renderer paused - awaiting canvas';
+    this.mount.appendChild(this.pausedOverlay);
+
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000003);
     scene.fog = new THREE.Fog(0x000003, 500, 5500);
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50000);
+    const { width: initialWidth, height: initialHeight } = this.getMountSize();
+    const safeInitialWidth = initialWidth || window.innerWidth || 1;
+    const safeInitialHeight = initialHeight || window.innerHeight || 1;
+    const camera = new THREE.PerspectiveCamera(75, safeInitialWidth / safeInitialHeight, 0.1, 50000);
     camera.position.set(0, 0, SCENE_CONFIG.CAMERA_Z);
 
     const renderer = new THREE.WebGLRenderer({
@@ -63,14 +90,14 @@ export class SceneComposer {
       powerPreference: 'high-performance',
       precision: 'mediump',
     });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(safeInitialWidth, safeInitialHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    mount.appendChild(renderer.domElement);
+    if (!this.tryAttachRenderer(renderer)) {
+      this.pauseRendering('Renderer paused - unable to attach canvas');
+    }
     lifecycle.add(() => {
       renderer.dispose();
-      if (mount.contains(renderer.domElement)) {
-        mount.removeChild(renderer.domElement);
-      }
+      this.detachRenderer(renderer);
     });
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.5));
@@ -192,7 +219,11 @@ export class SceneComposer {
     this.resizeHandler = () => this.handleResize();
     this.handleResize();
     lifecycle.addEventListener(window, 'resize', this.resizeHandler);
+    this.resizeObserver = new ResizeObserver(() => this.handleResize());
+    this.resizeObserver.observe(this.mount);
+    lifecycle.add(() => this.resizeObserver?.disconnect());
     lifecycle.add(() => {
+      this.mount.contains(this.pausedOverlay) && this.mount.removeChild(this.pausedOverlay);
       scene.remove(reticle, laser, enemyGroup, startGroup, pauseGroup, helpGroup, helpSpotlight, gameOverGroup, gunAnchor);
       scene.clear();
     });
@@ -216,8 +247,25 @@ export class SceneComposer {
 
   private handleResize() {
     const { camera, renderer, targets } = this.graph;
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const { width, height } = this.getMountSize();
+    if (width === 0 || height === 0) {
+      console.warn('[SceneComposer] Mount has zero dimensions; pausing render');
+      this.pauseRendering('Renderer paused - awaiting layout');
+      return;
+    }
+
+    if (!this.mount.contains(renderer.domElement)) {
+      const appended = this.tryAttachRenderer(renderer);
+      if (!appended) {
+        this.pauseRendering('Renderer paused - canvas missing');
+        return;
+      }
+    }
+
+    this.resumeRendering();
+
+    const w = width;
+    const h = height;
     const aspect = w / h;
 
     camera.aspect = aspect;
@@ -246,5 +294,65 @@ export class SceneComposer {
 
     targets.pauseTargets.resume.group.position.x = 0.35 * visibleWidth;
     targets.pauseTargets.resume.group.updateMatrix();
+  }
+
+  public canRender() {
+    if (this.renderPausedReason) return false;
+    if (!this.mount.contains(this.graph.renderer.domElement)) {
+      if (this.tryAttachRenderer(this.graph.renderer)) {
+        this.resumeRendering();
+        return true;
+      }
+      this.pauseRendering('Renderer paused - canvas missing');
+      return false;
+    }
+    return true;
+  }
+
+  private getMountSize() {
+    const width = Math.floor(this.mount.clientWidth);
+    const height = Math.floor(this.mount.clientHeight);
+    if (width === 0 || height === 0) {
+      console.warn('[SceneComposer] Mount returned zero dimensions; falling back to viewport');
+      const fallback = { width: window.innerWidth, height: window.innerHeight };
+      if (fallback.width === 0 || fallback.height === 0) {
+        console.error('[SceneComposer] Computed dimensions are 0; cannot size renderer');
+      }
+      return fallback;
+    }
+    return { width, height };
+  }
+
+  private tryAttachRenderer(renderer: THREE.WebGLRenderer) {
+    try {
+      this.mount.appendChild(renderer.domElement);
+    } catch (error) {
+      console.error('[SceneComposer] Failed to append renderer canvas', error);
+      return false;
+    }
+
+    if (!this.mount.contains(renderer.domElement)) {
+      console.error('[SceneComposer] Renderer canvas not attached after append');
+      return false;
+    }
+
+    return true;
+  }
+
+  private detachRenderer(renderer: THREE.WebGLRenderer) {
+    if (this.mount.contains(renderer.domElement)) {
+      this.mount.removeChild(renderer.domElement);
+    }
+  }
+
+  private pauseRendering(reason: string) {
+    this.renderPausedReason = reason;
+    this.pausedOverlay.textContent = reason;
+    this.pausedOverlay.style.display = 'flex';
+  }
+
+  private resumeRendering() {
+    this.renderPausedReason = null;
+    this.pausedOverlay.style.display = 'none';
   }
 }

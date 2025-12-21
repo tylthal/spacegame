@@ -214,7 +214,7 @@ const GameScene: React.FC<Props> = ({
     lifecycle.add(assets);
 
     const composer = new SceneComposer(mountRef.current, lifecycle, assets);
-    const { scene, camera, renderer, gunAnchor, gunPivot, muzzle, reticle, laser, enemyGroup, startGroup, pauseGroup, helpGroup, helpSpotlight, gameOverGroup, targets } = composer.graph;
+    const { scene, camera, gunAnchor, gunPivot, muzzle, reticle, laser, enemyGroup, startGroup, pauseGroup, helpGroup, helpSpotlight, gameOverGroup, targets } = composer.graph;
     sceneComposerRef.current = composer;
 
     const particles = new ParticleSystem(scene);
@@ -754,6 +754,8 @@ const GameScene: React.FC<Props> = ({
     };
 
     const handleRenderStage = () => {
+      if (!sceneComposerRef.current?.canRender()) return;
+      const renderer = sceneComposerRef.current.graph.renderer;
       camera.lookAt(0, 10, -500);
       renderer.render(scene, camera);
     };
