@@ -37,19 +37,24 @@ export class HandTracker {
     private static getCdnAssetSource() {
         return {
             label: 'cdn',
-            wasmPath: this.ensureTrailingSlash("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"),
+            wasmPath: this.normalizeBasePath("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"),
             modelPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
         };
     }
 
-    private static ensureTrailingSlash(path: string) {
-        const normalized = path.replace(/\/+$/, '');
-        return `${normalized}/`;
+    private static normalizeBasePath(path: string) {
+        return path.replace(/\/+$/, '');
+    }
+
+    private static joinUrl(base: string, resource: string) {
+        const normalizedBase = this.normalizeBasePath(base);
+        const normalizedResource = resource.replace(/^\/+/, '');
+        return `${normalizedBase}/${normalizedResource}`;
     }
 
     private static async verifyAssetAvailability(source: AssetSource, timeoutMs = 5000) {
         const assets = [
-            { url: `${source.wasmPath}vision_wasm_internal.wasm`, label: 'WASM core' },
+            { url: this.joinUrl(source.wasmPath, 'vision_wasm_internal.wasm'), label: 'WASM core' },
             { url: source.modelPath, label: 'hand model' }
         ];
 
@@ -97,7 +102,7 @@ export class HandTracker {
     private static async initializeWithSource(source: AssetSource) {
         let lastError: unknown;
         let vision: Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>;
-        const wasmPath = this.ensureTrailingSlash(source.wasmPath);
+        const wasmPath = this.normalizeBasePath(source.wasmPath);
         const modelPath = source.modelPath;
 
         console.info('HandTracker resolving MediaPipe assets', {
@@ -109,9 +114,9 @@ export class HandTracker {
         try {
             vision = await FilesetResolver.forVisionTasks(wasmPath);
             console.info('FilesetResolver ready', {
-                wasmCoreUrl: `${wasmPath}vision_wasm_internal.wasm`,
-                wasmJsUrl: `${wasmPath}vision_wasm_internal.js`,
-                wasmLoaderUrl: `${wasmPath}vision_wasm_nosimd_internal.wasm`
+                wasmCoreUrl: this.joinUrl(wasmPath, 'vision_wasm_internal.wasm'),
+                wasmJsUrl: this.joinUrl(wasmPath, 'vision_wasm_internal.js'),
+                wasmLoaderUrl: this.joinUrl(wasmPath, 'vision_wasm_nosimd_internal.wasm')
             });
         } catch (resolverError) {
             throw new Error(`Unable to load WASM assets from ${source.label}: ${resolverError instanceof Error ? resolverError.message : String(resolverError)}`);

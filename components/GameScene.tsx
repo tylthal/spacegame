@@ -728,11 +728,12 @@ const GameScene: React.FC<Props> = ({
               raycaster.ray.direction.normalize();
 
               muzzle.getWorldPosition(_v2);
+              gunPivot.getWorldQuaternion(_q1);
               raycaster.ray.origin.copy(_v2);
               raycaster.ray.direction.normalize();
               raycaster.ray.at(1000, _v3);
 
-              bulletPool.spawn(_v2, raycaster.ray.quaternion(), _v3.sub(_v2).normalize().multiplyScalar(BULLET_SPEED), now);
+              bulletPool.spawn(_v2, _q1, _v3.sub(_v2).normalize().multiplyScalar(BULLET_SPEED), now);
 
               particles.spawnMuzzleFlash(_v2, raycaster.ray.direction);
               const updatedStatus = weaponController.getStatus();
