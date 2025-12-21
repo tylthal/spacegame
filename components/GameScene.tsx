@@ -16,6 +16,7 @@ import { MissilePool } from '../systems/MissilePool';
 import { CalibrationService } from '../services/CalibrationService';
 import { ResourceLifecycle } from '../systems/ResourceLifecycle';
 import { isDevFeatureEnabled } from '../utils/devMode';
+import { PerfTracer, perfTracer } from '../telemetry/PerfTracer';
 import useOverlayStateAdapter, { OverlayState } from './ui/OverlayStateAdapter';
 
 /**
@@ -581,6 +582,8 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
       renderer.render(scene, camera);
     };
 
+    const tracer = benchmarkModeEnabled ? perfTracer : PerfTracer.create({ enabled: false });
+
     const loop = new GameLoop(
       {
         input: handleInputStage,
@@ -588,7 +591,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
         simulation: handleSimulationStage,
         render: handleRenderStage,
       },
-      { targetFps: TARGET_FPS, debugPerf: benchmarkModeEnabled, perfLogInterval: 60 },
+      { targetFps: TARGET_FPS, tracer, telemetryEnabled: benchmarkModeEnabled, perfLogInterval: 60 },
     );
     gameLoopRef.current = loop;
     lifecycle.add(() => loop.stop());

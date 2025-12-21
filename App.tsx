@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameScene from './components/GameScene';
 import WebcamFeed from './components/WebcamFeed';
 import { HandTracker } from './services/handTracker';
+import { perfTracer } from './telemetry/PerfTracer';
+import { isDevFeatureEnabled } from './utils/devMode';
 
 /**
  * App Component
@@ -15,6 +17,8 @@ const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
+
+  const telemetryEnabled = isDevFeatureEnabled('benchmark');
   
   // --- Refs for Performance ---
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -41,9 +45,11 @@ const App: React.FC = () => {
       if (videoRef.current && !isDetecting.current) {
         const now = performance.now();
         // Target ~30Hz detection to balance accuracy and CPU overhead
-        if (now - lastDetectionTime.current >= 33) { 
+        if (now - lastDetectionTime.current >= 33) {
           isDetecting.current = true;
+          const detectStart = telemetryEnabled ? perfTracer.startSpan('hand-detect') : null;
           const result = await HandTracker.detect(videoRef.current);
+          perfTracer.endSpan('hand-detect', detectStart);
           if (result) {
             handResultRef.current = result;
           }
@@ -69,7 +75,7 @@ const App: React.FC = () => {
     }
 
     return () => cancelAnimationFrame(animationId);
-  }, [isInitializing]);
+  }, [isInitializing, telemetryEnabled]);
 
   /**
    * handleDamage
