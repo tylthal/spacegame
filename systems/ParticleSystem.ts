@@ -3,6 +3,7 @@ import { SCENE_CONFIG } from '../config/constants';
 
 // Shared objects to avoid GC
 const _tempColor = new THREE.Color();
+const _tempVec = new THREE.Vector3();
 
 export class ParticleSystem {
     public mesh: THREE.Points;
@@ -140,6 +141,48 @@ export class ParticleSystem {
             this.ages[id] = 1.0; 
             this.decays[id] = 0.04; 
             
+            this.head = (this.head + 1) % this.maxParticles;
+            if (this.count < this.maxParticles) this.count++;
+            else this.tail = (this.tail + 1) % this.maxParticles;
+        }
+    }
+
+    public spawnMuzzleFlash(origin: THREE.Vector3, direction: THREE.Vector3) {
+        const count = 24;
+        _tempColor.setHex(0xfff1c2);
+        const r = _tempColor.r, g = _tempColor.g, b = _tempColor.b;
+
+        const dirX = direction.x;
+        const dirY = direction.y;
+        const dirZ = direction.z;
+
+        for (let i = 0; i < count; i++) {
+            const id = this.head;
+            const i3 = id * 3;
+
+            this.positions[i3] = origin.x;
+            this.positions[i3 + 1] = origin.y;
+            this.positions[i3 + 2] = origin.z;
+
+            const spread = 0.25;
+            const jitterX = (Math.random() - 0.5) * spread;
+            const jitterY = (Math.random() - 0.5) * spread;
+            const jitterZ = (Math.random() - 0.2) * spread;
+
+            _tempVec.set(dirX + jitterX, dirY + jitterY, dirZ + jitterZ).normalize();
+            const speed = 45 + Math.random() * 40;
+
+            this.velocities[i3] = _tempVec.x * speed;
+            this.velocities[i3 + 1] = _tempVec.y * speed;
+            this.velocities[i3 + 2] = _tempVec.z * speed;
+
+            this.colors[i3] = r;
+            this.colors[i3 + 1] = g;
+            this.colors[i3 + 2] = b;
+
+            this.ages[id] = 0.4 + Math.random() * 0.2;
+            this.decays[id] = 0.5 + Math.random() * 0.2;
+
             this.head = (this.head + 1) % this.maxParticles;
             if (this.count < this.maxParticles) this.count++;
             else this.tail = (this.tail + 1) % this.maxParticles;
