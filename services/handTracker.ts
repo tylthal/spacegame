@@ -1,5 +1,11 @@
 import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
+type AssetSource = {
+    label: 'local' | 'cdn';
+    wasmPath: string;
+    modelPath: string;
+};
+
 /**
  * HandTracker Service
  * Static singleton that handles the lifecycle of the MediaPipe HandLandmarker.
@@ -9,6 +15,12 @@ export class HandTracker {
     private static handLandmarker: HandLandmarker | null = null;
     private static delegate: 'GPU' | 'CPU' | null = null;
 
+    private static readonly CDN_ASSETS: AssetSource = {
+        label: 'cdn',
+        wasmPath: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/",
+        modelPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+    };
+
     /**
      * init
      * Fetches WASM assets and initializes the model.
@@ -17,43 +29,131 @@ export class HandTracker {
     static async init() {
         if (this.handLandmarker) return { delegate: this.delegate };
 
-        const wasmPath = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
-        const modelPath = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
-
         let lastError: unknown;
 
-        try {
-            const vision = await FilesetResolver.forVisionTasks(wasmPath);
+        for (const source of this.getAssetSources()) {
+            try {
+                await this.verifyAssetAvailability(source);
+                return await this.initializeWithSource(source);
+            } catch (error) {
+                lastError = error;
+                console.warn(`HandTracker initialization failed using ${source.label} assets:`, error);
+            }
+        }
 
+        this.handLandmarker = null;
+        this.delegate = null;
+        throw lastError ?? new Error('Unknown HandTracker initialization failure');
+    }
+
+    private static getAssetSources(): AssetSource[] {
+        const baseUrl = this.buildAssetPath('mediapipe');
+        return [
+            {
+                label: 'local',
+                wasmPath: this.ensureTrailingSlash(`${baseUrl}/wasm`),
+                modelPath: `${baseUrl}/hand_landmarker.task`
+            },
+            this.CDN_ASSETS
+        ];
+    }
+
+    private static buildAssetPath(path: string) {
+        const base = typeof import.meta.env.BASE_URL === 'string' ? import.meta.env.BASE_URL : './';
+        const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        return `${normalizedBase}${normalizedPath}`;
+    }
+
+    private static ensureTrailingSlash(path: string) {
+        return path.endsWith('/') ? path : `${path}/`;
+    }
+
+    private static async verifyAssetAvailability(source: AssetSource, timeoutMs = 5000) {
+        const assets = [
+            { url: `${source.wasmPath}vision_wasm_internal.wasm`, label: 'WASM core' },
+            { url: source.modelPath, label: 'hand model' }
+        ];
+
+        const results = await Promise.all(
+            assets.map(async ({ url, label }) => {
+                try {
+                    await this.checkUrl(url, timeoutMs);
+                    return { ok: true };
+                } catch (error) {
+                    return { ok: false, label, error };
+                }
+            })
+        );
+
+        const failures = results.filter(result => !result.ok);
+        if (failures.length) {
+            const reasons = failures
+                .map(failure => {
+                    const error = failure.error instanceof Error ? failure.error.message : String(failure.error);
+                    return `${failure.label}: ${error}`;
+                })
+                .join('; ');
+            throw new Error(`Failed to load hand-tracking assets from ${source.label} (${reasons})`);
+        }
+    }
+
+    private static async checkUrl(url: string, timeoutMs: number) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch(url, { method: 'GET', cache: 'no-store', signal: controller.signal });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (error: unknown) {
+            if ((error as Error)?.name === 'AbortError') {
+                throw new Error(`Timeout after ${timeoutMs}ms`);
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
+    private static async initializeWithSource(source: AssetSource) {
+        let lastError: unknown;
+        let vision: Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>;
+        try {
+            vision = await FilesetResolver.forVisionTasks(source.wasmPath);
+        } catch (resolverError) {
+            throw new Error(`Unable to load WASM assets from ${source.label}: ${resolverError instanceof Error ? resolverError.message : String(resolverError)}`);
+        }
+
+        try {
             this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
-                    modelAssetPath: modelPath,
+                    modelAssetPath: source.modelPath,
                     delegate: "GPU"
                 },
                 runningMode: "VIDEO",
                 numHands: 2
             });
             this.delegate = 'GPU';
-            console.log("HandTracker initialized (GPU)");
+            console.log(`HandTracker initialized (GPU) using ${source.label} assets`);
             return { delegate: 'GPU' as const };
         } catch (error) {
             lastError = error;
-            console.warn("HandTracker GPU initialization failed, attempting CPU fallback:", error);
+            console.warn(`HandTracker GPU initialization failed for ${source.label} assets, attempting CPU fallback:`, error);
             try {
-                const vision = await FilesetResolver.forVisionTasks(wasmPath);
                 this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
                     baseOptions: {
-                        modelAssetPath: modelPath,
-                        delegate: "CPU"
+                        modelAssetPath: source.modelPath,
+                        delegate: "CPU",
                     },
                     runningMode: "VIDEO",
                     numHands: 2
                 });
                 this.delegate = 'CPU';
-                console.log("HandTracker initialized (CPU)");
+                console.log(`HandTracker initialized (CPU) using ${source.label} assets`);
                 return { delegate: 'CPU' as const };
             } catch (cpuError) {
-                console.error("Failed to initialize HandTracker (CPU):", cpuError);
+                console.error(`Failed to initialize HandTracker (CPU) with ${source.label} assets:`, cpuError);
                 // Log detailed error for debugging
                 if (cpuError instanceof Error) {
                      console.error(cpuError.message, cpuError.stack);
@@ -61,12 +161,9 @@ export class HandTracker {
                      console.error(JSON.stringify(cpuError));
                 }
                 lastError = cpuError;
+                throw lastError;
             }
         }
-
-        this.handLandmarker = null;
-        this.delegate = null;
-        throw lastError ?? new Error('Unknown HandTracker initialization failure');
     }
 
     /**
