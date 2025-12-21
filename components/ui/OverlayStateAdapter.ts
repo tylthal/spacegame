@@ -3,6 +3,12 @@ import { GamePhase, TrackingStatus } from '../../types';
 import { HelpState } from '../../systems/PhaseManager';
 import { WeaponStatus } from '../../systems/WeaponController';
 
+export interface CalibrationStatus {
+  stalled: boolean;
+  cameraReady?: boolean;
+  fallbackCta?: boolean;
+}
+
 export interface OverlayState {
   phase: GamePhase;
   score: number;
@@ -10,6 +16,7 @@ export interface OverlayState {
   trackingStatus: TrackingStatus;
   weaponStatus: WeaponStatus;
   helpState?: HelpState;
+  calibrationStatus?: CalibrationStatus;
 }
 
 const cloneState = (state: OverlayState): OverlayState => ({
@@ -17,6 +24,7 @@ const cloneState = (state: OverlayState): OverlayState => ({
   trackingStatus: { ...state.trackingStatus },
   weaponStatus: { ...state.weaponStatus },
   helpState: state.helpState ? { ...state.helpState } : undefined,
+  calibrationStatus: state.calibrationStatus ? { ...state.calibrationStatus } : undefined,
 });
 
 const isEqual = (a: OverlayState, b: OverlayState) =>
@@ -29,6 +37,12 @@ const isEqual = (a: OverlayState, b: OverlayState) =>
   a.weaponStatus.heat === b.weaponStatus.heat &&
   a.weaponStatus.isOverheated === b.weaponStatus.isOverheated &&
   a.weaponStatus.missileProgress === b.weaponStatus.missileProgress &&
+  ((!a.calibrationStatus && !b.calibrationStatus) ||
+    (!!a.calibrationStatus &&
+      !!b.calibrationStatus &&
+      a.calibrationStatus.stalled === b.calibrationStatus.stalled &&
+      a.calibrationStatus.cameraReady === b.calibrationStatus.cameraReady &&
+      a.calibrationStatus.fallbackCta === b.calibrationStatus.fallbackCta)) &&
   ((!a.helpState && !b.helpState) ||
     (!!a.helpState && !!b.helpState &&
       a.helpState.page === b.helpState.page &&

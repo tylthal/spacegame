@@ -42,6 +42,7 @@ interface Props {
   hull: number;
   lives: number;
   handTrackingEnabled: boolean;
+  cameraPermissionGranted: boolean;
 }
 
 // Memory Optimization Globals - Pooled strictly to avoid GC and per-frame allocations
@@ -57,7 +58,17 @@ const _menuZVec = new THREE.Vector3(0, 0, 1);
 const _forward = new THREE.Vector3(0, 0, -1);
 const _right = new THREE.Vector3(1, 0, 0);
 
-const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, onReset, score, hull, lives, handTrackingEnabled }) => {
+const GameScene: React.FC<Props> = ({
+  handResultRef,
+  onScoreUpdate,
+  onDamage,
+  onReset,
+  score,
+  hull,
+  lives,
+  handTrackingEnabled,
+  cameraPermissionGranted,
+}) => {
   const mountRef = useRef<HTMLDivElement>(null);
   
   const enemiesRef = useRef<EnemyData[]>([]);
@@ -78,6 +89,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     trackingStatus: { aimer: handTrackingEnabled, trigger: handTrackingEnabled, health: handTrackingEnabled ? 0 : 1 },
     weaponStatus: weaponStatusRef.current,
     helpState: { page: 0, enemyIndex: 0 },
+    calibrationStatus: { stalled: false, cameraReady: cameraPermissionGranted, fallbackCta: false },
   });
 
   const phaseManagerRef = useRef<PhaseManager | null>(null);
@@ -90,7 +102,19 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     overlayStateRef.current.score = score;
   }, [hull, lives, score]);
 
+  useEffect(() => {
+    const currentStatus = overlayStateRef.current.calibrationStatus || {
+      stalled: false,
+      fallbackCta: false,
+    };
+    overlayStateRef.current.calibrationStatus = {
+      ...currentStatus,
+      cameraReady: cameraPermissionGranted,
+    };
+  }, [cameraPermissionGranted]);
+
   const benchmarkModeEnabled = isDevFeatureEnabled('benchmark');
+  const noGestureDevBypass = isDevFeatureEnabled('nogestures');
 
   const overlayState = useOverlayStateAdapter(overlayStateRef, 90);
 
@@ -115,10 +139,10 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   });
   const shakeRef = useRef(0);
   const pauseGestureCooldown = useRef(0);
+  const CALIBRATION_STALL_MS = 6000;
+  const CALIBRATION_AUTO_READY_MS = 9000;
 
   useEffect(() => {
-    if (handTrackingEnabled) return;
-
     const updatePointer = (x: number, y: number) => {
       const nx = Math.min(1, Math.max(0, x / window.innerWidth));
       const ny = Math.min(1, Math.max(0, y / window.innerHeight));
@@ -174,12 +198,13 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
         fireMissile: false,
       };
     };
-  }, [handTrackingEnabled]);
+  }, []);
 
   // Scene bootstrap: one-time construction of renderer, systems, and the animation loop
   useEffect(() => {
     overlayStateRef.current.phase = initialPhase;
     overlayStateRef.current.calibrationProgress = 0;
+    calibrationStartRef.current = performance.now();
 
     if (!mountRef.current) return;
     const lifecycle = new ResourceLifecycle();
@@ -378,7 +403,19 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
       },
       onTransition: phase => {
         resetTransientObjects();
-        if (phase === 'CALIBRATING') overlayStateRef.current.calibrationProgress = 0;
+        if (phase === 'CALIBRATING') {
+          overlayStateRef.current.calibrationProgress = 0;
+          calibrationServiceRef.current.resetHold();
+          calibrationStartRef.current = performance.now();
+          lastLandmarkTimeRef.current = null;
+          fallbackReadyTriggeredRef.current = false;
+          overlayStateRef.current.calibrationStatus = {
+            stalled: false,
+            fallbackCta: false,
+            cameraReady: cameraPermissionGranted,
+          };
+          if (!manualGestureBypassRef.current) manualGestureBypassRef.current = noGestureDevBypass;
+        }
       },
       phaseHandlers: {
         CALIBRATING: () => { clearEnemies(); resetWeapons(); },
@@ -416,11 +453,23 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
     const handleInputStage = ({ now }: FrameContext) => {
       const calibrationPoint = calibrationServiceRef.current.getCalibrationPoint();
-      const snapshot = handTrackingEnabled
+      const handSnapshot = handTrackingEnabled
         ? inputProcessorRef.current.processFrame(handResultRef.current, calibrationPoint, now)
-        : buildFallbackSnapshot();
-      inputSnapshotRef.current = snapshot;
-      overlayStateRef.current.trackingStatus = snapshot.tracking;
+        : null;
+
+      if (
+        handSnapshot?.tracking &&
+        (handSnapshot.tracking.aimer || handSnapshot.tracking.trigger || handSnapshot.tracking.health > 0)
+      ) {
+        lastLandmarkTimeRef.current = now;
+      }
+
+      const shouldBypassGestures = manualGestureBypassRef.current || noGestureDevBypass;
+      const shouldUseFallback = !handTrackingEnabled || shouldBypassGestures || !handSnapshot?.gestures?.tip;
+      const snapshot = shouldUseFallback ? buildFallbackSnapshot() : handSnapshot;
+
+      inputSnapshotRef.current = snapshot || buildFallbackSnapshot();
+      overlayStateRef.current.trackingStatus = handSnapshot?.tracking || snapshot?.tracking || overlayStateRef.current.trackingStatus;
     };
 
     const handleParticleStage = ({ timeScale }: FrameContext) => {
@@ -606,8 +655,27 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
       missilePool.update(timeScale, now, shouldDetonate, detonateMissile);
 
-      if (handTrackingEnabled && currentPhase === 'CALIBRATING') {
-          if (gestures && aimData) {
+      if (currentPhase === 'CALIBRATING') {
+          const lastSeen = lastLandmarkTimeRef.current ?? calibrationStartRef.current ?? now;
+          const timeSinceLandmark = now - lastSeen;
+          const stalled = cameraPermissionGranted && timeSinceLandmark > CALIBRATION_STALL_MS;
+          overlayStateRef.current.calibrationStatus = {
+            stalled,
+            fallbackCta: stalled,
+            cameraReady: cameraPermissionGranted,
+          };
+
+          if (
+            cameraPermissionGranted &&
+            timeSinceLandmark > CALIBRATION_AUTO_READY_MS &&
+            !fallbackReadyTriggeredRef.current
+          ) {
+            fallbackReadyTriggeredRef.current = true;
+            manualGestureBypassRef.current = true;
+            transitionPhase('READY');
+          }
+
+          if (handTrackingEnabled && !manualGestureBypassRef.current && gestures && aimData) {
               const { progress, completed } = calibrationServiceRef.current.update(gestures.pinch, aimData.tip, now);
               overlayStateRef.current.calibrationProgress = progress;
               if (completed) transitionPhase('READY');
@@ -617,6 +685,11 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
           }
       } else {
           calibrationServiceRef.current.resetHold();
+          overlayStateRef.current.calibrationStatus = {
+            stalled: false,
+            fallbackCta: false,
+            cameraReady: cameraPermissionGranted,
+          };
       }
 
       if (gestures) {
@@ -701,12 +774,25 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     loop.start();
 
     return () => lifecycle.disposeAll();
-  }, [benchmarkModeEnabled, handTrackingEnabled]);
+  }, [benchmarkModeEnabled, handTrackingEnabled, cameraPermissionGranted, noGestureDevBypass]);
+
+  const handleStartWithoutTracking = () => {
+    manualGestureBypassRef.current = true;
+    fallbackReadyTriggeredRef.current = true;
+    calibrationServiceRef.current.resetHold();
+    overlayStateRef.current.calibrationStatus = {
+      stalled: false,
+      fallbackCta: false,
+      cameraReady: cameraPermissionGranted,
+    };
+    overlayStateRef.current.calibrationProgress = 0;
+    phaseManagerRef.current?.transitionTo('READY');
+  };
 
   return (
     <div className="relative w-full h-full">
       <div ref={mountRef} className="w-full h-full" />
-      <SceneOverlays {...overlayState} />
+      <SceneOverlays {...overlayState} onStartWithoutTracking={handleStartWithoutTracking} />
     </div>
   );
 };
