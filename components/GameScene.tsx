@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { GamePhase, EnemyData, BulletData, MissileData } from '../types';
+import { GamePhase, EnemyData, MissileData } from '../types';
 import SceneOverlays from './SceneOverlays';
-import { DIFFICULTY, WEAPON, MISSILE, SCENE_CONFIG, BULLET_SPEED, BULLET_LIFESPAN } from '../config/constants';
+import { DIFFICULTY, MISSILE, SCENE_CONFIG, BULLET_SPEED } from '../config/constants';
 import { AssetManager } from '../systems/AssetManager';
 import { ParticleSystem } from '../systems/ParticleSystem';
 import { InputProcessor } from '../systems/InputProcessor';
@@ -10,6 +10,9 @@ import { EnemyFactory } from '../systems/EnemyFactory';
 import { GameLoop, FrameContext } from '../systems/GameLoop';
 import { SceneComposer } from '../systems/SceneComposer';
 import { PhaseManager } from '../systems/PhaseManager';
+import { WeaponController } from '../systems/WeaponController';
+import { BulletPool } from '../systems/BulletPool';
+import { MissilePool } from '../systems/MissilePool';
 
 /**
  * GameScene
@@ -42,7 +45,6 @@ const _v3 = new THREE.Vector3();
 const _v4 = new THREE.Vector3();
 const _q1 = new THREE.Quaternion();
 const _euler = new THREE.Euler();
-const _bulletSeg = new THREE.Line3();
 const _closestPt = new THREE.Vector3();
 const _targetPos = new THREE.Vector3();
 const _menuZVec = new THREE.Vector3(0, 0, 1);
@@ -52,24 +54,22 @@ const _right = new THREE.Vector3(1, 0, 0);
 // PERFORMANCE MONITORING FLAG
 const DEBUG_PERF = true;
 
-interface PooledBullet extends BulletData {
-    active: boolean;
-}
-
 const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, onReset, score, hull, lives }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   
   const enemiesRef = useRef<EnemyData[]>([]);
   // Pool for EnemyData objects to avoid creating JS objects every spawn
-  const enemyDataPoolRef = useRef<EnemyData[]>([]); 
+  const enemyDataPoolRef = useRef<EnemyData[]>([]);
 
-  const bulletPoolRef = useRef<PooledBullet[]>([]); 
-  const missilesRef = useRef<MissileData[]>([]);
+  const bulletPoolRef = useRef<BulletPool | null>(null);
+  const missilePoolRef = useRef<MissilePool | null>(null);
+  const weaponControllerRef = useRef<WeaponController | null>(null);
   
   const [phase, setPhase] = useState<GamePhase>('CALIBRATING');
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [trackingStatus, setTrackingStatus] = useState({ aimer: false, trigger: false });
   const [weaponStatus, setWeaponStatus] = useState({ heat: 0, isOverheated: false, missileProgress: 1.0 });
+  const weaponStatusRef = useRef({ heat: 0, isOverheated: false, missileProgress: 1.0 });
   const [helpState, setHelpState] = useState({ page: 0, enemyIndex: 0 });
 
   const phaseManagerRef = useRef<PhaseManager | null>(null);
@@ -87,16 +87,6 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const handInputRef = useRef<{ aimer: any; trigger: any } | null>(null);
 
   const calibrationPoint = useRef({ x: 0.5, y: 0.5 });
-  const fireCooldownRef = useRef(0);
-  const missileCooldownRef = useRef(0);
-  const heatRef = useRef(0);
-  const isOverheatedRef = useRef(false);
-  const overheatUnlockRef = useRef(0);
-  const lastHeatUpdateRef = useRef(0);
-  const lastMissileProgressRef = useRef(1.0);
-  const missileIdCounter = useRef(0);
-
-  const recoilRef = useRef(0);
   const shakeRef = useRef(0);
   const pauseGestureCooldown = useRef(0);
 
@@ -112,6 +102,10 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
     const particles = new ParticleSystem(scene);
     particleSystemRef.current = particles;
+
+    const weaponController = new WeaponController();
+    weaponController.reset(performance.now());
+    weaponControllerRef.current = weaponController;
 
     const startTargetObj = targets.startTarget;
     const restartTargetObj = targets.pauseTargets.restart;
@@ -169,25 +163,17 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
         }
     };
 
-    const spawnBullet = (pos: THREE.Vector3, quat: THREE.Quaternion, vel: THREE.Vector3, now: number) => {
-        let bullet = bulletPoolRef.current.find(b => !b.active);
-        if (!bullet) {
-            const mesh = new THREE.Mesh(assets.assets.geos.bullet, assets.assets.mats.bullet);
-            // Manual Matrix Update optimization for linear projectiles
-            mesh.matrixAutoUpdate = false; 
-            scene.add(mesh);
-            bullet = { mesh, velocity: new THREE.Vector3(), startTime: 0, prevPosition: new THREE.Vector3(), active: true };
-            bulletPoolRef.current.push(bullet);
-        }
-        bullet.active = true;
-        bullet.mesh.visible = true;
-        bullet.mesh.position.copy(pos);
-        bullet.mesh.quaternion.copy(quat);
-        bullet.mesh.updateMatrix(); // Initial update
-        bullet.velocity.copy(vel);
-        bullet.startTime = now;
-        bullet.prevPosition.copy(pos);
-    };
+    bulletPoolRef.current = new BulletPool({
+      scene,
+      geometry: assets.assets.geos.bullet,
+      material: assets.assets.mats.bullet,
+    });
+
+    missilePoolRef.current = new MissilePool({
+      scene,
+      geometry: assets.assets.geos.missile,
+      material: assets.assets.mats.missile,
+    });
 
     const removeEnemy = (index: number) => {
         const e = enemiesRef.current[index];
@@ -273,15 +259,17 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     const menuPlane = new THREE.Plane(_menuZVec, -SCENE_CONFIG.MENU_Z);
 
     const resetWeapons = () => {
-      heatRef.current = 0;
-      isOverheatedRef.current = false;
-      setWeaponStatus({ heat: 0, isOverheated: false, missileProgress: 1.0 });
+      const controller = weaponControllerRef.current;
+      if (!controller) return;
+      controller.reset(performance.now());
+      const status = controller.getStatus();
+      weaponStatusRef.current = status;
+      setWeaponStatus(status);
     };
 
     const resetTransientObjects = () => {
-      bulletPoolRef.current.forEach(b => { b.active = false; b.mesh.visible = false; });
-      missilesRef.current.forEach(m => scene.remove(m.mesh));
-      missilesRef.current = [];
+      bulletPoolRef.current?.reset();
+      missilePoolRef.current?.reset();
     };
 
     const phaseManager = new PhaseManager({
@@ -319,28 +307,35 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
       const phaseManager = phaseManagerRef.current;
       const currentPhase = phaseManager?.getPhase() ?? 'CALIBRATING';
+      const weaponController = weaponControllerRef.current;
+      const bulletPool = bulletPoolRef.current;
+      const missilePool = missilePoolRef.current;
+
+      if (!weaponController || !bulletPool || !missilePool) return;
 
       if (currentPhase === 'PLAYING') totalPlayTimeRef.current += deltaMs;
       const playTimeSeconds = totalPlayTimeRef.current / 1000;
-      const dtSeconds = deltaMs / 1000;
 
-      if (isOverheatedRef.current) { if (now > overheatUnlockRef.current) { isOverheatedRef.current = false; heatRef.current = 0; } }
-      else if (heatRef.current > 0) { heatRef.current = Math.max(0, heatRef.current - (WEAPON.COOLING_RATE * dtSeconds)); }
-
-      const missileProgress = Math.min(1.0, (now - missileCooldownRef.current) / MISSILE.COOLDOWN_MS);
-      if (Math.abs(heatRef.current - lastHeatUpdateRef.current) > 1.0 || isOverheatedRef.current !== (heatRef.current >= WEAPON.MAX_HEAT) || Math.abs(missileProgress - lastMissileProgressRef.current) > 0.01) {
-         setWeaponStatus({ heat: heatRef.current, isOverheated: isOverheatedRef.current, missileProgress });
-         lastHeatUpdateRef.current = heatRef.current; lastMissileProgressRef.current = missileProgress;
+      weaponController.update(deltaMs, now);
+      const status = weaponController.getStatus();
+      const prevStatus = weaponStatusRef.current;
+      if (
+        Math.abs(prevStatus.heat - status.heat) > 1.0 ||
+        prevStatus.isOverheated !== status.isOverheated ||
+        Math.abs(prevStatus.missileProgress - status.missileProgress) > 0.01
+      ) {
+        weaponStatusRef.current = status;
+        setWeaponStatus(status);
       }
 
-      recoilRef.current *= 0.85; shakeRef.current *= 0.9;
+      shakeRef.current *= 0.9;
       const currentCamZ = camera.position.z;
       camera.position.set(
-          (Math.random()-0.5)*shakeRef.current,
-          (Math.random()-0.5)*shakeRef.current,
-          currentCamZ
+        (Math.random() - 0.5) * shakeRef.current,
+        (Math.random() - 0.5) * shakeRef.current,
+        currentCamZ,
       );
-      gunPivot.position.z = recoilRef.current;
+      gunPivot.position.z = weaponController.getRecoilOffset();
 
       if (propsRef.current.lives === 0 && currentPhase !== 'GAMEOVER') transitionPhase('GAMEOVER');
 
@@ -403,91 +398,85 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
               }
           }
       }
-
-      for (let i = 0; i < bulletPoolRef.current.length; i++) {
-        const b = bulletPoolRef.current[i];
-        if (!b.active) continue;
-        b.prevPosition.copy(b.mesh.position);
-        b.mesh.position.addScaledVector(b.velocity, timeScale);
-        b.mesh.updateMatrix();
-
-        _bulletSeg.set(b.prevPosition, b.mesh.position);
+      const handleBulletCollision = (segment: THREE.Line3) => {
         let hit = false;
 
         const attemptTransition = (next: GamePhase) => {
-            const manager = phaseManagerRef.current;
-            return manager ? manager.transitionTo(next) : false;
+          const manager = phaseManagerRef.current;
+          return manager ? manager.transitionTo(next) : false;
         };
 
         const checkTarget = (obj: any, next: GamePhase, resetScore = false, action?: () => void) => {
-            _v3.setFromMatrixPosition(obj.group.matrixWorld);
-            _bulletSeg.closestPointToPoint(_v3, true, _closestPt);
-            if (_closestPt.distanceTo(_v3) < obj.radius) {
-                particles.spawnImpact(_v3, 0x00ffff);
-                const transitioned = action ? (action(), true) : attemptTransition(next);
-                if (transitioned && resetScore) onReset();
-                hit = true;
-            }
+          _v3.setFromMatrixPosition(obj.group.matrixWorld);
+          segment.closestPointToPoint(_v3, true, _closestPt);
+          if (_closestPt.distanceTo(_v3) < obj.radius) {
+            particles.spawnImpact(_v3, 0x00ffff);
+            const transitioned = action ? (action(), true) : attemptTransition(next);
+            if (transitioned && resetScore) onReset();
+            hit = true;
+          }
         };
 
         if (currentPhase === 'READY') checkTarget(startTargetObj, 'PLAYING');
         if (currentPhase === 'GAMEOVER') checkTarget(rebootTargetObj, 'READY', true);
         if (currentPhase === 'PAUSED') {
-            checkTarget(resumeTargetObj, 'PLAYING');
-            if(!hit) checkTarget(restartTargetObj, 'READY', true);
-            if(!hit) checkTarget(recalibrateTargetObj, 'CALIBRATING');
-            if(!hit) checkTarget(intelTargetObj, 'HELP');
+          checkTarget(resumeTargetObj, 'PLAYING');
+          if (!hit) checkTarget(restartTargetObj, 'READY', true);
+          if (!hit) checkTarget(recalibrateTargetObj, 'CALIBRATING');
+          if (!hit) checkTarget(intelTargetObj, 'HELP');
         }
         if (currentPhase === 'HELP') {
-            checkTarget(helpReturnTargetObj, 'PAUSED');
-            if (!hit && phaseManager) checkTarget(helpNextPageTargetObj, 'HELP', false, () => { phaseManager.toggleHelpPage(); });
-            if (!hit && phaseManager?.getHelpState().page === 1) checkTarget(helpCycleEnemyTargetObj, 'HELP', false, () => { phaseManager.cycleHelpEnemy(DIFFICULTY.ENEMIES.length); });
+          checkTarget(helpReturnTargetObj, 'PAUSED');
+          if (!hit && phaseManager) checkTarget(helpNextPageTargetObj, 'HELP', false, () => { phaseManager.toggleHelpPage(); });
+          if (!hit && phaseManager?.getHelpState().page === 1) {
+            checkTarget(helpCycleEnemyTargetObj, 'HELP', false, () => {
+              phaseManager.cycleHelpEnemy(DIFFICULTY.ENEMIES.length);
+            });
+          }
         }
 
         if (currentPhase === 'PLAYING' && !hit) {
-            for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
-                const e = enemiesRef.current[j];
-                if (Math.abs(e.mesh.position.z - b.mesh.position.z) > 100) continue;
-                _targetPos.copy(e.mesh.position);
-                _bulletSeg.closestPointToPoint(_targetPos, true, _closestPt);
-                if (_closestPt.distanceTo(_targetPos) < e.hitRadius) {
-                    e.hp--;
-                    if (e.hp <= 0) {
-                        onScoreUpdate(e.points);
-                        spawnExplosion(_targetPos, false, e.type);
-                        removeEnemy(j);
-                    }
-                    else { particles.spawnImpact(_targetPos, 0x00ffff, 15, 5); updateEnemyHealth(e); }
-                    hit = true; break;
-                }
+          for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
+            const e = enemiesRef.current[j];
+            if (Math.abs(e.mesh.position.z - segment.end.z) > 100) continue;
+            _targetPos.copy(e.mesh.position);
+            segment.closestPointToPoint(_targetPos, true, _closestPt);
+            if (_closestPt.distanceTo(_targetPos) < e.hitRadius) {
+              e.hp--;
+              if (e.hp <= 0) {
+                onScoreUpdate(e.points);
+                spawnExplosion(_targetPos, false, e.type);
+                removeEnemy(j);
+              } else { particles.spawnImpact(_targetPos, 0x00ffff, 15, 5); updateEnemyHealth(e); }
+              hit = true; break;
             }
+          }
         }
-        if (hit || (now - b.startTime > BULLET_LIFESPAN)) { b.active = false; b.mesh.visible = false; }
-      }
+        return hit;
+      };
 
-      for (let i = missilesRef.current.length - 1; i >= 0; i--) {
-        const m = missilesRef.current[i];
-        m.mesh.position.addScaledVector(m.velocity, timeScale);
-        let detonate = false;
-        const mp = m.mesh.position;
-        for (const e of enemiesRef.current) { if (mp.distanceTo(e.mesh.position) < MISSILE.PROXIMITY_RADIUS) { detonate = true; break; } }
-        if (now - m.startTime > MISSILE.LIFESPAN_MS) detonate = true;
-        if (detonate) {
-           spawnExplosion(mp, true, 'STANDARD');
-           for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
-               const e = enemiesRef.current[j];
-               if (mp.distanceTo(e.mesh.position) < MISSILE.BLAST_RADIUS) {
-                   e.hp -= MISSILE.DAMAGE;
-                   if (e.hp <= 0) {
-                       onScoreUpdate(e.points); spawnExplosion(e.mesh.position, false, e.type);
-                       removeEnemy(j);
-                   }
-                   else updateEnemyHealth(e);
-               }
-           }
-           scene.remove(m.mesh); missilesRef.current.splice(i, 1);
-        } else m.mesh.rotateZ(0.2 * timeScale);
-      }
+      bulletPool.update(timeScale, now, handleBulletCollision);
+
+      const shouldDetonate = (missile: MissileData) => {
+        const mp = missile.mesh.position;
+        for (const e of enemiesRef.current) { if (mp.distanceTo(e.mesh.position) < MISSILE.PROXIMITY_RADIUS) return true; }
+        return false;
+      };
+
+      const detonateMissile = (missile: MissileData) => {
+        const mp = missile.mesh.position;
+        spawnExplosion(mp, true, 'STANDARD');
+        for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
+          const e = enemiesRef.current[j];
+          if (mp.distanceTo(e.mesh.position) < MISSILE.BLAST_RADIUS) {
+            e.hp -= MISSILE.DAMAGE;
+            if (e.hp <= 0) { onScoreUpdate(e.points); spawnExplosion(e.mesh.position, false, e.type); removeEnemy(j); }
+            else updateEnemyHealth(e);
+          }
+        }
+      };
+
+      missilePool.update(timeScale, now, shouldDetonate, detonateMissile);
 
       if (aimer) {
           const { isPauseGesture, isPinching, isFist, tip } = inputProcessorRef.current.detectGestures(aimer, trigger);
@@ -501,24 +490,20 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
                   if (completed) { calibrationPoint.current = { x: tip.x, y: tip.y }; transitionPhase('READY'); }
               }
               if (currentPhase !== 'CALIBRATING') {
-                  if (isFist && now - missileCooldownRef.current > MISSILE.COOLDOWN_MS) {
-                      missileCooldownRef.current = now; recoilRef.current = 25.0;
+                  if (isFist && weaponController.canFireMissile(now)) {
+                      weaponController.recordMissileFire(now);
                       gunPivot.getWorldQuaternion(_q1); _v1.setFromMatrixPosition(muzzle.matrixWorld); _v2.copy(_forward).applyQuaternion(_q1);
-                      const m = new THREE.Mesh(assets.assets.geos.missile, assets.assets.mats.missile);
-                      m.position.copy(_v1); m.quaternion.copy(_q1); scene.add(m);
-                      missilesRef.current.push({ mesh: m, velocity: _v2.clone().multiplyScalar(MISSILE.SPEED), startTime: now, id: missileIdCounter.current++ });
-                      particles.spawnImpact(m.position, 0xff8800, 120, 20, 0.035);
-                      setWeaponStatus({ heat: heatRef.current, isOverheated: isOverheatedRef.current, missileProgress: 0 });
+                      missilePool.spawn(_v1, _q1, _v2.clone().multiplyScalar(MISSILE.SPEED), now);
+                      particles.spawnImpact(_v1, 0xff8800, 120, 20, 0.035);
+                      const updatedStatus = weaponController.getStatus();
+                      weaponStatusRef.current = updatedStatus;
+                      setWeaponStatus(updatedStatus);
                   }
-                  if (now > fireCooldownRef.current && !isOverheatedRef.current) {
-                      heatRef.current = Math.min(WEAPON.MAX_HEAT, heatRef.current + WEAPON.HEAT_PER_SHOT);
-                      if (heatRef.current >= WEAPON.MAX_HEAT) { isOverheatedRef.current = true; overheatUnlockRef.current = now + WEAPON.OVERHEAT_DURATION_MS; }
+                  if (weaponController.canFirePrimary(now)) {
+                      weaponController.recordPrimaryFire(now);
 
                       const jitterX = (Math.random() - 0.5) * 0.005;
                       const jitterY = (Math.random() - 0.5) * 0.005;
-                      fireCooldownRef.current = now + (1000 / WEAPON.FIRE_RATE);
-
-                      recoilRef.current += 3.0 + (heatRef.current / WEAPON.MAX_HEAT) * 5.0;
 
                       raycaster.setFromCamera({ x: (tip.x - calibrationPoint.current.x) * 1.3 + jitterX, y: (tip.y - calibrationPoint.current.y) * 1.1 + jitterY }, camera);
                       raycaster.ray.at(200, _v1);
@@ -530,9 +515,12 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
                       raycaster.ray.direction.normalize();
                       raycaster.ray.at(1000, _v3);
 
-                      spawnBullet(_v2, raycaster.ray.quaternion(), _v3.sub(_v2).normalize().multiplyScalar(BULLET_SPEED), now);
+                      bulletPool.spawn(_v2, raycaster.ray.quaternion(), _v3.sub(_v2).normalize().multiplyScalar(BULLET_SPEED), now);
 
                       particles.spawnMuzzleFlash(_v2, raycaster.ray.direction);
+                      const updatedStatus = weaponController.getStatus();
+                      weaponStatusRef.current = updatedStatus;
+                      setWeaponStatus(updatedStatus);
                   }
               }
           }
