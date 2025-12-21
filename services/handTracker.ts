@@ -1,25 +1,19 @@
 import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
-type AssetSource = {
-    label: 'local' | 'cdn';
-    wasmPath: string;
-    modelPath: string;
-};
-
 /**
  * HandTracker Service
  * Static singleton that handles the lifecycle of the MediaPipe HandLandmarker.
  * Configured for dual-hand GPU tracking in VIDEO mode.
  */
+type AssetSource = {
+    label: 'cdn';
+    wasmPath: string;
+    modelPath: string;
+};
+
 export class HandTracker {
     private static handLandmarker: HandLandmarker | null = null;
     private static delegate: 'GPU' | 'CPU' | null = null;
-
-    private static readonly CDN_ASSETS: AssetSource = {
-        label: 'cdn',
-        wasmPath: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm",
-        modelPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-    };
 
     /**
      * init
@@ -29,44 +23,23 @@ export class HandTracker {
     static async init() {
         if (this.handLandmarker) return { delegate: this.delegate };
 
-        let lastError: unknown;
-
-        for (const source of this.getAssetSources()) {
-            try {
-                await this.verifyAssetAvailability(source);
-                return await this.initializeWithSource(source);
-            } catch (error) {
-                lastError = error;
-                console.warn(`HandTracker initialization failed using ${source.label} assets:`, error);
-            }
+        try {
+            const source = this.getCdnAssetSource();
+            await this.verifyAssetAvailability(source);
+            return await this.initializeWithSource(source);
+        } catch (error) {
+            this.handLandmarker = null;
+            this.delegate = null;
+            throw error;
         }
-
-        this.handLandmarker = null;
-        this.delegate = null;
-        throw lastError ?? new Error('Unknown HandTracker initialization failure');
     }
 
-    private static getAssetSources(): AssetSource[] {
-        const baseUrl = this.buildAssetPath('mediapipe');
-        const wasmPath = this.ensureTrailingSlash(`${baseUrl}/wasm`);
-        return [
-            {
-                label: 'local',
-                wasmPath,
-                modelPath: `${baseUrl}/hand_landmarker.task`
-            },
-            {
-                ...this.CDN_ASSETS,
-                wasmPath: this.ensureTrailingSlash(this.CDN_ASSETS.wasmPath)
-            }
-        ];
-    }
-
-    private static buildAssetPath(path: string) {
-        const base = typeof import.meta.env.BASE_URL === 'string' ? import.meta.env.BASE_URL : './';
-        const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
-        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-        return `${normalizedBase}${normalizedPath}`;
+    private static getCdnAssetSource() {
+        return {
+            label: 'cdn',
+            wasmPath: this.ensureTrailingSlash("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"),
+            modelPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+        };
     }
 
     private static ensureTrailingSlash(path: string) {
