@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Orbital Sniper Favicon</title>
+  <desc id="desc">Stylized planet with an orbiting satellite</desc>
+  <defs>
+    <linearGradient id="planet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5b8def" />
+      <stop offset="100%" stop-color="#0b1d4d" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#050915" />
+  <circle cx="32" cy="34" r="18" fill="url(#planet)" />
+  <ellipse cx="32" cy="34" rx="20" ry="10" fill="none" stroke="#9ae5ff" stroke-width="3" />
+  <circle cx="48" cy="28" r="5" fill="#ffde59" stroke="#f0b400" stroke-width="2" />
+  <circle cx="25" cy="30" r="3" fill="#ffffff" opacity="0.8" />
+</svg>
