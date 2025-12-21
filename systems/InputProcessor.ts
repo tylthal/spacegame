@@ -2,6 +2,13 @@ import * as THREE from 'three';
 import { OneEuroFilter } from '../utils/filters';
 import { AIM, PINCH_THRESHOLD, MISSILE } from '../config/constants';
 
+/**
+ * InputProcessor
+ * --------------
+ * Pure utility for translating MediaPipe landmarks into smoothed aim rotations and gesture flags.
+ * The heavy lifting (filtering, gesture thresholds) happens here so the render loop can stay lean.
+ */
+
 // Pooled result objects to prevent Garbage Collection churn
 const _gestureResult = {
     isPauseGesture: false,
@@ -21,6 +28,10 @@ export class InputProcessor {
         this.smoothedRotation = new THREE.Euler(0, 0, 0);
     }
 
+    /**
+     * Extract the right/left hand landmarks out of the MediaPipe result.
+     * Returns nulls if the hand is not present to keep downstream logic simple.
+     */
     public getHandData(result: any) {
         const landmarks = result?.landmarks || [];
         const handednesses = result?.handednesses || [];
@@ -35,6 +46,12 @@ export class InputProcessor {
         return { aimer, trigger };
     }
 
+    /**
+     * Convert raw landmarks into actionable gesture flags used by the game loop.
+     * - Pause gesture: right hand open palm (ignores edge cases near the frame border)
+     * - Pinch: thumb/index proximity below PINCH_THRESHOLD
+     * - Fist: average distance of fingertips to wrist below MISSILE.FIST_THRESHOLD
+     */
     public detectGestures(aimer: any, trigger: any) {
         // Reset pooled result
         _gestureResult.isPauseGesture = false;
@@ -76,6 +93,11 @@ export class InputProcessor {
         return _gestureResult;
     }
 
+    /**
+     * Convert a single fingertip landmark into a smoothed camera rotation.
+     * Applies the virtual mousepad model (sensitivity + tanh soft clamp), then runs the
+     * OneEuroFilter and dynamic lerp to avoid overshooting on sudden flicks.
+     */
     public calculateRotation(tip: any, calibrationPoint: {x: number, y: number}, now: number, target: THREE.Euler): void {
         const rawDx = (tip.x - calibrationPoint.x);
         const rawDy = (tip.y - calibrationPoint.y);

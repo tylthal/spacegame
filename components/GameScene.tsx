@@ -8,6 +8,20 @@ import { ParticleSystem } from '../systems/ParticleSystem';
 import { InputProcessor } from '../systems/InputProcessor';
 import { EnemyFactory } from '../systems/EnemyFactory';
 
+/**
+ * GameScene
+ * ---------
+ * Imperative orchestrator that owns the Three.js scene, render loop, and the high-frequency
+ * game simulation. React passes low-frequency state (score, hull, lives) while everything
+ * time-critical (hand tracking, particles, physics) lives in refs to avoid reconciliation cost.
+ *
+ * Frame anatomy (60fps target):
+ * 1) Interpret latest MediaPipe results via InputProcessor.
+ * 2) Advance pooled particle buffers and weapon/enemy simulation.
+ * 3) Update reticle/laser and interactive menu targets.
+ * 4) Render the Three.js scene, then sync overlay state back to React.
+ */
+
 interface Props {
   handResultRef: React.RefObject<any>;
   onScoreUpdate: (points: number) => void;
@@ -18,7 +32,7 @@ interface Props {
   lives: number;
 }
 
-// Memory Optimization Globals - Pooled strictly to avoid GC
+// Memory Optimization Globals - Pooled strictly to avoid GC and per-frame allocations
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
@@ -33,7 +47,7 @@ const _forward = new THREE.Vector3(0, 0, -1);
 const _right = new THREE.Vector3(1, 0, 0);
 
 // PERFORMANCE MONITORING FLAG
-const DEBUG_PERF = true; 
+const DEBUG_PERF = true;
 
 interface PooledBullet extends BulletData {
     active: boolean;
@@ -100,6 +114,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const helpEnemyIndexRef = useRef(0);
   const helpShowcaseRef = useRef<THREE.Group | null>(null);
 
+  // Scene bootstrap: one-time construction of renderer, systems, and the animation loop
   useEffect(() => {
     if (!mountRef.current) return;
 
@@ -358,6 +373,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     const raycaster = new THREE.Raycaster();
     const menuPlane = new THREE.Plane(_menuZVec, -SCENE_CONFIG.MENU_Z);
 
+    // Centralized phase transition handler: mirrors React state and resets transient pools
     const setGamePhase = (newPhase: GamePhase) => {
       phaseRef.current = newPhase;
       setPhase(newPhase);
@@ -383,6 +399,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
     if (DEBUG_PERF) console.log("Performance Profiler Initialized");
 
+    // Main render loop: input -> particles -> game logic -> render
     const animate = (time: number) => {
       // PERF: Start Total
       let tStart = 0;
