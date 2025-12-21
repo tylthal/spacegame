@@ -7,6 +7,7 @@ export interface CalibrationStatus {
   stalled: boolean;
   cameraReady?: boolean;
   fallbackCta?: boolean;
+  message?: string;
 }
 
 export interface OverlayState {
@@ -42,7 +43,8 @@ const isEqual = (a: OverlayState, b: OverlayState) =>
       !!b.calibrationStatus &&
       a.calibrationStatus.stalled === b.calibrationStatus.stalled &&
       a.calibrationStatus.cameraReady === b.calibrationStatus.cameraReady &&
-      a.calibrationStatus.fallbackCta === b.calibrationStatus.fallbackCta)) &&
+      a.calibrationStatus.fallbackCta === b.calibrationStatus.fallbackCta &&
+      a.calibrationStatus.message === b.calibrationStatus.message)) &&
   ((!a.helpState && !b.helpState) ||
     (!!a.helpState && !!b.helpState &&
       a.helpState.page === b.helpState.page &&
