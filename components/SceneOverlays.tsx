@@ -1,31 +1,13 @@
 import React from 'react';
-import { GamePhase, TrackingStatus } from '../types';
 import WeaponStatus from './ui/WeaponStatus';
 import CalibrationOverlay from './ui/CalibrationOverlay';
 import ReadyOverlay from './ui/ReadyOverlay';
 import PauseOverlay from './ui/PauseOverlay';
 import GameOverOverlay from './ui/GameOverOverlay';
 import HelpOverlay from './ui/HelpOverlay';
+import { OverlayState } from './ui/OverlayStateAdapter';
 
-interface WeaponStatusData {
-    heat: number;
-    isOverheated: boolean;
-    missileProgress: number;
-}
-
-interface HelpState {
-    page: number; // 0: Mechanics, 1: Enemies
-    enemyIndex: number;
-}
-
-interface Props {
-  phase: GamePhase;
-  score: number;
-  calibrationProgress: number;
-  trackingStatus: TrackingStatus;
-  weaponStatus: WeaponStatusData;
-  helpState?: HelpState;
-}
+type Props = OverlayState;
 
 const SceneOverlays: React.FC<Props> = ({ phase, score, calibrationProgress, trackingStatus, weaponStatus, helpState }) => {
   return (
