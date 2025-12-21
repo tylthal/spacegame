@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { GamePhase, EnemyData, MissileData, InputSnapshot, TrackingStatus } from '../types';
+import { GamePhase, EnemyData, MissileData, InputSnapshot } from '../types';
 import SceneOverlays from './SceneOverlays';
 import { DIFFICULTY, MISSILE, SCENE_CONFIG, BULLET_SPEED } from '../config/constants';
 import { AssetManager } from '../systems/AssetManager';
@@ -10,12 +10,13 @@ import { EnemyFactory } from '../systems/EnemyFactory';
 import { GameLoop, FrameContext } from '../systems/GameLoop';
 import { SceneComposer } from '../systems/SceneComposer';
 import { PhaseManager } from '../systems/PhaseManager';
-import { WeaponController } from '../systems/WeaponController';
+import { WeaponController, WeaponStatus } from '../systems/WeaponController';
 import { BulletPool } from '../systems/BulletPool';
 import { MissilePool } from '../systems/MissilePool';
 import { CalibrationService } from '../services/CalibrationService';
 import { ResourceLifecycle } from '../systems/ResourceLifecycle';
 import { isDevFeatureEnabled } from '../utils/devMode';
+import useOverlayStateAdapter, { OverlayState } from './ui/OverlayStateAdapter';
 
 /**
  * GameScene
@@ -65,21 +66,29 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const missilePoolRef = useRef<MissilePool | null>(null);
   const weaponControllerRef = useRef<WeaponController | null>(null);
   
-  const [phase, setPhase] = useState<GamePhase>('CALIBRATING');
-  const [calibrationProgress, setCalibrationProgress] = useState(0);
-  const [trackingStatus, setTrackingStatus] = useState<TrackingStatus>({ aimer: false, trigger: false, health: 0 });
-  const [weaponStatus, setWeaponStatus] = useState({ heat: 0, isOverheated: false, missileProgress: 1.0 });
-  const weaponStatusRef = useRef({ heat: 0, isOverheated: false, missileProgress: 1.0 });
-  const [helpState, setHelpState] = useState({ page: 0, enemyIndex: 0 });
+  const weaponStatusRef = useRef<WeaponStatus>({ heat: 0, isOverheated: false, missileProgress: 1.0 });
+  const overlayStateRef = useRef<OverlayState>({
+    phase: 'CALIBRATING',
+    score,
+    calibrationProgress: 0,
+    trackingStatus: { aimer: false, trigger: false, health: 0 },
+    weaponStatus: weaponStatusRef.current,
+    helpState: { page: 0, enemyIndex: 0 },
+  });
 
   const phaseManagerRef = useRef<PhaseManager | null>(null);
   const totalPlayTimeRef = useRef(0);
   const TARGET_FPS = 60;
 
   const propsRef = useRef({ hull, lives, score });
-  useEffect(() => { propsRef.current = { hull, lives, score }; }, [hull, lives, score]);
+  useEffect(() => {
+    propsRef.current = { hull, lives, score };
+    overlayStateRef.current.score = score;
+  }, [hull, lives, score]);
 
   const benchmarkModeEnabled = isDevFeatureEnabled('benchmark');
+
+  const overlayState = useOverlayStateAdapter(overlayStateRef, 90);
 
   const assetManagerRef = useRef<AssetManager | null>(null);
   const particleSystemRef = useRef<ParticleSystem | null>(null);
@@ -269,7 +278,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
       controller.reset(performance.now());
       const status = controller.getStatus();
       weaponStatusRef.current = status;
-      setWeaponStatus(status);
+      overlayStateRef.current.weaponStatus = status;
     };
 
     const resetTransientObjects = () => {
@@ -280,11 +289,19 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     const phaseManager = new PhaseManager({
       visibilityTargets: { startGroup, pauseGroup, gameOverGroup, enemyGroup, helpGroup, helpSpotlight },
       scene,
-      onPhaseChange: newPhase => { setPhase(newPhase); pauseGestureCooldown.current = performance.now() + 1500; },
-      onHelpStateChange: setHelpState,
-      onTransition: resetTransientObjects,
+      onPhaseChange: newPhase => {
+        overlayStateRef.current.phase = newPhase;
+        pauseGestureCooldown.current = performance.now() + 1500;
+      },
+      onHelpStateChange: state => {
+        overlayStateRef.current.helpState = state;
+      },
+      onTransition: phase => {
+        resetTransientObjects();
+        if (phase === 'CALIBRATING') overlayStateRef.current.calibrationProgress = 0;
+      },
       phaseHandlers: {
-        CALIBRATING: () => { setCalibrationProgress(0); clearEnemies(); resetWeapons(); },
+        CALIBRATING: () => { clearEnemies(); resetWeapons(); },
         READY: () => { totalPlayTimeRef.current = 0; clearEnemies(); resetWeapons(); },
         GAMEOVER: () => { clearEnemies(); resetWeapons(); },
         HELP: () => { clearEnemies(); },
@@ -300,7 +317,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
       const calibrationPoint = calibrationServiceRef.current.getCalibrationPoint();
       const snapshot = inputProcessorRef.current.processFrame(handResultRef.current, calibrationPoint, now);
       inputSnapshotRef.current = snapshot;
-      setTrackingStatus(snapshot.tracking);
+      overlayStateRef.current.trackingStatus = snapshot.tracking;
     };
 
     const handleParticleStage = ({ timeScale }: FrameContext) => {
@@ -332,7 +349,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
         Math.abs(prevStatus.missileProgress - status.missileProgress) > 0.01
       ) {
         weaponStatusRef.current = status;
-        setWeaponStatus(status);
+        overlayStateRef.current.weaponStatus = status;
       }
 
       shakeRef.current *= 0.9;
@@ -488,11 +505,11 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
       if (currentPhase === 'CALIBRATING') {
           if (gestures && aimData) {
               const { progress, completed } = calibrationServiceRef.current.update(gestures.pinch, aimData.tip, now);
-              setCalibrationProgress(progress);
+              overlayStateRef.current.calibrationProgress = progress;
               if (completed) transitionPhase('READY');
           } else {
               calibrationServiceRef.current.resetHold();
-              setCalibrationProgress(0);
+              overlayStateRef.current.calibrationProgress = 0;
           }
       } else {
           calibrationServiceRef.current.resetHold();
@@ -512,7 +529,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
               particles.spawnImpact(_v1, 0xff8800, 120, 20, 0.035);
               const updatedStatus = weaponController.getStatus();
               weaponStatusRef.current = updatedStatus;
-              setWeaponStatus(updatedStatus);
+              overlayStateRef.current.weaponStatus = updatedStatus;
           }
 
           if (aimData.tip && weaponController.canFirePrimary(now)) {
@@ -536,7 +553,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
               particles.spawnMuzzleFlash(_v2, raycaster.ray.direction);
               const updatedStatus = weaponController.getStatus();
               weaponStatusRef.current = updatedStatus;
-              setWeaponStatus(updatedStatus);
+              overlayStateRef.current.weaponStatus = updatedStatus;
           }
       }
 
@@ -556,7 +573,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
               const pos = laser.geometry.attributes.position;
               pos.setXYZ(0, _v1.x, _v1.y, _v1.z); pos.setXYZ(1, _v3.x, _v3.y, _v3.z); pos.needsUpdate = true; laser.visible = true;
           }
-      } else { reticle.visible = laser.visible = false; if (phaseManager) phaseManager.resetPauseHold(); if (currentPhase === 'CALIBRATING') { setCalibrationProgress(0); } }
+      } else { reticle.visible = laser.visible = false; if (phaseManager) phaseManager.resetPauseHold(); if (currentPhase === 'CALIBRATING') { overlayStateRef.current.calibrationProgress = 0; } }
     };
 
     const handleRenderStage = () => {
@@ -583,10 +600,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   return (
     <div className="relative w-full h-full">
       <div ref={mountRef} className="w-full h-full" />
-      <SceneOverlays 
-        phase={phase} score={score} calibrationProgress={calibrationProgress}
-        trackingStatus={trackingStatus} weaponStatus={weaponStatus} helpState={helpState}
-      />
+      <SceneOverlays {...overlayState} />
     </div>
   );
 };
