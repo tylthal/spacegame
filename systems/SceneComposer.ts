@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SCENE_CONFIG } from '../config/constants';
+import { ResourceLifecycle } from './ResourceLifecycle';
 
 export interface InteractiveTarget {
   group: THREE.Group;
@@ -45,7 +46,7 @@ export class SceneComposer {
   private resizeHandler: () => void;
   public readonly graph: SceneGraph;
 
-  constructor(mount: HTMLElement) {
+  constructor(mount: HTMLElement, lifecycle: ResourceLifecycle) {
     this.mount = mount;
 
     const scene = new THREE.Scene();
@@ -64,34 +65,40 @@ export class SceneComposer {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     mount.appendChild(renderer.domElement);
+    lifecycle.add(() => {
+      renderer.dispose();
+      if (mount.contains(renderer.domElement)) {
+        mount.removeChild(renderer.domElement);
+      }
+    });
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.5));
     const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
     mainLight.position.set(0, 50, 50);
     scene.add(mainLight);
 
-    const starfield = this.createStarfield();
+    const starfield = this.createStarfield(lifecycle);
     scene.add(starfield);
 
     const startGroup = new THREE.Group();
     scene.add(startGroup);
-    const startTarget = this.createInteractiveTarget(0, 10, SCENE_CONFIG.MENU_Z, 0x00ffff);
+    const startTarget = this.createInteractiveTarget(0, 10, SCENE_CONFIG.MENU_Z, 0x00ffff, lifecycle);
     startGroup.add(startTarget.group);
 
     const pauseGroup = new THREE.Group();
     scene.add(pauseGroup);
-    const restartTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0xffff00, 15);
-    const recalibrateTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0xff00ff, 15);
-    const intelTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0x0088ff, 15);
-    const resumeTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0x00ff00, 18);
+    const restartTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0xffff00, lifecycle, 15);
+    const recalibrateTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0xff00ff, lifecycle, 15);
+    const intelTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0x0088ff, lifecycle, 15);
+    const resumeTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0x00ff00, lifecycle, 18);
     pauseGroup.add(resumeTarget.group, restartTarget.group, recalibrateTarget.group, intelTarget.group);
     pauseGroup.visible = false;
 
     const helpGroup = new THREE.Group();
     scene.add(helpGroup);
-    const helpReturnTarget = this.createInteractiveTarget(0, -70, SCENE_CONFIG.MENU_Z, 0xff8800, 25);
-    const helpNextPageTarget = this.createInteractiveTarget(140, 0, SCENE_CONFIG.MENU_Z, 0x00ffff, 20);
-    const helpCycleEnemyTarget = this.createInteractiveTarget(-140, 0, SCENE_CONFIG.MENU_Z, 0xff00ff, 20);
+    const helpReturnTarget = this.createInteractiveTarget(0, -70, SCENE_CONFIG.MENU_Z, 0xff8800, lifecycle, 25);
+    const helpNextPageTarget = this.createInteractiveTarget(140, 0, SCENE_CONFIG.MENU_Z, 0x00ffff, lifecycle, 20);
+    const helpCycleEnemyTarget = this.createInteractiveTarget(-140, 0, SCENE_CONFIG.MENU_Z, 0xff00ff, lifecycle, 20);
     helpGroup.add(helpReturnTarget.group);
     helpGroup.visible = false;
 
@@ -106,7 +113,7 @@ export class SceneComposer {
 
     const gameOverGroup = new THREE.Group();
     scene.add(gameOverGroup);
-    const gameOverTarget = this.createInteractiveTarget(0, -10, SCENE_CONFIG.MENU_Z, 0xff0000, 25);
+    const gameOverTarget = this.createInteractiveTarget(0, -10, SCENE_CONFIG.MENU_Z, 0xff0000, lifecycle, 25);
     gameOverGroup.add(gameOverTarget.group);
     gameOverGroup.visible = false;
 
@@ -126,11 +133,23 @@ export class SceneComposer {
       new THREE.Mesh(new THREE.CircleGeometry(0.6, 16), reticleMat),
     );
     reticle.visible = false;
+    lifecycle.add(() => {
+      reticleMat.dispose();
+      reticle.traverse(obj => {
+        if ((obj as THREE.Mesh).geometry) {
+          (obj as THREE.Mesh).geometry.dispose();
+        }
+      });
+    });
     scene.add(reticle);
     const laser = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
       new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.35 }),
     );
+    lifecycle.add(() => {
+      laser.geometry.dispose();
+      (laser.material as THREE.Material).dispose();
+    });
     scene.add(laser);
 
     const enemyGroup = new THREE.Group();
@@ -170,17 +189,14 @@ export class SceneComposer {
 
     this.resizeHandler = () => this.handleResize();
     this.handleResize();
-    window.addEventListener('resize', this.resizeHandler);
+    lifecycle.addEventListener(window, 'resize', this.resizeHandler);
+    lifecycle.add(() => {
+      scene.remove(reticle, laser, enemyGroup, startGroup, pauseGroup, helpGroup, helpSpotlight, gameOverGroup, gunAnchor);
+      scene.clear();
+    });
   }
 
-  dispose() {
-    window.removeEventListener('resize', this.resizeHandler);
-    this.graph.renderer.dispose();
-    this.graph.scene.clear();
-    this.mount.removeChild(this.graph.renderer.domElement);
-  }
-
-  private createStarfield() {
+  private createStarfield(lifecycle: ResourceLifecycle) {
     const starGeo = new THREE.BufferGeometry();
     const starPos = new Float32Array(15000 * 3);
     for (let i = 0; i < 15000; i++) {
@@ -196,10 +212,21 @@ export class SceneComposer {
     const starfield = new THREE.Points(starGeo, starMat);
     starfield.matrixAutoUpdate = false;
     starfield.updateMatrix();
+    lifecycle.add(() => {
+      starGeo.dispose();
+      starMat.dispose();
+    });
     return starfield;
   }
 
-  private createInteractiveTarget(x: number, y: number, z: number, color: number, size = 20): InteractiveTarget {
+  private createInteractiveTarget(
+    x: number,
+    y: number,
+    z: number,
+    color: number,
+    lifecycle: ResourceLifecycle,
+    size = 20,
+  ): InteractiveTarget {
     const group = new THREE.Group();
     group.position.set(x, y, z);
     const targetGeo = new THREE.IcosahedronGeometry(size, 1);
@@ -209,6 +236,11 @@ export class SceneComposer {
     group.add(new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ color: 0xffffff })));
     group.matrixAutoUpdate = false;
     group.updateMatrix();
+    lifecycle.add(() => {
+      targetGeo.dispose();
+      targetMat.dispose();
+      coreGeo.dispose();
+    });
     return { group, radius: size * 1.3 };
   }
 

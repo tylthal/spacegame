@@ -30,7 +30,7 @@ This guide is a quick walkthrough of how the simulation is stitched together and
 - **Pooling**: `EnemyData`, bullets, and pooled Three.js geometries/materials are reused to avoid garbage collection spikes during combat.
 - **Math Objects**: Frequently used vectors/quaternions are declared once at module scope (`const _v1 = new THREE.Vector3()`) and reused every frame.
 - **Manual Matrix Updates**: Bullet meshes disable auto-updates and manually call `updateMatrix()` for straight-line projectiles.
-- **Perf Logging**: Toggle `DEBUG_PERF` in `GameScene.tsx` to log per-stage timing (input, particles, logic, render) averaged over 60 frames.
+- **Perf Logging**: Enable the `benchmark` dev flag (e.g. append `?benchmark=1` to the URL or set `localStorage.setItem('spacegame_dev_benchmark', '1')`) to log per-stage timing (input, particles, logic, render) averaged over 60 frames.
 
 ## UI & Menu Targets
 
