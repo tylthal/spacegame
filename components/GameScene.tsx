@@ -14,6 +14,8 @@ import { WeaponController } from '../systems/WeaponController';
 import { BulletPool } from '../systems/BulletPool';
 import { MissilePool } from '../systems/MissilePool';
 import { CalibrationService } from '../services/CalibrationService';
+import { ResourceLifecycle } from '../systems/ResourceLifecycle';
+import { isDevFeatureEnabled } from '../utils/devMode';
 
 /**
  * GameScene
@@ -52,9 +54,6 @@ const _menuZVec = new THREE.Vector3(0, 0, 1);
 const _forward = new THREE.Vector3(0, 0, -1);
 const _right = new THREE.Vector3(1, 0, 0);
 
-// PERFORMANCE MONITORING FLAG
-const DEBUG_PERF = true;
-
 const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, onReset, score, hull, lives }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   
@@ -80,6 +79,8 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const propsRef = useRef({ hull, lives, score });
   useEffect(() => { propsRef.current = { hull, lives, score }; }, [hull, lives, score]);
 
+  const benchmarkModeEnabled = isDevFeatureEnabled('benchmark');
+
   const assetManagerRef = useRef<AssetManager | null>(null);
   const particleSystemRef = useRef<ParticleSystem | null>(null);
   const inputProcessorRef = useRef<InputProcessor>(new InputProcessor());
@@ -93,15 +94,19 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   // Scene bootstrap: one-time construction of renderer, systems, and the animation loop
   useEffect(() => {
     if (!mountRef.current) return;
-    const composer = new SceneComposer(mountRef.current);
+    const lifecycle = new ResourceLifecycle();
+
+    const composer = new SceneComposer(mountRef.current, lifecycle);
     const { scene, camera, renderer, gunAnchor, gunPivot, muzzle, reticle, laser, enemyGroup, startGroup, pauseGroup, helpGroup, helpSpotlight, gameOverGroup, targets } = composer.graph;
     sceneComposerRef.current = composer;
 
     const assets = new AssetManager();
     assetManagerRef.current = assets;
+    lifecycle.add(assets);
 
     const particles = new ParticleSystem(scene);
     particleSystemRef.current = particles;
+    lifecycle.add(() => particles.dispose());
 
     const weaponController = new WeaponController();
     weaponController.reset(performance.now());
@@ -289,7 +294,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
     const transitionPhase = (next: GamePhase) => phaseManagerRef.current?.transitionTo(next);
 
-    if (DEBUG_PERF) console.log("Performance Profiler Initialized");
+    if (benchmarkModeEnabled) console.log("Performance Profiler Initialized");
 
     const handleInputStage = ({ now }: FrameContext) => {
       const calibrationPoint = calibrationServiceRef.current.getCalibrationPoint();
@@ -566,18 +571,14 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
         simulation: handleSimulationStage,
         render: handleRenderStage,
       },
-      { targetFps: TARGET_FPS, debugPerf: DEBUG_PERF, perfLogInterval: 60 },
+      { targetFps: TARGET_FPS, debugPerf: benchmarkModeEnabled, perfLogInterval: 60 },
     );
     gameLoopRef.current = loop;
+    lifecycle.add(() => loop.stop());
     loop.start();
 
-    return () => {
-        loop.stop();
-        assetManagerRef.current?.dispose();
-        particleSystemRef.current?.dispose();
-        composer.dispose();
-    };
-  }, []); 
+    return () => lifecycle.disposeAll();
+  }, [benchmarkModeEnabled]);
 
   return (
     <div className="relative w-full h-full">
