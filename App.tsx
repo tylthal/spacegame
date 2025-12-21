@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const [useFallbackControls, setUseFallbackControls] = useState(false);
   const [handTrackingReady, setHandTrackingReady] = useState(false);
   const [cameraPermissionGranted, setCameraPermissionGranted] = useState(false);
+  const [cameraInitError, setCameraInitError] = useState<string | null>(null);
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
 
@@ -37,6 +38,7 @@ const App: React.FC = () => {
     setInitError(null);
     setUseFallbackControls(false);
     setCameraPermissionGranted(false);
+    setCameraInitError(null);
 
     try {
       await HandTracker.init();
@@ -264,12 +266,26 @@ const App: React.FC = () => {
           <div className="absolute bottom-24 right-4 md:bottom-8 md:right-8 w-20 h-14 md:w-48 md:h-36 border-2 border-cyan-500/30 rounded-lg overflow-hidden shadow-2xl z-[100] bg-black transition-all">
             <WebcamFeed
               videoRef={videoRef}
-              onPermissionGranted={() => setCameraPermissionGranted(true)}
-              onPermissionDenied={() => setCameraPermissionGranted(false)}
+              onPermissionGranted={() => {
+                setCameraPermissionGranted(true);
+                setCameraInitError(null);
+              }}
+              onPermissionDenied={error => {
+                setCameraPermissionGranted(false);
+                setCameraInitError(
+                  error instanceof Error
+                    ? error.message
+                    : 'Unable to access camera. Verify permissions and hardware.',
+                );
+                setUseFallbackControls(true);
+              }}
             />
             {!cameraPermissionGranted && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-300 text-center px-2">
-                Camera unavailable — mouse + keyboard fallback active
+                <div className="space-y-1">
+                  <div>Camera unavailable — mouse + keyboard fallback active</div>
+                  {cameraInitError && <div className="text-[9px] md:text-[10px] text-red-200/70 normal-case">{cameraInitError}</div>}
+                </div>
               </div>
             )}
             <div className="absolute inset-0 pointer-events-none border border-cyan-500/20 mix-blend-overlay opacity-50 bg-[radial-gradient(circle,transparent_0%,rgba(0,0,0,0.4)_100%)]" />
