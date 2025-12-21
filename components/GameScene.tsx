@@ -89,7 +89,7 @@ const GameScene: React.FC<Props> = ({
     trackingStatus: { aimer: handTrackingEnabled, trigger: handTrackingEnabled, health: handTrackingEnabled ? 0 : 1 },
     weaponStatus: weaponStatusRef.current,
     helpState: { page: 0, enemyIndex: 0 },
-    calibrationStatus: { stalled: false, cameraReady: cameraPermissionGranted, fallbackCta: false },
+    calibrationStatus: { stalled: false, cameraReady: cameraPermissionGranted, fallbackCta: !cameraPermissionGranted },
   });
 
   const calibrationStartRef = useRef<number | null>(null);
@@ -114,6 +114,7 @@ const GameScene: React.FC<Props> = ({
     overlayStateRef.current.calibrationStatus = {
       ...currentStatus,
       cameraReady: cameraPermissionGranted,
+      fallbackCta: !cameraPermissionGranted,
     };
   }, [cameraPermissionGranted]);
 
@@ -668,7 +669,7 @@ const GameScene: React.FC<Props> = ({
           const stalled = cameraPermissionGranted && timeSinceLandmark > CALIBRATION_STALL_MS;
           overlayStateRef.current.calibrationStatus = {
             stalled,
-            fallbackCta: stalled,
+            fallbackCta: !cameraPermissionGranted || stalled,
             cameraReady: cameraPermissionGranted,
           };
 
@@ -694,7 +695,7 @@ const GameScene: React.FC<Props> = ({
           calibrationServiceRef.current.resetHold();
           overlayStateRef.current.calibrationStatus = {
             stalled: false,
-            fallbackCta: false,
+            fallbackCta: !cameraPermissionGranted,
             cameraReady: cameraPermissionGranted,
           };
       }

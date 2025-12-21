@@ -57,16 +57,16 @@ const App: React.FC = () => {
   }, [initializeHandTracking]);
 
   useEffect(() => {
-    if (!handTrackingReady || useFallbackControls) {
+    if (!handTrackingReady || useFallbackControls || !cameraPermissionGranted) {
       handResultRef.current = null;
     }
-  }, [handTrackingReady, useFallbackControls]);
+  }, [handTrackingReady, useFallbackControls, cameraPermissionGranted]);
 
   // Neural Link Loop: High-frequency hand detection
   useEffect(() => {
     let animationId: number | null = null;
 
-    const handTrackingActive = handTrackingReady && !useFallbackControls;
+    const handTrackingActive = handTrackingReady && cameraPermissionGranted && !useFallbackControls;
 
     const detect = async () => {
       if (!handTrackingActive) return;
@@ -105,7 +105,7 @@ const App: React.FC = () => {
     return () => {
       if (animationId) cancelAnimationFrame(animationId);
     };
-  }, [isInitializing, telemetryEnabled, handTrackingReady, useFallbackControls]);
+  }, [isInitializing, telemetryEnabled, handTrackingReady, cameraPermissionGranted, useFallbackControls]);
 
   /**
    * handleDamage
@@ -137,7 +137,7 @@ const App: React.FC = () => {
     setScore(s => s + p);
   }, []);
 
-  const handTrackingActive = handTrackingReady && !useFallbackControls;
+  const handTrackingActive = handTrackingReady && cameraPermissionGranted && !useFallbackControls;
 
   return (
     <div className="relative w-screen h-screen bg-black overflow-hidden font-mono text-cyan-400 select-none">
@@ -267,6 +267,11 @@ const App: React.FC = () => {
               onPermissionGranted={() => setCameraPermissionGranted(true)}
               onPermissionDenied={() => setCameraPermissionGranted(false)}
             />
+            {!cameraPermissionGranted && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-300 text-center px-2">
+                Camera unavailable — mouse + keyboard fallback active
+              </div>
+            )}
             <div className="absolute inset-0 pointer-events-none border border-cyan-500/20 mix-blend-overlay opacity-50 bg-[radial-gradient(circle,transparent_0%,rgba(0,0,0,0.4)_100%)]" />
             <div className="absolute top-1 left-1 md:top-2 md:left-2 flex items-center gap-1.5">
                <div className="w-1 h-1 md:w-1.5 md:h-1.5 bg-red-500 rounded-full animate-ping" />

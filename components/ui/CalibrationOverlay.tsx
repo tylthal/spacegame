@@ -12,7 +12,7 @@ interface Props {
 const CalibrationOverlay: React.FC<Props> = ({ progress, trackingStatus, calibrationStatus, onStartWithoutTracking }) => {
     const stalled = calibrationStatus?.stalled ?? false;
     const cameraReady = calibrationStatus?.cameraReady ?? true;
-    const showFallbackCta = calibrationStatus?.fallbackCta && !!onStartWithoutTracking;
+    const showFallbackCta = !!onStartWithoutTracking && (!cameraReady || calibrationStatus?.fallbackCta);
     const pointerEventsClass = showFallbackCta ? 'pointer-events-auto' : 'pointer-events-none';
 
     const guidanceText = (() => {
