@@ -3,29 +3,54 @@ import React, { useEffect } from 'react';
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement>;
   onPermissionGranted?: () => void;
-  onPermissionDenied?: (error: unknown) => void;
+  onError?: (error: CameraError) => void;
 }
+
+export type CameraErrorCode =
+  | 'NO_DEVICES'
+  | 'PERMISSION_DENIED'
+  | 'DEVICE_IN_USE'
+  | 'DEVICE_LOST'
+  | 'UNSUPPORTED'
+  | 'UNKNOWN';
+
+export interface CameraError extends Error {
+  code: CameraErrorCode;
+  cause?: unknown;
+}
+
+const createCameraError = (code: CameraErrorCode, message: string, cause?: unknown): CameraError => {
+  const error = new Error(message) as CameraError;
+  error.name = 'CameraError';
+  error.code = code;
+  if (cause) {
+    error.cause = cause;
+  }
+  return error;
+};
 
 /**
  * WebcamFeed Component
  * Requests and manages the user's camera stream.
  * Optimized for computer vision tasks with low-resolution and specific frame rate.
  */
-const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onPermissionDenied }) => {
+const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError }) => {
   useEffect(() => {
     let active = true;
 
     async function startCamera() {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('Camera API unavailable in this browser.');
+          throw createCameraError('UNSUPPORTED', 'Camera API unavailable in this browser.');
         }
 
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const hasVideoInput = devices.some(device => device.kind === 'videoinput');
-        if (!hasVideoInput) {
-          throw new Error('Requested device not found. Connect a camera or check system permissions.');
+        const videoInputs = devices.filter(device => device.kind === 'videoinput');
+        if (videoInputs.length === 0) {
+          throw createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.');
         }
+
+        const preferredDevice = videoInputs.find(device => device.label.toLowerCase().includes('front')) ?? videoInputs[0];
 
         /**
          * Vision Optimization:
@@ -34,6 +59,7 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onPermissi
          */
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
+            deviceId: preferredDevice.deviceId ? { exact: preferredDevice.deviceId } : undefined,
             width: { ideal: 320 },
             height: { ideal: 240 },
             frameRate: { ideal: 30 }
@@ -46,6 +72,14 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onPermissi
           return;
         }
 
+        stream.getTracks().forEach(track => {
+          track.onended = () => {
+            if (!active) return;
+            const deviceLostError = createCameraError('DEVICE_LOST', 'Camera disconnected during capture.');
+            onError?.(deviceLostError);
+          };
+        });
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
@@ -53,7 +87,27 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onPermissi
         onPermissionGranted?.();
       } catch (err) {
         console.error('Neural Uplink Error (Camera Access):', err);
-        onPermissionDenied?.(err);
+        if (err instanceof DOMException) {
+          switch (err.name) {
+            case 'NotAllowedError':
+            case 'SecurityError':
+              onError?.(createCameraError('PERMISSION_DENIED', 'Camera permission denied. Enable access to continue.', err));
+              return;
+            case 'NotFoundError':
+              onError?.(createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.', err));
+              return;
+            case 'NotReadableError':
+              onError?.(createCameraError('DEVICE_IN_USE', 'Camera is in use by another application.', err));
+              return;
+            case 'AbortError':
+              onError?.(createCameraError('DEVICE_LOST', 'Camera disconnected during capture.', err));
+              return;
+            default:
+              onError?.(createCameraError('UNKNOWN', err.message, err));
+              return;
+          }
+        }
+        onError?.(createCameraError('UNKNOWN', 'Unable to access camera. Verify permissions and hardware.', err));
       }
     }
 
@@ -65,7 +119,7 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onPermissi
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
       }
     };
-  }, [onPermissionDenied, onPermissionGranted, videoRef]);
+  }, [onError, onPermissionGranted, videoRef]);
 
   // scale-x-[-1] mirrors the feed for intuitive human movement matching
   return <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" playsInline muted />;
