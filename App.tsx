@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [handTrackingReady, setHandTrackingReady] = useState(false);
   const [cameraPermissionGranted, setCameraPermissionGranted] = useState(false);
   const [cameraInitError, setCameraInitError] = useState<CameraError | null>(null);
+  const [cameraRestartToken, setCameraRestartToken] = useState(0);
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
 
@@ -137,6 +138,13 @@ const App: React.FC = () => {
 
   const handleScoreUpdate = useCallback((p: number) => {
     setScore(s => s + p);
+  }, []);
+
+  const handleRetryCamera = useCallback(() => {
+    setCameraPermissionGranted(false);
+    setCameraInitError(null);
+    setUseFallbackControls(false);
+    setCameraRestartToken(token => token + 1);
   }, []);
 
   const handTrackingActive = handTrackingReady && cameraPermissionGranted && !useFallbackControls;
@@ -265,10 +273,14 @@ const App: React.FC = () => {
           {/* Responsive: Smaller on mobile, standard on desktop. Moved higher on mobile to clear Weapon Status */}
           <div className="absolute bottom-24 right-4 md:bottom-8 md:right-8 w-20 h-14 md:w-48 md:h-36 border-2 border-cyan-500/30 rounded-lg overflow-hidden shadow-2xl z-[100] bg-black transition-all">
             <WebcamFeed
+              key={cameraRestartToken}
               videoRef={videoRef}
               onPermissionGranted={() => {
                 setCameraPermissionGranted(true);
                 setCameraInitError(null);
+                if (cameraInitError) {
+                  setUseFallbackControls(false);
+                }
               }}
               onError={error => {
                 setCameraPermissionGranted(false);
@@ -278,13 +290,22 @@ const App: React.FC = () => {
             />
             {!cameraPermissionGranted && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-300 text-center px-2">
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <div>Camera unavailable — mouse + keyboard fallback active</div>
+                  <p className="text-[9px] md:text-[10px] text-red-100/80 normal-case tracking-normal">
+                    Reconnect or select a webcam, then press retry to reinitialize the feed.
+                  </p>
                   {cameraInitError && (
                     <div className="text-[9px] md:text-[10px] text-red-200/70 normal-case">
                       {cameraInitError.message}
                     </div>
                   )}
+                  <button
+                    className="mt-2 px-3 py-1 text-[9px] md:text-[10px] rounded bg-red-600/80 text-white uppercase tracking-widest hover:bg-red-500 transition"
+                    onClick={handleRetryCamera}
+                  >
+                    Retry camera
+                  </button>
                 </div>
               </div>
             )}

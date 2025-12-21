@@ -37,20 +37,36 @@ const createCameraError = (code: CameraErrorCode, message: string, cause?: unkno
 const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError }) => {
   useEffect(() => {
     let active = true;
+    let currentStream: MediaStream | null = null;
+    let currentDeviceId: string | null = null;
 
-    async function startCamera() {
+    const stopCurrentStream = () => {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+      }
+    };
+
+    const getVideoInputs = async () => {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.filter(device => device.kind === 'videoinput');
+    };
+
+    const startCamera = async (targetDeviceId?: string) => {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw createCameraError('UNSUPPORTED', 'Camera API unavailable in this browser.');
         }
 
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoInputs = devices.filter(device => device.kind === 'videoinput');
+        const videoInputs = await getVideoInputs();
         if (videoInputs.length === 0) {
           throw createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.');
         }
 
-        const preferredDevice = videoInputs.find(device => device.label.toLowerCase().includes('front')) ?? videoInputs[0];
+        const preferredDevice =
+          videoInputs.find(device => device.deviceId === targetDeviceId) ??
+          videoInputs.find(device => device.label.toLowerCase().includes('front')) ??
+          videoInputs[0];
 
         /**
          * Vision Optimization:
@@ -71,6 +87,10 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError })
           stream.getTracks().forEach(track => track.stop());
           return;
         }
+
+        stopCurrentStream();
+        currentStream = stream;
+        currentDeviceId = preferredDevice.deviceId;
 
         stream.getTracks().forEach(track => {
           track.onended = () => {
@@ -109,11 +129,37 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError })
         }
         onError?.(createCameraError('UNKNOWN', 'Unable to access camera. Verify permissions and hardware.', err));
       }
-    }
+    };
+
+    const handleDeviceChange = async () => {
+      if (!navigator.mediaDevices?.enumerateDevices) return;
+      try {
+        const videoInputs = await getVideoInputs();
+        if (videoInputs.length === 0) {
+          stopCurrentStream();
+          onError?.(createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.'));
+          return;
+        }
+
+        const activeDeviceAvailable = currentDeviceId
+          ? videoInputs.some(device => device.deviceId === currentDeviceId)
+          : false;
+
+        if (!activeDeviceAvailable) {
+          await startCamera(videoInputs[0]?.deviceId);
+        }
+      } catch (err) {
+        console.error('Camera device change handling failed:', err);
+      }
+    };
 
     startCamera();
+    navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange);
+
     return () => {
       active = false;
+      navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
+      stopCurrentStream();
       // Cleanup: Stop all tracks on unmount
       if (videoRef.current && videoRef.current.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());

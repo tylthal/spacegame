@@ -16,8 +16,8 @@ const CalibrationOverlay: React.FC<Props> = ({ progress, trackingStatus, calibra
     const pointerEventsClass = showFallbackCta ? 'pointer-events-auto' : 'pointer-events-none';
 
     const guidanceText = (() => {
-      if (!cameraReady) return 'Allow camera access to continue calibration.';
-      if (stalled) return 'We cannot see your hands. Move them into view or start without tracking.';
+      if (!cameraReady) return calibrationStatus?.message ?? 'Camera offline. Reconnect or select a device to continue.';
+      if (stalled) return calibrationStatus?.message ?? 'We cannot see your hands. Move them into view or start without tracking.';
       if (progress > 0) return 'HOLD STEADY';
       return 'Pinch LEFT Index & Thumb to Align';
     })();

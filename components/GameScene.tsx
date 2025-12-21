@@ -89,7 +89,14 @@ const GameScene: React.FC<Props> = ({
     trackingStatus: { aimer: handTrackingEnabled, trigger: handTrackingEnabled, health: handTrackingEnabled ? 0 : 1 },
     weaponStatus: weaponStatusRef.current,
     helpState: { page: 0, enemyIndex: 0 },
-    calibrationStatus: { stalled: false, cameraReady: cameraPermissionGranted, fallbackCta: !cameraPermissionGranted },
+    calibrationStatus: {
+      stalled: false,
+      cameraReady: cameraPermissionGranted,
+      fallbackCta: !cameraPermissionGranted,
+      message: cameraPermissionGranted
+        ? undefined
+        : 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.',
+    },
   });
 
   const calibrationStartRef = useRef<number | null>(null);
@@ -115,6 +122,9 @@ const GameScene: React.FC<Props> = ({
       ...currentStatus,
       cameraReady: cameraPermissionGranted,
       fallbackCta: !cameraPermissionGranted,
+      message: cameraPermissionGranted
+        ? undefined
+        : 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.',
     };
   }, [cameraPermissionGranted]);
 
@@ -671,6 +681,11 @@ const GameScene: React.FC<Props> = ({
             stalled,
             fallbackCta: !cameraPermissionGranted || stalled,
             cameraReady: cameraPermissionGranted,
+            message: !cameraPermissionGranted
+              ? 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.'
+              : stalled
+                  ? 'No hand data received. Verify the camera is connected and your hands are visible.'
+                  : undefined,
           };
 
           if (
@@ -697,6 +712,9 @@ const GameScene: React.FC<Props> = ({
             stalled: false,
             fallbackCta: !cameraPermissionGranted,
             cameraReady: cameraPermissionGranted,
+            message: cameraPermissionGranted
+              ? undefined
+              : 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.',
           };
       }
 
