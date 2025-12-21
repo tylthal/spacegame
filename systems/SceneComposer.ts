@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SCENE_CONFIG } from '../config/constants';
 import { ResourceLifecycle } from './ResourceLifecycle';
+import { AssetManager } from './AssetManager';
 
 export interface InteractiveTarget {
   group: THREE.Group;
@@ -46,7 +47,7 @@ export class SceneComposer {
   private resizeHandler: () => void;
   public readonly graph: SceneGraph;
 
-  constructor(mount: HTMLElement, lifecycle: ResourceLifecycle) {
+  constructor(mount: HTMLElement, lifecycle: ResourceLifecycle, assets: AssetManager) {
     this.mount = mount;
 
     const scene = new THREE.Scene();
@@ -77,28 +78,29 @@ export class SceneComposer {
     mainLight.position.set(0, 50, 50);
     scene.add(mainLight);
 
-    const starfield = this.createStarfield(lifecycle);
+    const starfield = assets.createStarfieldInstance();
     scene.add(starfield);
+    lifecycle.add(() => assets.releaseStarfieldInstance(starfield));
 
     const startGroup = new THREE.Group();
     scene.add(startGroup);
-    const startTarget = this.createInteractiveTarget(0, 10, SCENE_CONFIG.MENU_Z, 0x00ffff, lifecycle);
+    const startTarget = this.createInteractiveTarget(0, 10, SCENE_CONFIG.MENU_Z, 0x00ffff, lifecycle, assets);
     startGroup.add(startTarget.group);
 
     const pauseGroup = new THREE.Group();
     scene.add(pauseGroup);
-    const restartTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0xffff00, lifecycle, 15);
-    const recalibrateTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0xff00ff, lifecycle, 15);
-    const intelTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0x0088ff, lifecycle, 15);
-    const resumeTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0x00ff00, lifecycle, 18);
+    const restartTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0xffff00, lifecycle, assets, 15);
+    const recalibrateTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0xff00ff, lifecycle, assets, 15);
+    const intelTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0x0088ff, lifecycle, assets, 15);
+    const resumeTarget = this.createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0x00ff00, lifecycle, assets, 18);
     pauseGroup.add(resumeTarget.group, restartTarget.group, recalibrateTarget.group, intelTarget.group);
     pauseGroup.visible = false;
 
     const helpGroup = new THREE.Group();
     scene.add(helpGroup);
-    const helpReturnTarget = this.createInteractiveTarget(0, -70, SCENE_CONFIG.MENU_Z, 0xff8800, lifecycle, 25);
-    const helpNextPageTarget = this.createInteractiveTarget(140, 0, SCENE_CONFIG.MENU_Z, 0x00ffff, lifecycle, 20);
-    const helpCycleEnemyTarget = this.createInteractiveTarget(-140, 0, SCENE_CONFIG.MENU_Z, 0xff00ff, lifecycle, 20);
+    const helpReturnTarget = this.createInteractiveTarget(0, -70, SCENE_CONFIG.MENU_Z, 0xff8800, lifecycle, assets, 25);
+    const helpNextPageTarget = this.createInteractiveTarget(140, 0, SCENE_CONFIG.MENU_Z, 0x00ffff, lifecycle, assets, 20);
+    const helpCycleEnemyTarget = this.createInteractiveTarget(-140, 0, SCENE_CONFIG.MENU_Z, 0xff00ff, lifecycle, assets, 20);
     helpGroup.add(helpReturnTarget.group);
     helpGroup.visible = false;
 
@@ -113,7 +115,7 @@ export class SceneComposer {
 
     const gameOverGroup = new THREE.Group();
     scene.add(gameOverGroup);
-    const gameOverTarget = this.createInteractiveTarget(0, -10, SCENE_CONFIG.MENU_Z, 0xff0000, lifecycle, 25);
+    const gameOverTarget = this.createInteractiveTarget(0, -10, SCENE_CONFIG.MENU_Z, 0xff0000, lifecycle, assets, 25);
     gameOverGroup.add(gameOverTarget.group);
     gameOverGroup.visible = false;
 
@@ -196,51 +198,19 @@ export class SceneComposer {
     });
   }
 
-  private createStarfield(lifecycle: ResourceLifecycle) {
-    const starGeo = new THREE.BufferGeometry();
-    const starPos = new Float32Array(15000 * 3);
-    for (let i = 0; i < 15000; i++) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(Math.random() * 2 - 1);
-      const r = 5000 + Math.random() * 5000;
-      starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      starPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      starPos[i * 3 + 2] = r * Math.cos(phi);
-    }
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-    const starMat = new THREE.PointsMaterial({ color: 0x888888, size: 1.5, transparent: true, opacity: 0.5, fog: false });
-    const starfield = new THREE.Points(starGeo, starMat);
-    starfield.matrixAutoUpdate = false;
-    starfield.updateMatrix();
-    lifecycle.add(() => {
-      starGeo.dispose();
-      starMat.dispose();
-    });
-    return starfield;
-  }
-
   private createInteractiveTarget(
     x: number,
     y: number,
     z: number,
     color: number,
     lifecycle: ResourceLifecycle,
+    assets: AssetManager,
     size = 20,
   ): InteractiveTarget {
-    const group = new THREE.Group();
+    const group = assets.acquireMenuTarget(size, color);
     group.position.set(x, y, z);
-    const targetGeo = new THREE.IcosahedronGeometry(size, 1);
-    const targetMat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 2.5, wireframe: true });
-    group.add(new THREE.Mesh(targetGeo, targetMat));
-    const coreGeo = new THREE.SphereGeometry(size * 0.4, 16, 16);
-    group.add(new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ color: 0xffffff })));
-    group.matrixAutoUpdate = false;
     group.updateMatrix();
-    lifecycle.add(() => {
-      targetGeo.dispose();
-      targetMat.dispose();
-      coreGeo.dispose();
-    });
+    lifecycle.add(() => assets.releaseMenuTarget(group, size, color));
     return { group, radius: size * 1.3 };
   }
 
