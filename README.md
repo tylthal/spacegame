@@ -2,6 +2,14 @@
 
 A high-fidelity space combat simulator utilizing Three.js for 3D rendering and MediaPipe Hands for zero-latency gesture control.
 
+## Quickstart
+
+1. Install dependencies: `npm install`
+2. Start the dev server: `npm run dev`
+3. Open the provided localhost URL (Vite defaults to `5173`) in a Chromium-based browser. WebGL2/WebGPU and webcam access are required for gameplay.
+
+For production-style checks, run `npm run build` to type-check and bundle the project.
+
 ## Project Architecture
 
 ### 1. Neural Link (Hand Tracking)
@@ -81,3 +89,11 @@ The game flows through six distinct states managed by `phaseRef`:
 ### Damage Mechanics
 - **Void Breaches**: Enemies target the unrendered station below the camera. Upon impact, they explode and deal hull damage.
 - **Neural Disconnect**: Reaching 0% Hull Integrity triggers a Game Over state. Shoot the red "Reboot" module to restart.
+
+## Documentation Map
+
+- **`docs/ARCHITECTURE.md`**: High-level system design and rendering/data-flow model.
+- **`docs/TECHNICAL_REFERENCE.md`**: File-by-file structure, configuration references, and performance notes.
+- **`docs/DEVELOPER_GUIDE.md`**: Practical walkthrough of the frame pipeline, phase management, and contribution tips.
+- **`docs/UI_STYLE_GUIDE.md`**: Visual language, colors, and component styling conventions.
+- **`docs/USER_GUIDE.md`**: Player-facing instructions and troubleshooting.
