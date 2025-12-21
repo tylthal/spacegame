@@ -1,23 +1,35 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orbital Sniper: Void Defense</title>
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "three": "https://esm.sh/three@0.170.0",
-    "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
-  }
-}
-</script>
+    <script>
+      const existingImportMap = document.querySelector('script[type="importmap"]');
+      if (existingImportMap) {
+        console.error('Unexpected import map detected; bundled dependencies should be used instead of CDN fallbacks.', existingImportMap.textContent);
+      }
+
+      const enableImportMapFallback = window.location.search.includes('useImportMap');
+      if (enableImportMapFallback) {
+        console.error('CDN import map fallback activated; ensure bundling uses local node_modules.', window.location.href);
+        const importMap = {
+          imports: {
+            react: "https://esm.sh/react@19.0.0",
+            "react-dom": "https://esm.sh/react-dom@19.0.0",
+            "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+            three: "https://esm.sh/three@0.170.0",
+            "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm",
+            "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+            "react/": "https://esm.sh/react@^19.2.3/"
+          }
+        };
+        const script = document.createElement('script');
+        script.type = 'importmap';
+        script.textContent = JSON.stringify(importMap, null, 2);
+        document.currentScript?.insertAdjacentElement('afterend', script);
+      }
+    </script>
 </head>
 <body>
     <div id="root"></div>
