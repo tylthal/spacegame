@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameScene from './components/GameScene';
-import WebcamFeed from './components/WebcamFeed';
+import WebcamFeed, { CameraError } from './components/WebcamFeed';
 import { HandTracker } from './services/handTracker';
 import { perfTracer } from './telemetry/PerfTracer';
 import { isDevFeatureEnabled } from './utils/devMode';
@@ -19,7 +19,7 @@ const App: React.FC = () => {
   const [useFallbackControls, setUseFallbackControls] = useState(false);
   const [handTrackingReady, setHandTrackingReady] = useState(false);
   const [cameraPermissionGranted, setCameraPermissionGranted] = useState(false);
-  const [cameraInitError, setCameraInitError] = useState<string | null>(null);
+  const [cameraInitError, setCameraInitError] = useState<CameraError | null>(null);
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
 
@@ -270,13 +270,9 @@ const App: React.FC = () => {
                 setCameraPermissionGranted(true);
                 setCameraInitError(null);
               }}
-              onPermissionDenied={error => {
+              onError={error => {
                 setCameraPermissionGranted(false);
-                setCameraInitError(
-                  error instanceof Error
-                    ? error.message
-                    : 'Unable to access camera. Verify permissions and hardware.',
-                );
+                setCameraInitError(error);
                 setUseFallbackControls(true);
               }}
             />
@@ -284,7 +280,11 @@ const App: React.FC = () => {
               <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-300 text-center px-2">
                 <div className="space-y-1">
                   <div>Camera unavailable — mouse + keyboard fallback active</div>
-                  {cameraInitError && <div className="text-[9px] md:text-[10px] text-red-200/70 normal-case">{cameraInitError}</div>}
+                  {cameraInitError && (
+                    <div className="text-[9px] md:text-[10px] text-red-200/70 normal-case">
+                      {cameraInitError.message}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
