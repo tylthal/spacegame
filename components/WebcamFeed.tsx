@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement>;
+  onPermissionGranted?: () => void;
+  onPermissionDenied?: (error: unknown) => void;
 }
 
 /**
@@ -9,7 +11,7 @@ interface Props {
  * Requests and manages the user's camera stream.
  * Optimized for computer vision tasks with low-resolution and specific frame rate.
  */
-const WebcamFeed: React.FC<Props> = ({ videoRef }) => {
+const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onPermissionDenied }) => {
   useEffect(() => {
     async function startCamera() {
       try {
@@ -31,9 +33,11 @@ const WebcamFeed: React.FC<Props> = ({ videoRef }) => {
             videoRef.current.srcObject = stream;
             videoRef.current.play();
           }
+          onPermissionGranted?.();
         }
       } catch (err) {
         console.error("Neural Uplink Error (Camera Access):", err);
+        onPermissionDenied?.(err);
       }
     }
     startCamera();

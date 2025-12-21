@@ -7,14 +7,23 @@ import GameOverOverlay from './ui/GameOverOverlay';
 import HelpOverlay from './ui/HelpOverlay';
 import { OverlayState } from './ui/OverlayStateAdapter';
 
-type Props = OverlayState;
+type Props = OverlayState & { onStartWithoutTracking?: () => void };
 
-const SceneOverlays: React.FC<Props> = ({ phase, score, calibrationProgress, trackingStatus, weaponStatus, helpState }) => {
+const SceneOverlays: React.FC<Props> = ({
+  phase,
+  score,
+  calibrationProgress,
+  trackingStatus,
+  weaponStatus,
+  helpState,
+  calibrationStatus,
+  onStartWithoutTracking,
+}) => {
   return (
     <>
       {/* HUD Elements */}
       {(phase === 'PLAYING' || phase === 'READY') && (
-        <WeaponStatus 
+        <WeaponStatus
             heat={weaponStatus.heat} 
             isOverheated={weaponStatus.isOverheated} 
             missileProgress={weaponStatus.missileProgress} 
@@ -23,7 +32,12 @@ const SceneOverlays: React.FC<Props> = ({ phase, score, calibrationProgress, tra
 
       {/* Overlays */}
       {phase === 'CALIBRATING' && (
-        <CalibrationOverlay progress={calibrationProgress} trackingStatus={trackingStatus} />
+        <CalibrationOverlay
+          progress={calibrationProgress}
+          trackingStatus={trackingStatus}
+          calibrationStatus={calibrationStatus}
+          onStartWithoutTracking={onStartWithoutTracking}
+        />
       )}
 
       {phase === 'READY' && <ReadyOverlay />}
