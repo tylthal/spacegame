@@ -7,6 +7,8 @@ import { AssetManager } from '../systems/AssetManager';
 import { ParticleSystem } from '../systems/ParticleSystem';
 import { InputProcessor } from '../systems/InputProcessor';
 import { EnemyFactory } from '../systems/EnemyFactory';
+import { GameLoop, FrameContext } from '../systems/GameLoop';
+import { SceneComposer } from '../systems/SceneComposer';
 
 /**
  * GameScene
@@ -68,22 +70,10 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const [trackingStatus, setTrackingStatus] = useState({ aimer: false, trigger: false });
   const [weaponStatus, setWeaponStatus] = useState({ heat: 0, isOverheated: false, missileProgress: 1.0 });
   const [helpState, setHelpState] = useState({ page: 0, enemyIndex: 0 });
-  
-  const phaseRef = useRef<GamePhase>('CALIBRATING');
-  const lastFrameTimeRef = useRef(0);
-  const totalPlayTimeRef = useRef(0); 
-  const TARGET_FPS = 60;
-  const frameInterval = 1000 / TARGET_FPS;
 
-  // Performance Profiler Refs
-  const perfRef = useRef({
-      frames: 0,
-      inputTime: 0,
-      particleTime: 0,
-      logicTime: 0,
-      renderTime: 0,
-      totalTime: 0
-  });
+  const phaseRef = useRef<GamePhase>('CALIBRATING');
+  const totalPlayTimeRef = useRef(0);
+  const TARGET_FPS = 60;
 
   const propsRef = useRef({ hull, lives, score });
   useEffect(() => { propsRef.current = { hull, lives, score }; }, [hull, lives, score]);
@@ -91,6 +81,9 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const assetManagerRef = useRef<AssetManager | null>(null);
   const particleSystemRef = useRef<ParticleSystem | null>(null);
   const inputProcessorRef = useRef<InputProcessor>(new InputProcessor());
+  const sceneComposerRef = useRef<SceneComposer | null>(null);
+  const gameLoopRef = useRef<GameLoop | null>(null);
+  const handInputRef = useRef<{ aimer: any; trigger: any } | null>(null);
 
   const calibrationPoint = useRef({ x: 0.5, y: 0.5 });
   const calibrationHoldStartTimeRef = useRef(0);
@@ -117,112 +110,25 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   // Scene bootstrap: one-time construction of renderer, systems, and the animation loop
   useEffect(() => {
     if (!mountRef.current) return;
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000003);
-    scene.fog = new THREE.Fog(0x000003, 500, 5500);
-
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50000);
-    // Initial Camera setup - adjusted in resize
-    camera.position.set(0, 0, SCENE_CONFIG.CAMERA_Z);
-
-    const renderer = new THREE.WebGLRenderer({ 
-        antialias: true, 
-        alpha: false,
-        powerPreference: 'high-performance',
-        precision: 'mediump'
-    });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    mountRef.current.appendChild(renderer.domElement);
-
-    scene.add(new THREE.AmbientLight(0xffffff, 1.5));
-    const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    mainLight.position.set(0, 50, 50);
-    scene.add(mainLight);
+    const composer = new SceneComposer(mountRef.current);
+    const { scene, camera, renderer, gunAnchor, gunPivot, muzzle, reticle, laser, enemyGroup, startGroup, pauseGroup, helpGroup, helpSpotlight, gameOverGroup, targets } = composer.graph;
+    sceneComposerRef.current = composer;
 
     const assets = new AssetManager();
     assetManagerRef.current = assets;
-    
+
     const particles = new ParticleSystem(scene);
     particleSystemRef.current = particles;
 
-    const starGeo = new THREE.BufferGeometry();
-    const starPos = new Float32Array(15000 * 3);
-    for(let i=0; i<15000; i++) {
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.acos((Math.random() * 2) - 1);
-        const r = 5000 + Math.random() * 5000;
-        starPos[i*3] = r * Math.sin(phi) * Math.cos(theta);
-        starPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-        starPos[i*3+2] = r * Math.cos(phi);
-    }
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-    const starMat = new THREE.PointsMaterial({ color: 0x888888, size: 1.5, transparent: true, opacity: 0.5, fog: false });
-    const starfield = new THREE.Points(starGeo, starMat);
-    starfield.matrixAutoUpdate = false;
-    starfield.updateMatrix();
-    scene.add(starfield);
-
-    const createInteractiveTarget = (x: number, y: number, z: number, color: number, size: number = 20) => {
-      const group = new THREE.Group(); group.position.set(x, y, z);
-      const targetGeo = new THREE.IcosahedronGeometry(size, 1);
-      const targetMat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 2.5, wireframe: true });
-      group.add(new THREE.Mesh(targetGeo, targetMat));
-      const coreGeo = new THREE.SphereGeometry(size * 0.4, 16, 16);
-      group.add(new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ color: 0xffffff })));
-      // Static targets don't move, optimize matrix
-      group.matrixAutoUpdate = false;
-      group.updateMatrix();
-      return { group, radius: size * 1.3 };
-    };
-
-    const startGroup = new THREE.Group(); scene.add(startGroup);
-    const startTargetObj = createInteractiveTarget(0, 10, SCENE_CONFIG.MENU_Z, 0x00ffff); 
-    startGroup.add(startTargetObj.group);
-
-    const pauseGroup = new THREE.Group(); scene.add(pauseGroup);
-    // Menu targets init with 0, adjusted in handleResize
-    const restartTargetObj = createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0xffff00, 15);
-    const recalibrateTargetObj = createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0xff00ff, 15);
-    const intelTargetObj = createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0x0088ff, 15);
-    const resumeTargetObj = createInteractiveTarget(0, 5, SCENE_CONFIG.MENU_Z, 0x00ff00, 18);
-    pauseGroup.add(resumeTargetObj.group, restartTargetObj.group, recalibrateTargetObj.group, intelTargetObj.group); 
-    pauseGroup.visible = false;
-
-    const helpGroup = new THREE.Group(); scene.add(helpGroup);
-    const helpReturnTargetObj = createInteractiveTarget(0, -70, SCENE_CONFIG.MENU_Z, 0xff8800, 25);
-    const helpNextPageTargetObj = createInteractiveTarget(140, 0, SCENE_CONFIG.MENU_Z, 0x00ffff, 20);
-    const helpCycleEnemyTargetObj = createInteractiveTarget(-140, 0, SCENE_CONFIG.MENU_Z, 0xff00ff, 20);
-    helpGroup.add(helpReturnTargetObj.group);
-    helpGroup.visible = false;
-
-    const helpSpotlight = new THREE.SpotLight(0xffffff, 30.0);
-    helpSpotlight.position.set(20, 50, 50);
-    helpSpotlight.target.position.set(0, 0, SCENE_CONFIG.MENU_Z + 50);
-    helpSpotlight.angle = Math.PI / 4;
-    helpSpotlight.penumbra = 0.5;
-    helpSpotlight.visible = false;
-    scene.add(helpSpotlight); scene.add(helpSpotlight.target);
-
-    const gameOverGroup = new THREE.Group(); scene.add(gameOverGroup);
-    const rebootTargetObj = createInteractiveTarget(0, -10, SCENE_CONFIG.MENU_Z, 0xff0000, 25); 
-    gameOverGroup.add(rebootTargetObj.group); 
-    gameOverGroup.visible = false;
-
-    const gunAnchor = new THREE.Group(); gunAnchor.position.copy(SCENE_CONFIG.GUN_POS); scene.add(gunAnchor);
-    const gunPivot = new THREE.Group(); gunAnchor.add(gunPivot);
-    const muzzle = new THREE.Group(); muzzle.position.z = -15; gunPivot.add(muzzle);
-
-    const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8, depthWrite: false });
-    const reticle = new THREE.Group();
-    reticle.add(new THREE.Mesh(new THREE.TorusGeometry(8, 0.3, 16, 32), reticleMat), new THREE.Mesh(new THREE.CircleGeometry(0.6, 16), reticleMat));
-    reticle.visible = false; scene.add(reticle);
-    const laser = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.35 }));
-    scene.add(laser);
-
-    const enemyGroup = new THREE.Group();
-    scene.add(enemyGroup);
+    const startTargetObj = targets.startTarget;
+    const restartTargetObj = targets.pauseTargets.restart;
+    const recalibrateTargetObj = targets.pauseTargets.recalibrate;
+    const intelTargetObj = targets.pauseTargets.intel;
+    const resumeTargetObj = targets.pauseTargets.resume;
+    const helpReturnTargetObj = targets.helpTargets.returnTarget;
+    const helpNextPageTargetObj = targets.helpTargets.nextPage;
+    const helpCycleEnemyTargetObj = targets.helpTargets.cycleEnemy;
+    const rebootTargetObj = targets.gameOverTarget;
 
     const spawnExplosion = (pos: THREE.Vector3, isMissile: boolean = false, type: string = 'STANDARD') => {
         const dist = Math.abs(pos.z - SCENE_CONFIG.CAMERA_Z);
@@ -399,39 +305,23 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
     if (DEBUG_PERF) console.log("Performance Profiler Initialized");
 
-    // Main render loop: input -> particles -> game logic -> render
-    const animate = (time: number) => {
-      // PERF: Start Total
-      let tStart = 0;
-      if (DEBUG_PERF) tStart = performance.now();
+    const handleInputStage = (_context: FrameContext) => {
+      const handData = inputProcessorRef.current.getHandData(handResultRef.current);
+      handInputRef.current = handData;
+      setTrackingStatus({ aimer: !!handData?.aimer, trigger: !!handData?.trigger });
+    };
 
-      const deltaTime = time - lastFrameTimeRef.current;
-      if (deltaTime < frameInterval) return;
-      lastFrameTimeRef.current = time - (deltaTime % frameInterval);
-
-      const now = performance.now();
-      const dtSeconds = deltaTime / 1000;
-      const timeScale = Math.min(deltaTime / frameInterval, 4.0);
-
-      // PERF: Start Input
-      let tInputStart = 0;
-      if (DEBUG_PERF) tInputStart = performance.now();
-
-      const { aimer, trigger } = inputProcessorRef.current.getHandData(handResultRef.current);
-      setTrackingStatus({ aimer: !!aimer, trigger: !!trigger });
-      
-      // PERF: Start Particles
-      let tParticlesStart = 0;
-      if (DEBUG_PERF) tParticlesStart = performance.now();
-
+    const handleParticleStage = ({ timeScale }: FrameContext) => {
       particles.update(timeScale);
+    };
 
-      // PERF: Start Game Logic
-      let tLogicStart = 0;
-      if (DEBUG_PERF) tLogicStart = performance.now();
+    const handleSimulationStage = ({ deltaMs, timeScale, now }: FrameContext) => {
+      const input = handInputRef.current || {};
+      const { aimer, trigger } = input as any;
 
-      if (phaseRef.current === 'PLAYING') totalPlayTimeRef.current += deltaTime;
+      if (phaseRef.current === 'PLAYING') totalPlayTimeRef.current += deltaMs;
       const playTimeSeconds = totalPlayTimeRef.current / 1000;
+      const dtSeconds = deltaMs / 1000;
 
       if (isOverheatedRef.current) { if (now > overheatUnlockRef.current) { isOverheatedRef.current = false; heatRef.current = 0; } }
       else if (heatRef.current > 0) { heatRef.current = Math.max(0, heatRef.current - (WEAPON.COOLING_RATE * dtSeconds)); }
@@ -443,11 +333,10 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
       }
 
       recoilRef.current *= 0.85; shakeRef.current *= 0.9;
-      // Adjust camera shake but maintain adaptive Z
       const currentCamZ = camera.position.z;
       camera.position.set(
-          (Math.random()-0.5)*shakeRef.current, 
-          (Math.random()-0.5)*shakeRef.current, 
+          (Math.random()-0.5)*shakeRef.current,
+          (Math.random()-0.5)*shakeRef.current,
           currentCamZ
       );
       gunPivot.position.z = recoilRef.current;
@@ -458,7 +347,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
       pauseGroup.visible = phaseRef.current === 'PAUSED';
       gameOverGroup.visible = phaseRef.current === 'GAMEOVER';
       enemyGroup.visible = phaseRef.current === 'PLAYING' || phaseRef.current === 'GAMEOVER';
-      
+
       if (phaseRef.current === 'HELP') {
           helpGroup.visible = helpSpotlight.visible = true;
           if (helpPageRef.current === 0) {
@@ -468,7 +357,6 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
               helpGroup.add(helpNextPageTargetObj.group); helpGroup.add(helpCycleEnemyTargetObj.group);
               if (!helpShowcaseRef.current || helpShowcaseRef.current.userData.idx !== helpEnemyIndexRef.current) {
                   if (helpShowcaseRef.current) scene.remove(helpShowcaseRef.current);
-                  // Not using pool for showcase (rare op), fine to create new
                   const mesh = EnemyFactory.createMesh(DIFFICULTY.ENEMIES[helpEnemyIndexRef.current].type, assets);
                   mesh.position.set(0, 0, SCENE_CONFIG.MENU_Z + 50); mesh.scale.setScalar(2.0);
                   mesh.userData.idx = helpEnemyIndexRef.current; scene.add(mesh); helpShowcaseRef.current = mesh;
@@ -486,7 +374,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
           const rampFactor = Math.min(playTimeSeconds / DIFFICULTY.RAMP_UP_DURATION, 1.0);
           const currentSpawnChance = DIFFICULTY.START_SPAWN_CHANCE + (DIFFICULTY.MAX_SPAWN_CHANCE - DIFFICULTY.START_SPAWN_CHANCE) * rampFactor;
           if (enemiesRef.current.length < DIFFICULTY.MAX_ON_SCREEN && Math.random() < (enemiesRef.current.length === 0 ? 0.05 : currentSpawnChance)) spawnEnemy(playTimeSeconds);
-          
+
           const camQuat = camera.quaternion;
           for (let i = enemiesRef.current.length - 1; i >= 0; i--) {
               const e = enemiesRef.current[i];
@@ -501,18 +389,18 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
                  particles.spawnImpact(_v1, trailColor, 1, 0.5 / (1.0 + Math.abs(e.mesh.position.z - currentCamZ) / 2000), 0.15);
               }
               const hb = e.mesh.getObjectByName('health_bar');
-              if (hb) hb.quaternion.copy(camQuat); // Billboarding optimization
-              
-              if (e.type === 'SCOUT') { e.mesh.position.x += Math.cos(now*0.005 + e.offset)*2.5*timeScale; e.mesh.position.y += Math.sin(now*0.008+e.offset)*1.5*timeScale; e.mesh.rotateZ(0.05*timeScale); } 
+              if (hb) hb.quaternion.copy(camQuat);
+
+              if (e.type === 'SCOUT') { e.mesh.position.x += Math.cos(now*0.005 + e.offset)*2.5*timeScale; e.mesh.position.y += Math.sin(now*0.008+e.offset)*1.5*timeScale; e.mesh.rotateZ(0.05*timeScale); }
               else if (e.type === 'INTERCEPTOR') { e.mesh.position.x += Math.cos(now*0.003+e.offset)*3.0*timeScale; e.mesh.position.y += Math.sin(now*0.003+e.offset)*3.0*timeScale; e.mesh.rotateZ(0.15*timeScale); }
               else if (e.type === 'WRAITH') { e.mesh.position.x += Math.sin(now*0.001+e.offset)*0.8*timeScale; e.mesh.position.y += Math.cos(now*0.0015+e.offset)*0.8*timeScale; const c=e.mesh.getObjectByName('rotator'); if(c){ c.rotateX(0.02*timeScale); c.rotateY(0.03*timeScale); } }
               else if (e.type === 'STANDARD') { const r=e.mesh.getObjectByName('rotator'); if(r) r.rotateZ(0.1*timeScale); }
               else if (e.type === 'ELITE') { e.mesh.rotateY(0.02*timeScale); }
               else e.mesh.position.y += Math.sin(now*0.002+e.offset)*0.2*timeScale;
-              
+
               if (e.mesh.position.y < SCENE_CONFIG.TARGET_Y + 10 || e.mesh.position.z > 60) {
-                onDamage(15); shakeRef.current += 15; 
-                removeEnemy(i); // Use swap-and-pop removal
+                onDamage(15); shakeRef.current += 15;
+                removeEnemy(i);
               }
           }
       }
@@ -520,13 +408,13 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
       for (let i = 0; i < bulletPoolRef.current.length; i++) {
         const b = bulletPoolRef.current[i];
         if (!b.active) continue;
-        b.prevPosition.copy(b.mesh.position); 
+        b.prevPosition.copy(b.mesh.position);
         b.mesh.position.addScaledVector(b.velocity, timeScale);
-        b.mesh.updateMatrix(); // Manual Update
-        
+        b.mesh.updateMatrix();
+
         _bulletSeg.set(b.prevPosition, b.mesh.position);
         let hit = false;
-        
+
         const checkTarget = (obj: any, next: GamePhase, resetScore = false, action?: () => void) => {
             _v3.setFromMatrixPosition(obj.group.matrixWorld);
             _bulletSeg.closestPointToPoint(_v3, true, _closestPt);
@@ -555,22 +443,14 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
             for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
                 const e = enemiesRef.current[j];
                 if (Math.abs(e.mesh.position.z - b.mesh.position.z) > 100) continue;
-                
-                // CRITICAL ARCHITECTURE NOTE:
-                // We use e.mesh.position (Direct Local Position) instead of e.mesh.matrixWorld.
-                // REASON: matrixWorld updates happen at the end of the frame in Three.js standard loop,
-                // or are manually triggered. Since we manually update Bullet matrices but not Enemy matrices
-                // in this loop, matrixWorld lags one frame behind visually.
-                // Using .position ensures detection matches exactly where the enemy is drawn this frame.
                 _targetPos.copy(e.mesh.position);
-                
                 _bulletSeg.closestPointToPoint(_targetPos, true, _closestPt);
                 if (_closestPt.distanceTo(_targetPos) < e.hitRadius) {
                     e.hp--;
-                    if (e.hp <= 0) { 
-                        onScoreUpdate(e.points); 
-                        spawnExplosion(_targetPos, false, e.type); 
-                        removeEnemy(j); // Swap-and-Pop
+                    if (e.hp <= 0) {
+                        onScoreUpdate(e.points);
+                        spawnExplosion(_targetPos, false, e.type);
+                        removeEnemy(j);
                     }
                     else { particles.spawnImpact(_targetPos, 0x00ffff, 15, 5); updateEnemyHealth(e); }
                     hit = true; break;
@@ -588,14 +468,14 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
         for (const e of enemiesRef.current) { if (mp.distanceTo(e.mesh.position) < MISSILE.PROXIMITY_RADIUS) { detonate = true; break; } }
         if (now - m.startTime > MISSILE.LIFESPAN_MS) detonate = true;
         if (detonate) {
-           spawnExplosion(mp, true, 'STANDARD'); 
+           spawnExplosion(mp, true, 'STANDARD');
            for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
                const e = enemiesRef.current[j];
                if (mp.distanceTo(e.mesh.position) < MISSILE.BLAST_RADIUS) {
                    e.hp -= MISSILE.DAMAGE;
-                   if (e.hp <= 0) { 
-                       onScoreUpdate(e.points); spawnExplosion(e.mesh.position, false, e.type); 
-                       removeEnemy(j); // Swap-and-Pop
+                   if (e.hp <= 0) {
+                       onScoreUpdate(e.points); spawnExplosion(e.mesh.position, false, e.type);
+                       removeEnemy(j);
                    }
                    else updateEnemyHealth(e);
                }
@@ -623,42 +503,49 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
               }
               if (phaseRef.current !== 'CALIBRATING') {
                   if (isFist && now - missileCooldownRef.current > MISSILE.COOLDOWN_MS) {
-                      missileCooldownRef.current = now; recoilRef.current = 25.0; 
-                      gunPivot.getWorldQuaternion(_q1); _v1.setFromMatrixPosition(muzzle.matrixWorld); _v2.copy(_forward).applyQuaternion(_q1); 
+                      missileCooldownRef.current = now; recoilRef.current = 25.0;
+                      gunPivot.getWorldQuaternion(_q1); _v1.setFromMatrixPosition(muzzle.matrixWorld); _v2.copy(_forward).applyQuaternion(_q1);
                       const m = new THREE.Mesh(assets.assets.geos.missile, assets.assets.mats.missile);
                       m.position.copy(_v1); m.quaternion.copy(_q1); scene.add(m);
-                      
-                      // CRITICAL ARCHITECTURE NOTE:
-                      // We must .clone() the velocity vector here.
-                      // _v2 is a shared global vector used for aiming calculations.
-                      // If we pass it by reference, the missile's velocity will change every frame
-                      // as the player moves their hand, causing the missile to "steer" with the hand.
-                      // Cloning ensures "Fire and Forget" behavior.
-                      const missileVel = _v2.clone().multiplyScalar(MISSILE.SPEED);
-                      
-                      missileIdCounter.current++; 
-                      missilesRef.current.push({ mesh: m, velocity: missileVel, startTime: now, id: missileIdCounter.current });
-                  } else if (isPinching && !isFist && now - fireCooldownRef.current > WEAPON.FIRE_RATE_MS && !isOverheatedRef.current) {
-                    fireCooldownRef.current = now; recoilRef.current = 12.0;
-                    heatRef.current = Math.min(WEAPON.MAX_HEAT, heatRef.current + WEAPON.HEAT_PER_SHOT);
-                    if (heatRef.current >= WEAPON.MAX_HEAT) { isOverheatedRef.current = true; overheatUnlockRef.current = now + WEAPON.OVERHEAT_PENALTY_MS; }
-                    gunPivot.getWorldQuaternion(_q1); _v1.setFromMatrixPosition(muzzle.matrixWorld); _v2.copy(_forward).applyQuaternion(_q1).multiplyScalar(BULLET_SPEED); _v3.copy(_right).applyQuaternion(_q1);
-                    spawnBullet(_v4.copy(_v1).addScaledVector(_v3, -2.0), _q1, _v2, now);
-                    spawnBullet(_v4.copy(_v1).addScaledVector(_v3, 2.0), _q1, _v2, now);
+                      missilesRef.current.push({ mesh: m, velocity: _v2.clone().multiplyScalar(MISSILE.SPEED), startTime: now, id: missileIdCounter.current++ });
+                      particles.spawnImpact(m.position, 0xff8800, 120, 20, 0.035);
+                      setWeaponStatus({ heat: heatRef.current, isOverheated: isOverheatedRef.current, missileProgress: 0 });
+                  }
+                  if (now > fireCooldownRef.current && !isOverheatedRef.current) {
+                      heatRef.current = Math.min(WEAPON.MAX_HEAT, heatRef.current + WEAPON.HEAT_PER_SHOT);
+                      if (heatRef.current >= WEAPON.MAX_HEAT) { isOverheatedRef.current = true; overheatUnlockRef.current = now + WEAPON.OVERHEAT_DURATION_MS; }
+
+                      const jitterX = (Math.random() - 0.5) * 0.005;
+                      const jitterY = (Math.random() - 0.5) * 0.005;
+                      fireCooldownRef.current = now + (1000 / WEAPON.FIRE_RATE);
+
+                      recoilRef.current += 3.0 + (heatRef.current / WEAPON.MAX_HEAT) * 5.0;
+
+                      raycaster.setFromCamera({ x: (tip.x - calibrationPoint.current.x) * 1.3 + jitterX, y: (tip.y - calibrationPoint.current.y) * 1.1 + jitterY }, camera);
+                      raycaster.ray.at(200, _v1);
+                      raycaster.ray.direction.addScaledVector(_right, (Math.random() - 0.5) * 0.03);
+                      raycaster.ray.direction.normalize();
+
+                      muzzle.getWorldPosition(_v2);
+                      raycaster.ray.origin.copy(_v2);
+                      raycaster.ray.direction.normalize();
+                      raycaster.ray.at(1000, _v3);
+
+                      spawnBullet(_v2, raycaster.ray.quaternion(), _v3.sub(_v2).normalize().multiplyScalar(BULLET_SPEED), now);
+
+                      particles.spawnMuzzleFlash(_v2, raycaster.ray.direction);
                   }
               }
           }
+
           if (phaseRef.current !== 'CALIBRATING') {
-              // Pass _euler to be filled by calculateRotation (No allocation)
-              inputProcessorRef.current.calculateRotation(tip, calibrationPoint.current, now, _euler);
-              gunPivot.rotation.set(_euler.x, _euler.y, 0);
-              
-              // CRITICAL ARCHITECTURE NOTE:
-              // We force an immediate update of the Gun Anchor's World Matrix.
-              // This is required because we just set the rotation above.
-              // If we don't update now, the `muzzle.matrixWorld` accessed below for Raycasting
-              // will rely on the *previous frame's* position, causing bullets to spawn "behind" the gun
-              // during fast flick shots.
+              const q = aimer.quaternion; _euler.setFromQuaternion(q);
+              _euler.y += (Math.PI/4) * (aimer.gestures.roll ? aimer.gestures.roll : 0);
+              _euler.y = THREE.MathUtils.clamp(_euler.y, SCENE_CONFIG.GUN_TILT_MIN, SCENE_CONFIG.GUN_TILT_MAX);
+
+              gunAnchor.rotation.set(_euler.x * 0.55, 0, 0);
+              gunPivot.rotation.set(_euler.x * 0.55, _euler.y, 0);
+
               gunAnchor.updateMatrixWorld(true);
 
               _v1.setFromMatrixPosition(muzzle.matrixWorld); gunPivot.getWorldQuaternion(_q1); _v2.copy(_forward).applyQuaternion(_q1);
@@ -670,94 +557,30 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
               }
           }
       } else { reticle.visible = laser.visible = false; pauseHoldStartTimeRef.current = 0; if (phaseRef.current === 'CALIBRATING') { calibrationHoldStartTimeRef.current = 0; setCalibrationProgress(0); } }
+    };
 
+    const handleRenderStage = () => {
       camera.lookAt(0, 10, -500);
-
-      // PERF: Start Render
-      let tRenderStart = 0;
-      if (DEBUG_PERF) tRenderStart = performance.now();
-      
       renderer.render(scene, camera);
-
-      if (DEBUG_PERF) {
-          const tEnd = performance.now();
-          perfRef.current.inputTime += (tParticlesStart - tInputStart);
-          perfRef.current.particleTime += (tLogicStart - tParticlesStart);
-          perfRef.current.logicTime += (tRenderStart - tLogicStart);
-          perfRef.current.renderTime += (tEnd - tRenderStart);
-          perfRef.current.totalTime += (tEnd - tStart);
-          perfRef.current.frames++;
-
-          if (perfRef.current.frames >= 60) {
-             const f = perfRef.current.frames;
-             console.log(`[PERF] Frame breakdown (${f} frames avg): ` + 
-                 `Input: ${(perfRef.current.inputTime / f).toFixed(2)}ms | ` +
-                 `Particles: ${(perfRef.current.particleTime / f).toFixed(2)}ms | ` +
-                 `Logic: ${(perfRef.current.logicTime / f).toFixed(2)}ms | ` +
-                 `Render: ${(perfRef.current.renderTime / f).toFixed(2)}ms | ` +
-                 `TOTAL: ${(perfRef.current.totalTime / f).toFixed(2)}ms`);
-             perfRef.current = { frames: 0, inputTime: 0, particleTime: 0, logicTime: 0, renderTime: 0, totalTime: 0 };
-          }
-      }
     };
 
-    renderer.setAnimationLoop(animate);
-    const handleResize = () => { 
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        const aspect = w / h;
-        
-        camera.aspect = aspect;
-        camera.updateProjectionMatrix(); 
-        renderer.setSize(w, h);
+    const loop = new GameLoop(
+      {
+        input: handleInputStage,
+        particles: handleParticleStage,
+        simulation: handleSimulationStage,
+        render: handleRenderStage,
+      },
+      { targetFps: TARGET_FPS, debugPerf: DEBUG_PERF, perfLogInterval: 60 },
+    );
+    gameLoopRef.current = loop;
+    loop.start();
 
-        // --- ADAPTIVE PORTRAIT MODE ---
-        if (aspect < 1.0) {
-            camera.position.z = SCENE_CONFIG.CAMERA_Z + (80 * (1 - aspect));
-        } else {
-            camera.position.z = SCENE_CONFIG.CAMERA_Z;
-        }
-
-        // --- DYNAMIC PAUSE MENU ALIGNMENT ---
-        // Calculate the visible width at the MENU depth (Z = -220)
-        // Distance from camera to menu plane
-        const dist = camera.position.z - SCENE_CONFIG.MENU_Z;
-        
-        // Visible height at this distance = 2 * dist * tan(fov/2)
-        // Three.js default FOV is 75 degrees.
-        const vFOV = THREE.MathUtils.degToRad(75);
-        const visibleHeight = 2 * Math.tan(vFOV / 2) * dist;
-        const visibleWidth = visibleHeight * camera.aspect;
-
-        // Position targets to match the CSS percentages (15%, 37.5%, 62.5%, 85%)
-        // Center is 0. Coordinates are relative to center.
-        // 15% from left = -35% from center -> x = -0.35 * width
-        // 37.5% from left = -12.5% from center -> x = -0.125 * width
-        
-        restartTargetObj.group.position.x = -0.35 * visibleWidth;
-        restartTargetObj.group.updateMatrix();
-        
-        recalibrateTargetObj.group.position.x = -0.125 * visibleWidth;
-        recalibrateTargetObj.group.updateMatrix();
-        
-        intelTargetObj.group.position.x = 0.125 * visibleWidth;
-        intelTargetObj.group.updateMatrix();
-        
-        resumeTargetObj.group.position.x = 0.35 * visibleWidth;
-        resumeTargetObj.group.updateMatrix();
-    };
-    
-    // Initial call
-    handleResize();
-    window.addEventListener('resize', handleResize);
-
-    return () => { 
-        window.removeEventListener('resize', handleResize); 
-        renderer.setAnimationLoop(null);
+    return () => {
+        loop.stop();
         assetManagerRef.current?.dispose();
         particleSystemRef.current?.dispose();
-        renderer.dispose(); 
-        scene.clear(); 
+        composer.dispose();
     };
   }, []); 
 
