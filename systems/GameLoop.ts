@@ -1,3 +1,5 @@
+import { PerfTracer, perfTracer as defaultTracer } from '../telemetry/PerfTracer';
+
 type FrameHook = (context: FrameContext) => void;
 
 interface FrameHooks {
@@ -13,19 +15,13 @@ export interface FrameContext {
   now: number;
 }
 
-interface PerfTotals {
-  frames: number;
-  inputTime: number;
-  particleTime: number;
-  logicTime: number;
-  renderTime: number;
-  totalTime: number;
-}
-
 interface GameLoopOptions {
   targetFps?: number;
   debugPerf?: boolean;
+  telemetryEnabled?: boolean;
   perfLogInterval?: number;
+  perfWindow?: number;
+  tracer?: PerfTracer;
 }
 
 /**
@@ -35,26 +31,30 @@ interface GameLoopOptions {
 export class GameLoop {
   private hooks: FrameHooks;
   private readonly frameInterval: number;
-  private readonly debugPerf: boolean;
-  private readonly perfLogInterval: number;
+  private readonly tracer: PerfTracer;
   private running = false;
   private rafId = 0;
   private lastFrameTime = 0;
-  private perfTotals: PerfTotals = {
-    frames: 0,
-    inputTime: 0,
-    particleTime: 0,
-    logicTime: 0,
-    renderTime: 0,
-    totalTime: 0,
-  };
 
   constructor(hooks: FrameHooks, options: GameLoopOptions = {}) {
     this.hooks = hooks;
     const targetFps = options.targetFps ?? 60;
     this.frameInterval = 1000 / targetFps;
-    this.debugPerf = options.debugPerf ?? false;
-    this.perfLogInterval = options.perfLogInterval ?? 60;
+    const requestedEnabled = options.telemetryEnabled ?? options.debugPerf;
+    const baseTracer = options.tracer ?? defaultTracer;
+    const shouldRebuild =
+      !options.tracer &&
+      (typeof requestedEnabled === 'boolean' ||
+        typeof options.perfLogInterval === 'number' ||
+        typeof options.perfWindow === 'number');
+
+    this.tracer = shouldRebuild
+      ? PerfTracer.create({
+          enabled: requestedEnabled ?? baseTracer.isEnabled(),
+          logInterval: options.perfLogInterval,
+          frameWindow: options.perfWindow,
+        })
+      : baseTracer;
   }
 
   updateHooks(nextHooks: FrameHooks) {
@@ -91,66 +91,21 @@ export class GameLoop {
       now,
     };
 
-    let tStart = 0;
-    let prev = 0;
-    if (this.debugPerf) {
-      tStart = performance.now();
-      prev = tStart;
-    }
-
+    const inputStart = this.tracer.startSpan('input');
     this.hooks.input?.(context);
-    if (this.debugPerf) {
-      const t = performance.now();
-      this.perfTotals.inputTime += t - prev;
-      prev = t;
-    }
+    this.tracer.endSpan('input', inputStart);
 
+    const logicStart = this.tracer.startSpan('logic');
     this.hooks.particles?.(context);
-    if (this.debugPerf) {
-      const t = performance.now();
-      this.perfTotals.particleTime += t - prev;
-      prev = t;
-    }
-
     this.hooks.simulation?.(context);
-    if (this.debugPerf) {
-      const t = performance.now();
-      this.perfTotals.logicTime += t - prev;
-      prev = t;
-    }
+    this.tracer.endSpan('logic', logicStart);
 
+    const renderStart = this.tracer.startSpan('render');
     this.hooks.render?.(context);
-    if (this.debugPerf) {
-      const tEnd = performance.now();
-      this.perfTotals.renderTime += tEnd - prev;
-      this.perfTotals.totalTime += tEnd - tStart;
-      this.perfTotals.frames++;
-      this.maybeLogPerf();
-    }
+    this.tracer.endSpan('render', renderStart);
+
+    this.tracer.finalizeFrame();
 
     this.rafId = requestAnimationFrame(this.tick);
   };
-
-  private maybeLogPerf() {
-    if (!this.debugPerf) return;
-    if (this.perfTotals.frames < this.perfLogInterval) return;
-
-    const f = this.perfTotals.frames;
-    console.log(
-      `[PERF] Frame breakdown (${f} frames avg): ` +
-        `Input: ${(this.perfTotals.inputTime / f).toFixed(2)}ms | ` +
-        `Particles: ${(this.perfTotals.particleTime / f).toFixed(2)}ms | ` +
-        `Logic: ${(this.perfTotals.logicTime / f).toFixed(2)}ms | ` +
-        `Render: ${(this.perfTotals.renderTime / f).toFixed(2)}ms | ` +
-        `TOTAL: ${(this.perfTotals.totalTime / f).toFixed(2)}ms`,
-    );
-    this.perfTotals = {
-      frames: 0,
-      inputTime: 0,
-      particleTime: 0,
-      logicTime: 0,
-      renderTime: 0,
-      totalTime: 0,
-    };
-  }
 }
