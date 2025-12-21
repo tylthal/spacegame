@@ -2,13 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GamePhase, EnemyData, BulletData, MissileData } from '../types';
 import SceneOverlays from './SceneOverlays';
-import { DIFFICULTY, WEAPON, MISSILE, SCENE_CONFIG, BULLET_SPEED, BULLET_LIFESPAN, PAUSE_HOLD_TIME_MS, CALIBRATION_HOLD_TIME_MS } from '../config/constants';
+import { DIFFICULTY, WEAPON, MISSILE, SCENE_CONFIG, BULLET_SPEED, BULLET_LIFESPAN } from '../config/constants';
 import { AssetManager } from '../systems/AssetManager';
 import { ParticleSystem } from '../systems/ParticleSystem';
 import { InputProcessor } from '../systems/InputProcessor';
 import { EnemyFactory } from '../systems/EnemyFactory';
 import { GameLoop, FrameContext } from '../systems/GameLoop';
 import { SceneComposer } from '../systems/SceneComposer';
+import { PhaseManager } from '../systems/PhaseManager';
 
 /**
  * GameScene
@@ -71,7 +72,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const [weaponStatus, setWeaponStatus] = useState({ heat: 0, isOverheated: false, missileProgress: 1.0 });
   const [helpState, setHelpState] = useState({ page: 0, enemyIndex: 0 });
 
-  const phaseRef = useRef<GamePhase>('CALIBRATING');
+  const phaseManagerRef = useRef<PhaseManager | null>(null);
   const totalPlayTimeRef = useRef(0);
   const TARGET_FPS = 60;
 
@@ -86,9 +87,6 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const handInputRef = useRef<{ aimer: any; trigger: any } | null>(null);
 
   const calibrationPoint = useRef({ x: 0.5, y: 0.5 });
-  const calibrationHoldStartTimeRef = useRef(0);
-  const pauseHoldStartTimeRef = useRef(0);
-  
   const fireCooldownRef = useRef(0);
   const missileCooldownRef = useRef(0);
   const heatRef = useRef(0);
@@ -101,11 +99,6 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
   const recoilRef = useRef(0);
   const shakeRef = useRef(0);
   const pauseGestureCooldown = useRef(0);
-  const phaseTransitionTime = useRef(0);
-
-  const helpPageRef = useRef(0);
-  const helpEnemyIndexRef = useRef(0);
-  const helpShowcaseRef = useRef<THREE.Group | null>(null);
 
   // Scene bootstrap: one-time construction of renderer, systems, and the animation loop
   useEffect(() => {
@@ -279,29 +272,34 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
     const raycaster = new THREE.Raycaster();
     const menuPlane = new THREE.Plane(_menuZVec, -SCENE_CONFIG.MENU_Z);
 
-    // Centralized phase transition handler: mirrors React state and resets transient pools
-    const setGamePhase = (newPhase: GamePhase) => {
-      phaseRef.current = newPhase;
-      setPhase(newPhase);
-      phaseTransitionTime.current = performance.now();
-      pauseGestureCooldown.current = performance.now() + 1500; 
+    const resetWeapons = () => {
+      heatRef.current = 0;
+      isOverheatedRef.current = false;
+      setWeaponStatus({ heat: 0, isOverheated: false, missileProgress: 1.0 });
+    };
+
+    const resetTransientObjects = () => {
       bulletPoolRef.current.forEach(b => { b.active = false; b.mesh.visible = false; });
       missilesRef.current.forEach(m => scene.remove(m.mesh));
       missilesRef.current = [];
-      if (['GAMEOVER', 'READY', 'CALIBRATING'].includes(newPhase)) {
-        clearEnemies(); // Use pooling clear
-        if (newPhase === 'CALIBRATING') { calibrationHoldStartTimeRef.current = 0; setCalibrationProgress(0); }
-        if (newPhase === 'READY') { totalPlayTimeRef.current = 0; }
-        heatRef.current = 0; isOverheatedRef.current = false;
-        setWeaponStatus({ heat: 0, isOverheated: false, missileProgress: 1.0 });
-      }
-      if (newPhase === 'HELP') {
-          helpPageRef.current = 0; helpEnemyIndexRef.current = 0;
-          setHelpState({ page: 0, enemyIndex: 0 });
-          if (helpShowcaseRef.current) { scene.remove(helpShowcaseRef.current); helpShowcaseRef.current = null; }
-          clearEnemies();
-      } else if (helpShowcaseRef.current) { scene.remove(helpShowcaseRef.current); helpShowcaseRef.current = null; }
     };
+
+    const phaseManager = new PhaseManager({
+      visibilityTargets: { startGroup, pauseGroup, gameOverGroup, enemyGroup, helpGroup, helpSpotlight },
+      scene,
+      onPhaseChange: newPhase => { setPhase(newPhase); pauseGestureCooldown.current = performance.now() + 1500; },
+      onHelpStateChange: setHelpState,
+      onTransition: resetTransientObjects,
+      phaseHandlers: {
+        CALIBRATING: () => { setCalibrationProgress(0); clearEnemies(); resetWeapons(); },
+        READY: () => { totalPlayTimeRef.current = 0; clearEnemies(); resetWeapons(); },
+        GAMEOVER: () => { clearEnemies(); resetWeapons(); },
+        HELP: () => { clearEnemies(); },
+      },
+    });
+    phaseManagerRef.current = phaseManager;
+
+    const transitionPhase = (next: GamePhase) => phaseManagerRef.current?.transitionTo(next);
 
     if (DEBUG_PERF) console.log("Performance Profiler Initialized");
 
@@ -319,7 +317,10 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
       const input = handInputRef.current || {};
       const { aimer, trigger } = input as any;
 
-      if (phaseRef.current === 'PLAYING') totalPlayTimeRef.current += deltaMs;
+      const phaseManager = phaseManagerRef.current;
+      const currentPhase = phaseManager?.getPhase() ?? 'CALIBRATING';
+
+      if (currentPhase === 'PLAYING') totalPlayTimeRef.current += deltaMs;
       const playTimeSeconds = totalPlayTimeRef.current / 1000;
       const dtSeconds = deltaMs / 1000;
 
@@ -341,36 +342,34 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
       );
       gunPivot.position.z = recoilRef.current;
 
-      if (propsRef.current.lives === 0 && phaseRef.current !== 'GAMEOVER') setGamePhase('GAMEOVER');
+      if (propsRef.current.lives === 0 && currentPhase !== 'GAMEOVER') transitionPhase('GAMEOVER');
 
-      startGroup.visible = phaseRef.current === 'READY';
-      pauseGroup.visible = phaseRef.current === 'PAUSED';
-      gameOverGroup.visible = phaseRef.current === 'GAMEOVER';
-      enemyGroup.visible = phaseRef.current === 'PLAYING' || phaseRef.current === 'GAMEOVER';
-
-      if (phaseRef.current === 'HELP') {
-          helpGroup.visible = helpSpotlight.visible = true;
-          if (helpPageRef.current === 0) {
+      if (currentPhase === 'HELP' && phaseManager) {
+          const helpStateSnapshot = phaseManager.getHelpState();
+          if (helpStateSnapshot.page === 0) {
               helpGroup.add(helpNextPageTargetObj.group); helpGroup.remove(helpCycleEnemyTargetObj.group);
-              if (helpShowcaseRef.current) { scene.remove(helpShowcaseRef.current); helpShowcaseRef.current = null; }
+              const existing = phaseManager.getHelpShowcase();
+              if (existing) { scene.remove(existing); phaseManager.clearHelpShowcase(); }
           } else {
               helpGroup.add(helpNextPageTargetObj.group); helpGroup.add(helpCycleEnemyTargetObj.group);
-              if (!helpShowcaseRef.current || helpShowcaseRef.current.userData.idx !== helpEnemyIndexRef.current) {
-                  if (helpShowcaseRef.current) scene.remove(helpShowcaseRef.current);
-                  const mesh = EnemyFactory.createMesh(DIFFICULTY.ENEMIES[helpEnemyIndexRef.current].type, assets);
+              const existing = phaseManager.getHelpShowcase();
+              if (!existing || existing.userData.idx !== helpStateSnapshot.enemyIndex) {
+                  if (existing) scene.remove(existing);
+                  const mesh = EnemyFactory.createMesh(DIFFICULTY.ENEMIES[helpStateSnapshot.enemyIndex].type, assets);
                   mesh.position.set(0, 0, SCENE_CONFIG.MENU_Z + 50); mesh.scale.setScalar(2.0);
-                  mesh.userData.idx = helpEnemyIndexRef.current; scene.add(mesh); helpShowcaseRef.current = mesh;
+                  mesh.userData.idx = helpStateSnapshot.enemyIndex; scene.add(mesh); phaseManager.setHelpShowcase(mesh);
               }
-              if (helpShowcaseRef.current) {
-                  helpShowcaseRef.current.rotation.y += 0.01 * timeScale;
-                  helpShowcaseRef.current.rotation.x = Math.sin(now * 0.001) * 0.2;
-                  const rot = helpShowcaseRef.current.getObjectByName('rotator');
+              const showcase = phaseManager.getHelpShowcase();
+              if (showcase) {
+                  showcase.rotation.y += 0.01 * timeScale;
+                  showcase.rotation.x = Math.sin(now * 0.001) * 0.2;
+                  const rot = showcase.getObjectByName('rotator');
                   if (rot) rot.rotateZ(0.05 * timeScale);
               }
           }
-      } else helpGroup.visible = helpSpotlight.visible = false;
+      }
 
-      if (phaseRef.current === 'PLAYING') {
+      if (currentPhase === 'PLAYING') {
           const rampFactor = Math.min(playTimeSeconds / DIFFICULTY.RAMP_UP_DURATION, 1.0);
           const currentSpawnChance = DIFFICULTY.START_SPAWN_CHANCE + (DIFFICULTY.MAX_SPAWN_CHANCE - DIFFICULTY.START_SPAWN_CHANCE) * rampFactor;
           if (enemiesRef.current.length < DIFFICULTY.MAX_ON_SCREEN && Math.random() < (enemiesRef.current.length === 0 ? 0.05 : currentSpawnChance)) spawnEnemy(playTimeSeconds);
@@ -415,31 +414,37 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
         _bulletSeg.set(b.prevPosition, b.mesh.position);
         let hit = false;
 
+        const attemptTransition = (next: GamePhase) => {
+            const manager = phaseManagerRef.current;
+            return manager ? manager.transitionTo(next) : false;
+        };
+
         const checkTarget = (obj: any, next: GamePhase, resetScore = false, action?: () => void) => {
             _v3.setFromMatrixPosition(obj.group.matrixWorld);
             _bulletSeg.closestPointToPoint(_v3, true, _closestPt);
             if (_closestPt.distanceTo(_v3) < obj.radius) {
-                particles.spawnImpact(_v3, 0x00ffff); if (action) action();
-                else { if (resetScore) onReset(); setGamePhase(next); }
+                particles.spawnImpact(_v3, 0x00ffff);
+                const transitioned = action ? (action(), true) : attemptTransition(next);
+                if (transitioned && resetScore) onReset();
                 hit = true;
             }
         };
 
-        if (phaseRef.current === 'READY') checkTarget(startTargetObj, 'PLAYING');
-        if (phaseRef.current === 'GAMEOVER') checkTarget(rebootTargetObj, 'READY', true);
-        if (phaseRef.current === 'PAUSED') {
+        if (currentPhase === 'READY') checkTarget(startTargetObj, 'PLAYING');
+        if (currentPhase === 'GAMEOVER') checkTarget(rebootTargetObj, 'READY', true);
+        if (currentPhase === 'PAUSED') {
             checkTarget(resumeTargetObj, 'PLAYING');
             if(!hit) checkTarget(restartTargetObj, 'READY', true);
             if(!hit) checkTarget(recalibrateTargetObj, 'CALIBRATING');
             if(!hit) checkTarget(intelTargetObj, 'HELP');
         }
-        if (phaseRef.current === 'HELP') {
+        if (currentPhase === 'HELP') {
             checkTarget(helpReturnTargetObj, 'PAUSED');
-            if (!hit) checkTarget(helpNextPageTargetObj, 'HELP', false, () => { helpPageRef.current = helpPageRef.current === 0 ? 1 : 0; setHelpState(s => ({ ...s, page: helpPageRef.current })); });
-            if (!hit && helpPageRef.current === 1) checkTarget(helpCycleEnemyTargetObj, 'HELP', false, () => { helpEnemyIndexRef.current = (helpEnemyIndexRef.current + 1) % DIFFICULTY.ENEMIES.length; setHelpState(s => ({ ...s, enemyIndex: helpEnemyIndexRef.current })); });
+            if (!hit && phaseManager) checkTarget(helpNextPageTargetObj, 'HELP', false, () => { phaseManager.toggleHelpPage(); });
+            if (!hit && phaseManager?.getHelpState().page === 1) checkTarget(helpCycleEnemyTargetObj, 'HELP', false, () => { phaseManager.cycleHelpEnemy(DIFFICULTY.ENEMIES.length); });
         }
 
-        if (phaseRef.current === 'PLAYING' && !hit) {
+        if (currentPhase === 'PLAYING' && !hit) {
             for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
                 const e = enemiesRef.current[j];
                 if (Math.abs(e.mesh.position.z - b.mesh.position.z) > 100) continue;
@@ -486,22 +491,16 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
 
       if (aimer) {
           const { isPauseGesture, isPinching, isFist, tip } = inputProcessorRef.current.detectGestures(aimer, trigger);
-          if (phaseRef.current === 'PLAYING' && now - pauseGestureCooldown.current > 0) {
-              if (isPauseGesture && (pauseHoldStartTimeRef.current === 0 || now - pauseHoldStartTimeRef.current > PAUSE_HOLD_TIME_MS)) {
-                  if (pauseHoldStartTimeRef.current === 0) pauseHoldStartTimeRef.current = now;
-                  else { setGamePhase('PAUSED'); pauseHoldStartTimeRef.current = 0; }
-              } else if (!isPauseGesture) pauseHoldStartTimeRef.current = 0;
-          }
+          if (phaseManager && currentPhase === 'PLAYING' && now - pauseGestureCooldown.current > 0) {
+              if (phaseManager.updatePauseHold(isPauseGesture, now)) transitionPhase('PAUSED');
+          } else if (phaseManager) phaseManager.resetPauseHold();
           if (trigger) {
-              if (phaseRef.current === 'CALIBRATING') {
-                  if (isPinching && now - phaseTransitionTime.current > 800) {
-                      if (calibrationHoldStartTimeRef.current === 0) calibrationHoldStartTimeRef.current = now;
-                      const progress = Math.min((now - calibrationHoldStartTimeRef.current) / CALIBRATION_HOLD_TIME_MS, 1.0);
-                      setCalibrationProgress(progress);
-                      if (progress >= 1.0) { calibrationPoint.current = { x: tip.x, y: tip.y }; setGamePhase('READY'); }
-                  } else { calibrationHoldStartTimeRef.current = 0; setCalibrationProgress(0); }
+              if (phaseManager && currentPhase === 'CALIBRATING') {
+                  const { progress, completed } = phaseManager.updateCalibrationHold(isPinching, now);
+                  setCalibrationProgress(progress);
+                  if (completed) { calibrationPoint.current = { x: tip.x, y: tip.y }; transitionPhase('READY'); }
               }
-              if (phaseRef.current !== 'CALIBRATING') {
+              if (currentPhase !== 'CALIBRATING') {
                   if (isFist && now - missileCooldownRef.current > MISSILE.COOLDOWN_MS) {
                       missileCooldownRef.current = now; recoilRef.current = 25.0;
                       gunPivot.getWorldQuaternion(_q1); _v1.setFromMatrixPosition(muzzle.matrixWorld); _v2.copy(_forward).applyQuaternion(_q1);
@@ -538,7 +537,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
               }
           }
 
-          if (phaseRef.current !== 'CALIBRATING') {
+          if (currentPhase !== 'CALIBRATING') {
               const q = aimer.quaternion; _euler.setFromQuaternion(q);
               _euler.y += (Math.PI/4) * (aimer.gestures.roll ? aimer.gestures.roll : 0);
               _euler.y = THREE.MathUtils.clamp(_euler.y, SCENE_CONFIG.GUN_TILT_MIN, SCENE_CONFIG.GUN_TILT_MAX);
@@ -556,7 +555,7 @@ const GameScene: React.FC<Props> = ({ handResultRef, onScoreUpdate, onDamage, on
                   pos.setXYZ(0, _v1.x, _v1.y, _v1.z); pos.setXYZ(1, _v3.x, _v3.y, _v3.z); pos.needsUpdate = true; laser.visible = true;
               }
           }
-      } else { reticle.visible = laser.visible = false; pauseHoldStartTimeRef.current = 0; if (phaseRef.current === 'CALIBRATING') { calibrationHoldStartTimeRef.current = 0; setCalibrationProgress(0); } }
+      } else { reticle.visible = laser.visible = false; if (phaseManager) phaseManager.resetPauseHold(); if (currentPhase === 'CALIBRATING') { setCalibrationProgress(0); } }
     };
 
     const handleRenderStage = () => {
