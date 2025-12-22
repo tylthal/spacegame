@@ -50,6 +50,9 @@ interface Props {
 
 const getCameraMessage = (cameraPermissionGranted: boolean, cameraErrorCode?: CameraErrorCode | null) => {
   if (cameraPermissionGranted) return undefined;
+  if (!cameraErrorCode) {
+    return 'Requesting camera access. Approve the browser prompt or enable permissions to continue.';
+  }
   switch (cameraErrorCode) {
     case 'NO_DEVICES':
       return 'No camera detected. Plug in a webcam or enable it in system settings, then press Re-request to scan again.';
