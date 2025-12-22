@@ -15,15 +15,14 @@
     "ci": "npm run lint && npm run test:ci"
   },
   "dependencies": {
-    "@mediapipe/tasks-vision": "0.10.14",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "three": "0.170.0"
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.23",

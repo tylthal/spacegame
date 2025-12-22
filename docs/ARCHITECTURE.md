@@ -1,113 +1,29 @@
-# Architecture Overview: Orbital Sniper
+# Architecture Overview
 
-## 1. High-Level Concept
-The application is a hybrid **React/Three.js** system. Unlike standard React Three Fiber applications, this project manages the Three.js render loop manually within a `useEffect` hook to ensure maximum performance and absolute control over the frame timing, essential for synchronizing with the asynchronous MediaPipe inference.
+The codebase has been reset to a thin React shell so the rebuild can progress without legacy coupling.
 
-## 1.1 Phased Rebuild Plan
-To support incremental refactors, the runtime can be rebuilt in five phases with clear module boundaries and hand-offs:
+## Current state
 
-1. **Input Stack**
-   - **Modules**: `services/handTracker.ts`, `config/constants.ts` (calibration), `types.ts` for landmark payloads.
-   - **Data Contract**: `HandResult | null` written to `handResultRef.current`, plus calibration metadata ({ zeroPoint, timestamp }).
-   - **Goal**: Guarantee stable input snapshots at ~30Hz before other systems consume them.
+- **Rendering/input removed**: No Three.js or MediaPipe code remains. The app is a simple React UI that swaps placeholder
+  screens representing the future calibration, ready/menu, and gameplay flows.
+- **No global singletons**: The placeholder screens are plain components with local state, keeping the surface ready for future
+  dependency-injected systems.
+- **Guardrails**: Tests fail if legacy modules or paths (old scenes, services, telemetry) reappear.
 
-2. **Phase Machine**
-   - **Modules**: `App.tsx` (state), `components/GameScene.tsx` (imperative mirror), `config/constants.ts` for timers.
-   - **Data Contract**: `{ phase, phaseRef, phaseTimestamps }` with explicit transitions (CALIBRATING → READY → PLAYING → PAUSED/HELP → GAMEOVER).
-   - **Goal**: Provide deterministic transition hooks that other systems can subscribe to without reading React state directly.
+## Near-term layering strategy
 
-3. **Rendering Spine**
-   - **Modules**: `components/GameScene.tsx`, `systems/AssetManager.ts`, `systems/SceneComposer.ts`, `styles/` for shared uniforms.
-   - **Data Contract**: `SceneContext` object exposing `camera`, `scene`, pooled meshes, and a `render(dt, inputState)` callback signature.
-   - **Goal**: Stabilize the render loop and resource lifecycle so gameplay code can swap in/out without reallocating GPU assets.
+1. **Input stack**: Introduce a new hand/input adapter behind a deterministic contract and unit tests.
+2. **Phase manager**: Add a pure-state phase controller and wire the placeholder screens to it.
+3. **Rendering spine**: Reintroduce the render loop and asset management as isolated modules with pooled resources and tests.
+4. **Gameplay + UI**: Layer gameplay systems and HUD components after the spine stabilizes.
 
-4. **Gameplay & Simulation**
-   - **Modules**: `systems/EnemyFactory.ts`, `systems/InputProcessor.ts`, projectile pools, AI utilities under `utils/`.
-   - **Data Contract**: `SimulationState` ({ enemies, projectiles, particles, scores }) updated per frame; gesture flags ({ fire, missile, pause }) read-only for simulation.
-   - **Goal**: Keep simulation pure and frame-bound, receiving only the immutable input snapshot and returning a diff to render/app layers.
+## File layout (clean base)
 
-5. **UI & Telemetry**
-   - **Modules**: `components/SceneOverlays.tsx`, `telemetry/` (if enabled), `styles/`.
-   - **Data Contract**: `UiModel` derived from the phase machine and simulation summaries (score, hull, prompts).
-   - **Goal**: Allow React overlays to iterate independently (low frequency) while reading stable summaries instead of raw frame data.
+- `App.tsx`: Top-level shell that renders the placeholder screens and foundation checklist.
+- `components/PhaseList.tsx`: Shows rebuild checkpoints and their status.
+- `components/PlaceholderScreen.tsx`: Placeholder panel describing what will be built in each phase and the guardrails in place.
+- `__tests__/legacyCleanup.test.ts`: Ensures removed legacy modules stay quarantined.
+- `components/__tests__/AppShell.test.tsx`: UI sanity checks for the placeholder shell.
 
-## 2. Core Components
-
-### A. The React Shell (`App.tsx`)
-Acts as the state container and "Central Command".
-- **Responsibilities**:
-  - Manages high-level game state (Score, Hull, Lives, Game Phase).
-  - Runs the **MediaPipe Loop** (Neural FPS).
-  - Renders the 2D HUD (Tailwind CSS layers).
-  - Passes mutable Refs to the Game Scene.
-
-### B. The Render Core (`GameScene.tsx`)
-A component that initializes the WebGL context and orchestrates specialized systems.
-- **Role**: Conductor/Orchestrator.
-- **Responsibilities**:
-  - Sets up Three.js (Scene, Camera, Renderer).
-  - Manages the **Game Loop** (`requestAnimationFrame`).
-  - Coordinates data flow between Systems (Input -> Logic -> Rendering).
-  - Handles high-level game flow (Phase transitions, Scoring).
-
-### C. The Neural Engine (`handTracker.ts`)
-A static singleton service wrapping `@mediapipe/tasks-vision`.
-- **Pattern**: Singleton to prevent model reloading on React re-renders.
-- **Configuration**: GPU Delegate, Video Mode, 2 Hands Max.
-
-## 3. Modular Systems
-To maintain code cleanliness and separation of concerns, logic is split into specialized classes in the `systems/` directory:
-
-1.  **`AssetManager`**: Handles the creation, storage, and disposal of shared Three.js Geometries and Materials (Kitbashing resources). It also owns pooled menu target prefabs and a reusable starfield geometry so resets and mode switches can recycle objects without reallocating WebGL resources.
-2.  **`EnemyFactory`**: Uses the AssetManager to assemble complex enemy ships from primitive shapes based on `EnemyType`.
-3.  **`ParticleSystem`**: Manages a high-performance, ring-buffered point cloud for explosions, trails, and shockwaves.
-4.  **`InputProcessor`**: Translates raw MediaPipe landmarks into smoothed game controls (Yaw/Pitch) and gesture flags (Fire, Missile, Pause).
-
-### Resource Pooling & Lifecycle
-
-The render core leans on pooling to keep allocations predictable and frame times stable:
-
-- **Geometries/Materials**: `AssetManager` builds all reusable primitives once (including menu targets and the starfield) and exposes methods to acquire/release instances instead of constructing on demand.
-- **Dynamic Objects**: `EnemyFactory`, `BulletPool`, `MissilePool`, and the menu targets retrieved in `SceneComposer` return meshes back to their pools when removed from the scene.
-- **Lifecycle Hooks**: `ResourceLifecycle` tracks disposables; unmounting or mode switches trigger asset releases before geometries/materials are finally disposed, ensuring GPU buffers are reclaimed cleanly.
-
-## 4. Data Flow: The "Ref Bridge" Pattern
-
-To avoid React's reconciliation overhead (which causes stutter in 60fps games), we do **not** pass high-frequency data (like hand coordinates or particle positions) via React Props.
-
-Instead, we use **Mutable References**:
-
-1.  **Detection**: `App.tsx` detects hands and writes the result to `handResultRef.current`.
-2.  **Read**: `GameScene.tsx` reads `handResultRef.current` inside its `animate()` loop (60 times per second).
-3.  **Processing**: `InputProcessor` converts this raw data into Aim Vectors and Action Flags.
-4.  **Result**: Zero-latency access to the latest hand data without triggering React re-renders.
-
-Only "Low Frequency" events (Score updates, Damage taken, Phase changes) trigger React state updates.
-
-## 5. Input Processing: The Virtual Mousepad
-
-Raw MediaPipe coordinates (0.0 to 1.0) are not mapped 1:1 to the screen. To prevent arm fatigue, we implement a specific mathematical model:
-
-1.  **OneEuroFilter**: Raw inputs are smoothed to remove camera jitter.
-2.  **Calibration Offset**: The position is calculated *relative* to a calibrated "Zero Point".
-3.  **Tanh Transfer Function**:
-    - `x_screen = tanh(x_hand * sensitivity) * max_yaw`
-    - This creates a curve that is linear in the center (precise aiming) but tapers off at the edges (soft clamp), preventing the reticle from getting stuck at the screen border.
-
-## 6. Rendering Layers (Z-Order)
-
-The visual stack is composed as follows (Back to Front):
-
-1.  **Starfield**: `Z = 5000+`. PointsMaterial. Fog disabled.
-2.  **Enemies**: `Z = -5000 to 0`. Standard meshes. Affected by fog.
-3.  **Menu Modules**: `Z = -220`. Interactive 3D objects (Start, Resume, Database).
-4.  **Particles**: `Z = Variable`. Additive blending, no depth write.
-5.  **Weapon/Reticle**: `Z = 0 to 15`. Attached to the camera group.
-6.  **2D HUD**: HTML/CSS Overlay (Score, Health).
-7.  **2D Overlays**: HTML/CSS Overlay (Pause Menu, Calibration, Webcam, Help).
-
-## Testing Strategy
-
-- **Unit (Vitest)**: Validate isolated math helpers, gesture classifiers, and phase reducers with deterministic fixtures. Favor pure functions in `utils/` and `systems/` to keep tests renderer-agnostic. Run locally with `npm run test:unit`.
-- **Integration (Playwright/Cypress)**: When available, drive the Vite preview build to confirm the phase machine, overlay hand-offs, and rendering spine work together. Scenarios include calibration → ready → playing transitions, pause menu targeting, and HUD updates.
-- **Smoke Scripts**: `npm run test:unit` for fast checks; `npm run test:ci` for CI smoke (mirrors unit suite, expandable to include headless browser flows).
+This minimal architecture is intentionally small; each upcoming phase should add new modules behind tests without reintroducing
+legacy assets or untyped globals.
