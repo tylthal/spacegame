@@ -194,10 +194,24 @@ const App: React.FC = () => {
       {cameraDiagnosticsOverlayEnabled && cameraDiagnostics && (
         <div className="absolute top-2 left-2 z-[120] bg-black/80 border border-cyan-500/40 rounded p-3 text-[10px] md:text-xs pointer-events-auto space-y-1 shadow-lg">
           <div className="font-black uppercase tracking-[0.2em] text-cyan-400">Camera Diagnostics</div>
+          <div className="text-white/80">Event: {cameraDiagnostics.event}</div>
           <div className="text-white/80">Device: {cameraDiagnostics.deviceLabel ?? 'Unknown'}</div>
+          {cameraDiagnostics.deviceId && <div className="text-white/60">deviceId: {cameraDiagnostics.deviceId}</div>}
           {cameraDiagnostics.constraints?.video && (
             <div className="text-white/60">
               Constraints: {JSON.stringify(cameraDiagnostics.constraints.video)}
+            </div>
+          )}
+          {cameraDiagnostics.appliedSettings && (
+            <div className="text-white/60 break-all">
+              Applied: {JSON.stringify(cameraDiagnostics.appliedSettings)}
+            </div>
+          )}
+          {cameraDiagnostics.preflightDetails && (
+            <div className="text-white/50 space-y-0.5">
+              <div>Secure Context: {cameraDiagnostics.preflightDetails.isSecureContext ? 'yes' : 'no'}</div>
+              <div>mediaDevices: {cameraDiagnostics.preflightDetails.hasMediaDevices ? 'yes' : 'no'}</div>
+              <div>getUserMedia: {cameraDiagnostics.preflightDetails.hasGetUserMedia ? 'yes' : 'no'}</div>
             </div>
           )}
           {cameraDiagnostics.message && <div className="text-red-300">{cameraDiagnostics.message}</div>}

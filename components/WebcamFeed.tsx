@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { mediaPreflightCheck } from '../utils/deviceDiagnostics';
+import { mediaPreflightCheck, type MediaPreflightResult } from '../utils/deviceDiagnostics';
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -23,9 +23,12 @@ export interface CameraError extends Error {
 }
 
 export interface CameraDiagnostics {
-  event: 'request' | 'acquired' | 'error';
+  event: 'preflight' | 'request' | 'acquired' | 'devicechange' | 'error';
   deviceLabel?: string;
+  deviceId?: string;
   constraints?: MediaStreamConstraints;
+  appliedSettings?: MediaTrackSettings;
+  preflightDetails?: MediaPreflightResult['details'];
   errorName?: string;
   message?: string;
 }
@@ -60,6 +63,7 @@ const WebcamFeed: React.FC<Props> = ({
     let currentDeviceId: string | null = null;
     let lastConstraints: MediaStreamConstraints | null = null;
     let lastDeviceLabel: string | undefined;
+    let lastDeviceId: string | undefined;
     let permissionProbeStream: MediaStream | null = null;
 
     const stopCurrentStream = (includeProbe = false) => {
@@ -113,12 +117,23 @@ const WebcamFeed: React.FC<Props> = ({
     const startCamera = async (targetDeviceId?: string, allowFallbackRetry = true) => {
       try {
         const preflight = mediaPreflightCheck();
+        onDiagnostics?.({
+          event: 'preflight',
+          deviceLabel: lastDeviceLabel,
+          deviceId: lastDeviceId,
+          constraints: lastConstraints ?? undefined,
+          preflightDetails: preflight.details,
+          message: preflight.ok ? 'Preflight passed' : preflight.issues.join(' '),
+        });
+
         if (!preflight.ok) {
           const preflightError = createCameraError('UNSUPPORTED', preflight.issues.join(' '));
           onDiagnostics?.({
             event: 'error',
             deviceLabel: lastDeviceLabel,
+            deviceId: lastDeviceId,
             constraints: lastConstraints ?? undefined,
+            preflightDetails: preflight.details,
             errorName: 'PreflightFailed',
             message: preflightError.message,
           });
@@ -153,11 +168,18 @@ const WebcamFeed: React.FC<Props> = ({
 
         lastConstraints = constraints;
         lastDeviceLabel = preferredDevice.label;
+        lastDeviceId = preferredDevice.deviceId;
         console.info('[CameraDiagnostics] Requesting camera', {
           label: preferredDevice.label || 'Unknown device',
+          deviceId: preferredDevice.deviceId || 'unknown',
           constraints,
         });
-        onDiagnostics?.({ event: 'request', deviceLabel: preferredDevice.label, constraints });
+        onDiagnostics?.({
+          event: 'request',
+          deviceLabel: preferredDevice.label,
+          deviceId: preferredDevice.deviceId,
+          constraints,
+        });
 
         let stream: MediaStream;
 
@@ -187,11 +209,21 @@ const WebcamFeed: React.FC<Props> = ({
         currentStream = stream;
         currentDeviceId = preferredDevice.deviceId;
 
+        const appliedSettings = stream.getVideoTracks()[0]?.getSettings();
+
         console.info('[CameraDiagnostics] Stream acquired', {
           label: preferredDevice.label || 'Unknown device',
+          deviceId: preferredDevice.deviceId || 'unknown',
           constraints,
+          appliedSettings,
         });
-        onDiagnostics?.({ event: 'acquired', deviceLabel: preferredDevice.label, constraints });
+        onDiagnostics?.({
+          event: 'acquired',
+          deviceLabel: preferredDevice.label,
+          deviceId: preferredDevice.deviceId,
+          constraints,
+          appliedSettings,
+        });
 
         stream.getTracks().forEach(track => {
           track.onended = () => {
@@ -211,6 +243,7 @@ const WebcamFeed: React.FC<Props> = ({
         onDiagnostics?.({
           event: 'error',
           deviceLabel: lastDeviceLabel,
+          deviceId: lastDeviceId,
           constraints: lastConstraints ?? undefined,
           errorName: err instanceof DOMException ? err.name : undefined,
           message: err instanceof Error ? err.message : String(err),
@@ -222,8 +255,9 @@ const WebcamFeed: React.FC<Props> = ({
         if (err instanceof DOMException && err.name === 'NotFoundError' && allowFallbackRetry) {
           console.warn('Preferred camera missing, retrying without device constraint.');
           onDiagnostics?.({
-            event: 'error',
+            event: 'devicechange',
             deviceLabel: lastDeviceLabel,
+            deviceId: lastDeviceId,
             constraints: lastConstraints ?? undefined,
             errorName: err.name,
             message: 'Requested device not found. Retrying with default camera.',
@@ -262,6 +296,13 @@ const WebcamFeed: React.FC<Props> = ({
         if (videoInputs.length === 0) {
           stopCurrentStream();
           onError?.(createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.'));
+          onDiagnostics?.({
+            event: 'devicechange',
+            deviceLabel: lastDeviceLabel,
+            deviceId: lastDeviceId,
+            constraints: lastConstraints ?? undefined,
+            message: 'All cameras removed. Waiting for device to reconnect.',
+          });
           return;
         }
 
@@ -270,7 +311,23 @@ const WebcamFeed: React.FC<Props> = ({
           : false;
 
         if (!activeDeviceAvailable) {
+          const fallbackDevice = videoInputs[0];
+          onDiagnostics?.({
+            event: 'devicechange',
+            deviceLabel: fallbackDevice?.label,
+            deviceId: fallbackDevice?.deviceId,
+            constraints: lastConstraints ?? undefined,
+            message: 'Active camera unplugged, retrying with available device.',
+          });
           await startCamera(videoInputs[0]?.deviceId);
+        } else {
+          onDiagnostics?.({
+            event: 'devicechange',
+            deviceLabel: lastDeviceLabel,
+            deviceId: lastDeviceId,
+            constraints: lastConstraints ?? undefined,
+            message: 'Device change detected but active camera remains available.',
+          });
         }
       } catch (err) {
         console.error('Camera device change handling failed:', err);
