@@ -17,3 +17,22 @@ body {
   width: 100vw;
   height: 100vh;
 }
+
+.calibration-overlay-video {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.calibration-overlay-video video {
+  filter: saturate(1.05) contrast(1.05);
+}
+
+.calibration-overlay-video::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 40%, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.85));
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}

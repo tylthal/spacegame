@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement>;
   onPermissionGranted?: () => void;
+  onStreamReady?: (stream: MediaStream | null) => void;
   onError?: (error: CameraError) => void;
   accessRequestToken?: number;
 }
@@ -32,7 +33,7 @@ const stopStreamTracks = (stream: MediaStream | null) => {
  * WebcamFeed Component
  * Requests and manages the user's camera stream.
  */
-const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, accessRequestToken }) => {
+const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onStreamReady, onError, accessRequestToken }) => {
   useEffect(() => {
     if (!accessRequestToken) return undefined;
 
@@ -55,6 +56,7 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, a
           await videoRef.current.play();
         }
 
+        onStreamReady?.(stream);
         onPermissionGranted?.();
       } catch (err) {
         let cameraError: CameraError;
@@ -75,13 +77,14 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, a
 
     return () => {
       cancelled = true;
+      onStreamReady?.(null);
       stopStreamTracks(currentStream);
       if (videoRef.current?.srcObject) {
         stopStreamTracks(videoRef.current.srcObject as MediaStream);
         videoRef.current.srcObject = null;
       }
     };
-  }, [accessRequestToken, onPermissionGranted, onError, videoRef]);
+  }, [accessRequestToken, onPermissionGranted, onStreamReady, onError, videoRef]);
 
   // scale-x-[-1] mirrors the feed for intuitive human movement matching
   return (

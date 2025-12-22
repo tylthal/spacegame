@@ -12,6 +12,8 @@ type Props = OverlayState & {
   onRetryCamera?: () => void;
   onRestartCalibration?: () => void;
   onContinueFromCalibration?: () => void;
+  videoStream?: MediaStream | null;
+  videoRef?: React.RefObject<HTMLVideoElement>;
 };
 
 const SceneOverlays: React.FC<Props> = ({
@@ -26,6 +28,8 @@ const SceneOverlays: React.FC<Props> = ({
   onRetryCamera,
   onRestartCalibration,
   onContinueFromCalibration,
+  videoStream,
+  videoRef,
 }) => {
   return (
     <>
@@ -48,6 +52,8 @@ const SceneOverlays: React.FC<Props> = ({
           onRetryCamera={onRetryCamera}
           onRestartCalibration={onRestartCalibration}
           onContinue={onContinueFromCalibration}
+          videoStream={videoStream}
+          videoRef={videoRef}
         />
       )}
 

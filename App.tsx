@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [handTrackingReady, setHandTrackingReady] = useState(false);
   const [cameraPermissionGranted, setCameraPermissionGranted] = useState(false);
   const [cameraInitError, setCameraInitError] = useState<CameraError | null>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraAccessRequestToken, setCameraAccessRequestToken] = useState(1);
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
@@ -158,12 +159,14 @@ const App: React.FC = () => {
     setCameraInitError(null);
     setUseFallbackControls(false);
     setCameraAccessRequestToken(token => token + 1);
+    setCameraStream(null);
   }, []);
 
   const requestCameraAccess = useCallback(() => {
     setCameraInitError(null);
     setUseFallbackControls(false);
     setCameraAccessRequestToken(token => token + 1);
+    setCameraStream(null);
   }, []);
 
   const handleStartExperience = useCallback(() => {
@@ -189,6 +192,7 @@ const App: React.FC = () => {
     setCameraPermissionGranted(false);
     setCameraInitError(error);
     setUseFallbackControls(true);
+    setCameraStream(null);
   }, []);
 
   if (showSplash) {
@@ -268,6 +272,8 @@ const App: React.FC = () => {
             handTrackingEnabled={handTrackingActive}
             cameraPermissionGranted={cameraReady}
             onRetryCamera={handleRetryCamera}
+            videoStream={cameraStream}
+            videoRef={videoRef}
           />
 
           {/* Top HUD: Tactical Information Display */}
@@ -350,6 +356,7 @@ const App: React.FC = () => {
             <WebcamFeed
               videoRef={videoRef}
               onPermissionGranted={handleCameraPermissionGranted}
+              onStreamReady={setCameraStream}
               onError={handleCameraError}
               accessRequestToken={cameraAccessRequestToken}
             />
