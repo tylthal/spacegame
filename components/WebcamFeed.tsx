@@ -163,10 +163,16 @@ const WebcamFeed: React.FC<Props> = ({
           throw createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.');
         }
 
+        const sanitizeDeviceId = (deviceId?: string) =>
+          deviceId && deviceId !== 'default' && deviceId !== 'communications' ? deviceId : undefined;
+
         const preferredDevice =
-          videoInputs.find(device => device.deviceId === targetDeviceId) ??
+          videoInputs.find(device => sanitizeDeviceId(device.deviceId) === targetDeviceId) ??
           videoInputs.find(device => device.label.toLowerCase().includes('front')) ??
+          videoInputs.find(device => sanitizeDeviceId(device.deviceId)) ??
           videoInputs[0];
+
+        const preferredDeviceId = sanitizeDeviceId(preferredDevice.deviceId);
 
         /**
          * Vision Optimization:
@@ -175,7 +181,7 @@ const WebcamFeed: React.FC<Props> = ({
          */
         const constraints: MediaStreamConstraints = {
           video: {
-            deviceId: preferredDevice.deviceId ? { exact: preferredDevice.deviceId } : undefined,
+            deviceId: preferredDeviceId ? { exact: preferredDeviceId } : undefined,
             width: { ideal: 320 },
             height: { ideal: 240 },
             frameRate: { ideal: 30 },
