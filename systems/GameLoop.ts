@@ -1,8 +1,8 @@
 import { PerfTracer, perfTracer as defaultTracer } from '../telemetry/PerfTracer';
 
-type FrameHook = (context: FrameContext) => void;
+export type FrameHook = (context: FrameContext) => void;
 
-interface FrameHooks {
+export interface FrameHooks {
   input?: FrameHook;
   particles?: FrameHook;
   simulation?: FrameHook;
