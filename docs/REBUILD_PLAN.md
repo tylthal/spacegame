@@ -34,7 +34,7 @@ a task stub of concrete steps to execute.
 - Document calibration flow and virtual mousepad transform, including tolerance values, in `docs/TECHNICAL_REFERENCE.md`. ✅ Completed: calibration guidance and tolerance table recorded.
 :::
 
-**Issue 5: Reconstruct phase/state machine with guards**
+**Issue 5: Reconstruct phase/state machine with guards** — **Status: Done**
 :::task-stub{title="Phase manager with coverage"}
 - Implement a pure-state `PhaseManager` with transitions (CALIBRATING → READY → PLAYING → PAUSED/HELP → GAMEOVER) and guard conditions.
 - Add unit tests for every transition, including gesture/time-based triggers and invalid transition rejections.

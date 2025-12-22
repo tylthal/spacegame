@@ -9,6 +9,8 @@
 ├── components/
 │   ├── PhaseList.tsx          # Lists placeholder phases and their status
 │   └── PlaceholderScreen.tsx  # Panel describing the active placeholder screen
+├── phase/
+│   └── PhaseManager.ts        # Pure-state phase controller with guarded transitions and events
 ├── input/                     # New input stack (hand tracking + gesture classification)
 │   ├── HandTracker.ts         # Interface + in-memory adapter for MediaPipe-like sources
 │   ├── InputProcessor.ts      # One Euro smoothing + gesture classification + virtual pad mapping
@@ -36,6 +38,19 @@ The rebuild will layer in new modules behind tests. Recommended order:
 2. Introduce a pure-state phase manager and connect it to the placeholder screens.
 3. Reintroduce rendering and asset management behind injected dependencies.
 4. Build gameplay loops and HUD components once the spine is stable.
+
+## Phase/state machine (Issue 5)
+
+- `PhaseManager` advances through `CALIBRATING → READY → PLAYING → PAUSED → GAMEOVER` using only timestamped samples and
+  gestures; no DOM or global dependencies are required.
+- Guardrails:
+  - Calibration completes only after `requiredCalibrationStableMs` of stable samples accumulate without a gap.
+  - Starting gameplay requires a recent stable sample (within `maxUnstableBeforeStartMs`) plus a start gesture (`pinch` or
+    `fist` by default).
+  - Holding a pause gesture (`palm`) for `pauseHoldMs` transitions to `PAUSED`; start gestures resume play.
+  - A configurable `maxPlayTimeMs` automatically moves the state to `GAMEOVER`.
+- Consumers can subscribe to transition/guard events to coordinate UI, audio, or analytics without coupling to the manager's
+  internal state.
 
 ## Input stack (Issue 4)
 
