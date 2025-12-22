@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameScene from './components/GameScene';
-import WebcamFeed, { CameraDiagnostics, CameraError, CameraErrorCode } from './components/WebcamFeed';
+import WebcamFeed, { CameraError } from './components/WebcamFeed';
 import CalibrationGuide from './components/CalibrationGuide';
 import { HandTracker } from './services/handTracker';
 import { calibrateCamera } from './services/CalibrationService';
@@ -22,11 +22,7 @@ const App: React.FC = () => {
   const [handTrackingReady, setHandTrackingReady] = useState(false);
   const [cameraPermissionGranted, setCameraPermissionGranted] = useState(false);
   const [cameraInitError, setCameraInitError] = useState<CameraError | null>(null);
-  const [cameraRequestPending, setCameraRequestPending] = useState(false);
-  const [cameraRestartToken, setCameraRestartToken] = useState(0);
   const [cameraAccessRequestToken, setCameraAccessRequestToken] = useState(1);
-  const [cameraErrorCode, setCameraErrorCode] = useState<CameraErrorCode | null>(null);
-  const [cameraDiagnostics, setCameraDiagnostics] = useState<CameraDiagnostics | null>(null);
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
   const [showSplash, setShowSplash] = useState(true);
@@ -35,7 +31,6 @@ const App: React.FC = () => {
   const [showCalibrationGuide, setShowCalibrationGuide] = useState(false);
 
   const telemetryEnabled = isDevFeatureEnabled('benchmark');
-  const cameraDiagnosticsOverlayEnabled = isDevFeatureEnabled('cameradiag');
   
   // --- Refs for Performance ---
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -160,18 +155,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleRetryCamera = useCallback(() => {
-    setCameraPermissionGranted(false);
     setCameraInitError(null);
-    setCameraErrorCode(null);
-    setCameraDiagnostics(null);
     setUseFallbackControls(false);
-    setCameraRestartToken(token => token + 1);
     setCameraAccessRequestToken(token => token + 1);
   }, []);
 
   const requestCameraAccess = useCallback(() => {
     setCameraInitError(null);
-    setCameraErrorCode(null);
     setUseFallbackControls(false);
     setCameraAccessRequestToken(token => token + 1);
   }, []);
@@ -189,27 +179,15 @@ const App: React.FC = () => {
     setShowCalibrationGuide(false);
   }, []);
 
-  const handleCameraDiagnostics = useCallback((info: CameraDiagnostics) => {
-    setCameraDiagnostics(info);
-    setCameraRequestPending(info.event === 'request');
-  }, []);
-
   const handleCameraPermissionGranted = useCallback(() => {
     setCameraPermissionGranted(true);
     setCameraInitError(null);
-    setCameraErrorCode(null);
-    setCameraRequestPending(false);
-    if (cameraInitError) {
-      setUseFallbackControls(false);
-    }
-  }, [cameraInitError]);
+    setUseFallbackControls(false);
+  }, []);
 
   const handleCameraError = useCallback((error: CameraError) => {
     setCameraPermissionGranted(false);
     setCameraInitError(error);
-    setCameraErrorCode(error.code);
-    setCameraDiagnostics(prev => ({ ...prev, event: 'error', message: error.message }));
-    setCameraRequestPending(false);
     setUseFallbackControls(true);
   }, []);
 
@@ -243,32 +221,6 @@ const App: React.FC = () => {
 
   return (
     <div className="relative w-screen h-screen bg-black overflow-hidden font-mono text-cyan-400 select-none">
-      {cameraDiagnosticsOverlayEnabled && cameraDiagnostics && (
-        <div className="absolute top-2 left-2 z-[120] bg-black/80 border border-cyan-500/40 rounded p-3 text-[10px] md:text-xs pointer-events-auto space-y-1 shadow-lg">
-          <div className="font-black uppercase tracking-[0.2em] text-cyan-400">Camera Diagnostics</div>
-          <div className="text-white/80">Event: {cameraDiagnostics.event}</div>
-          <div className="text-white/80">Device: {cameraDiagnostics.deviceLabel ?? 'Unknown'}</div>
-          {cameraDiagnostics.deviceId && <div className="text-white/60">deviceId: {cameraDiagnostics.deviceId}</div>}
-          {cameraDiagnostics.constraints?.video && (
-            <div className="text-white/60">
-              Constraints: {JSON.stringify(cameraDiagnostics.constraints.video)}
-            </div>
-          )}
-          {cameraDiagnostics.appliedSettings && (
-            <div className="text-white/60 break-all">
-              Applied: {JSON.stringify(cameraDiagnostics.appliedSettings)}
-            </div>
-          )}
-          {cameraDiagnostics.preflightDetails && (
-            <div className="text-white/50 space-y-0.5">
-              <div>Secure Context: {cameraDiagnostics.preflightDetails.isSecureContext ? 'yes' : 'no'}</div>
-              <div>mediaDevices: {cameraDiagnostics.preflightDetails.hasMediaDevices ? 'yes' : 'no'}</div>
-              <div>getUserMedia: {cameraDiagnostics.preflightDetails.hasGetUserMedia ? 'yes' : 'no'}</div>
-            </div>
-          )}
-          {cameraDiagnostics.message && <div className="text-red-300">{cameraDiagnostics.message}</div>}
-        </div>
-      )}
       {isInitializing && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black">
           <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-8" />
@@ -317,7 +269,7 @@ const App: React.FC = () => {
             lives={lives}
             handTrackingEnabled={handTrackingActive}
             cameraPermissionGranted={cameraPermissionGranted}
-            cameraErrorCode={cameraErrorCode}
+            cameraErrorCode={cameraInitError?.code}
             onRetryCamera={handleRetryCamera}
           />
 
@@ -399,10 +351,8 @@ const App: React.FC = () => {
           {/* Responsive: Smaller on mobile, standard on desktop. Moved higher on mobile to clear Weapon Status */}
           <div className="absolute bottom-24 right-4 md:bottom-8 md:right-8 w-20 h-14 md:w-48 md:h-36 border-2 border-cyan-500/30 rounded-lg overflow-hidden shadow-2xl z-[100] bg-black transition-all">
             <WebcamFeed
-              key={cameraRestartToken}
               videoRef={videoRef}
               onPermissionGranted={handleCameraPermissionGranted}
-              onDiagnostics={handleCameraDiagnostics}
               onError={handleCameraError}
               accessRequestToken={cameraAccessRequestToken}
             />
@@ -410,25 +360,12 @@ const App: React.FC = () => {
               <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-300 text-center px-2">
                 <div className="space-y-2">
                   <div className="space-y-1">
-                    <div>
-                      {cameraRequestPending
-                        ? 'Requesting camera access — approve the browser prompt to link your webcam'
-                        : 'Camera unavailable — mouse + keyboard fallback active'}
-                    </div>
-                    <p className="text-[9px] md:text-[10px] text-red-100/80 normal-case tracking-normal">
-                      {cameraRequestPending
-                        ? 'If you dismissed the prompt, use the button below after enabling permissions.'
-                        : 'Reconnect or select a webcam, then press retry to reinitialize the feed.'}
-                    </p>
+                    <div>Requesting camera access — approve the browser prompt to link your webcam.</div>
                     <p className="text-[9px] md:text-[10px] text-amber-100/80 normal-case tracking-normal">
-                      {cameraInitError?.code === 'UNSUPPORTED'
-                        ? cameraInitError.message
-                        : 'Use HTTPS or localhost and confirm permissions before retrying.'}
+                      Use HTTPS or localhost and confirm permissions before retrying.
                     </p>
-                    {cameraInitError && cameraInitError.code !== 'UNSUPPORTED' && (
-                      <div className="text-[9px] md:text-[10px] text-red-200/70 normal-case">
-                        {cameraInitError.message}
-                      </div>
+                    {cameraInitError && (
+                      <div className="text-[9px] md:text-[10px] text-red-200/70 normal-case">{cameraInitError.message}</div>
                     )}
                   </div>
                   <button
