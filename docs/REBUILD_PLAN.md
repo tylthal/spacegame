@@ -16,12 +16,13 @@ A phased plan for rebuilding the game from scratch with testing embedded through
 - Create a minimal `GameKernel` module that wires a tick loop with dependency injection for subsystems; include a contract test that the loop ticks and calls registered systems.
 :::
 
-**Issue 3: Remove legacy and broken implementations before rebuilding**
+**Issue 3: Remove legacy and broken implementations before rebuilding** — **Status: Done**
 :::task-stub{title="Prune or quarantine historical code"}
 - Identify legacy classes/modules that conflict with the new scaffold (e.g., obsolete gesture processors, outdated rendering shells) and either delete them or move them under a clearly labeled `legacy/` folder.
 - Replace ad hoc globals with typed interfaces and dependency injection points to prevent hidden coupling.
 - Add guard tests that fail fast if legacy modules are referenced from the new code paths (e.g., import checks or dependency graph assertions).
 - Update documentation references to point to the new scaffold locations and remove mentions of deprecated paths.
+  - _Result_: Removed the unused `LiquidMetalScene`, `WebcamOverlay`, and `handTracking` stubs; added `systems/__tests__/legacyGuards.test.ts` to enforce the quarantine and keep imports pointed at the new scaffold.
 :::
 
 **Issue 4: Rebuild input stack with deterministic tests**
