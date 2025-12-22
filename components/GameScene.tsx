@@ -13,7 +13,7 @@ import { PhaseManager } from '../systems/PhaseManager';
 import { WeaponController, WeaponStatus } from '../systems/WeaponController';
 import { BulletPool } from '../systems/BulletPool';
 import { MissilePool } from '../systems/MissilePool';
-import { CalibrationService, clearCalibrateCameraHandler, setCalibrateCameraHandler } from '../services/CalibrationService';
+import { CalibrationService, calibrateCamera, clearCalibrateCameraHandler, setCalibrateCameraHandler } from '../services/CalibrationService';
 import { ResourceLifecycle } from '../systems/ResourceLifecycle';
 import { isDevFeatureEnabled } from '../utils/devMode';
 import { PerfTracer, perfTracer } from '../telemetry/PerfTracer';
@@ -872,6 +872,29 @@ const GameScene: React.FC<Props> = ({
     phaseManagerRef.current?.transitionTo('READY');
   };
 
+  const handleContinueAfterCalibration = () => {
+    fallbackReadyTriggeredRef.current = true;
+    if (!handTrackingEnabled) {
+      manualGestureBypassRef.current = true;
+    }
+    calibrationServiceRef.current.resetHold();
+    overlayStateRef.current.calibrationStatus = {
+      stalled: false,
+      fallbackCta: false,
+      cameraReady: cameraPermissionGranted,
+    };
+    overlayStateRef.current.calibrationProgress = 1;
+    phaseManagerRef.current?.transitionTo('READY');
+  };
+
+  const handleRestartCalibration = () => {
+    fallbackReadyTriggeredRef.current = false;
+    manualGestureBypassRef.current = noGestureDevBypass;
+    calibrationServiceRef.current.resetHold();
+    overlayStateRef.current.calibrationProgress = 0;
+    calibrateCamera();
+  };
+
   return (
     <div className="relative w-full h-full">
       <div ref={mountRef} className="w-full h-full" />
@@ -879,6 +902,8 @@ const GameScene: React.FC<Props> = ({
         {...overlayState}
         onStartWithoutTracking={handleStartWithoutTracking}
         onRetryCamera={onRetryCamera}
+        onRestartCalibration={handleRestartCalibration}
+        onContinueFromCalibration={handleContinueAfterCalibration}
       />
     </div>
   );
