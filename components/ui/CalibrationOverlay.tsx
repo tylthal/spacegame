@@ -8,6 +8,8 @@ interface Props {
     calibrationStatus?: CalibrationStatus;
     onStartWithoutTracking?: () => void;
     onRetryCamera?: () => void;
+    onRestartCalibration?: () => void;
+    onContinue?: () => void;
 }
 
 const CalibrationOverlay: React.FC<Props> = ({
@@ -16,12 +18,17 @@ const CalibrationOverlay: React.FC<Props> = ({
   calibrationStatus,
   onStartWithoutTracking,
   onRetryCamera,
+  onRestartCalibration,
+  onContinue,
 }) => {
     const stalled = calibrationStatus?.stalled ?? false;
     const cameraReady = calibrationStatus?.cameraReady ?? true;
     const showFallbackCta = !!onStartWithoutTracking && (!cameraReady || calibrationStatus?.fallbackCta);
     const showRetryAction = !!onRetryCamera && !cameraReady;
-    const pointerEventsClass = showFallbackCta || showRetryAction ? 'pointer-events-auto' : 'pointer-events-none';
+    const pointerEventsClass =
+      showFallbackCta || showRetryAction || onRestartCalibration || onContinue
+        ? 'pointer-events-auto'
+        : 'pointer-events-none';
 
     const guidanceText = (() => {
       if (!cameraReady)
@@ -39,7 +46,15 @@ const CalibrationOverlay: React.FC<Props> = ({
         <div
           className={`absolute inset-0 flex items-center justify-center ${pointerEventsClass} bg-black/60 backdrop-blur-md z-50 p-4`}
         >
-          <div className="text-center relative w-full max-w-lg">
+          <div className="text-center relative w-full max-w-2xl">
+            <div className="flex flex-col items-center gap-3 mb-6 md:mb-8">
+              <div className="px-3 py-1 rounded-full bg-cyan-900/50 border border-cyan-500/40 text-[11px] uppercase tracking-[0.25em] text-cyan-200 flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                Calibrating Neural Link
+              </div>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/60">Hold your left-hand pinch steady to lock in</p>
+            </div>
+
             <div className="mb-8 md:mb-12 relative flex flex-col items-center justify-center scale-75 md:scale-100">
                <svg viewBox="0 0 200 200" className="w-64 h-64 rotate-[-90deg]">
                   <circle cx="100" cy="100" r="85" fill="transparent" stroke="rgba(0, 255, 255, 0.1)" strokeWidth="4" />
@@ -49,15 +64,18 @@ const CalibrationOverlay: React.FC<Props> = ({
                   {Math.round(progress * 100)}%
                </div>
             </div>
-            
+
             <h2 className="text-2xl md:text-4xl font-black italic text-cyan-400 mb-4 md:mb-8 uppercase tracking-tighter">Neural Sync Required</h2>
-            
+
             <div className="flex flex-col md:flex-row gap-2 md:gap-4 justify-center mb-4 md:mb-8">
                <div className={`px-4 py-2 rounded border font-bold uppercase text-[10px] tracking-widest transition-colors ${trackingStatus.trigger ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-red-500/10 border-red-500/30 text-red-500'}`}>
                   Left Hand: {trackingStatus.trigger ? 'LOCKED' : 'WAITING'}
                </div>
                <div className={`px-4 py-2 rounded border font-bold uppercase text-[10px] tracking-widest transition-colors ${trackingStatus.aimer ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-red-500/10 border-red-500/30 text-red-500'}`}>
                   Right Hand: {trackingStatus.aimer ? 'LOCKED' : 'WAITING'}
+               </div>
+               <div className={`px-4 py-2 rounded border font-bold uppercase text-[10px] tracking-[0.3em] transition-colors ${cameraReady ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-200' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                  Camera: {cameraReady ? 'ONLINE' : 'OFFLINE'}
                </div>
             </div>
 
@@ -67,18 +85,39 @@ const CalibrationOverlay: React.FC<Props> = ({
                </p>
             </div>
 
-            {showRetryAction && (
-              <div className="mt-4 flex flex-col gap-2 items-center pointer-events-auto">
+            <div className="mt-6 flex flex-col md:flex-row justify-center gap-3 md:gap-4 items-center">
+              {onRestartCalibration && (
                 <button
-                  className="px-4 py-2 bg-cyan-700/80 hover:bg-cyan-500 text-white font-bold uppercase tracking-widest rounded shadow-lg transition"
+                  className="px-4 py-2 bg-purple-800/70 hover:bg-purple-700 text-white font-bold uppercase tracking-[0.25em] rounded shadow-lg transition"
+                  onClick={onRestartCalibration}
+                >
+                  Restart Calibration
+                </button>
+              )}
+
+              {showRetryAction && (
+                <button
+                  className="px-4 py-2 bg-cyan-700/80 hover:bg-cyan-500 text-white font-bold uppercase tracking-[0.25em] rounded shadow-lg transition"
                   onClick={onRetryCamera}
                 >
                   Re-request camera access
                 </button>
-                <p className="text-[10px] text-white/60 uppercase tracking-[0.25em] text-center">
-                  Update permissions or plug in a device, then tap to try again.
-                </p>
-              </div>
+              )}
+
+              {onContinue && (
+                <button
+                  className="px-4 py-2 bg-emerald-600/80 hover:bg-emerald-500 text-white font-bold uppercase tracking-[0.25em] rounded shadow-lg transition"
+                  onClick={onContinue}
+                >
+                  Continue to Launch
+                </button>
+              )}
+            </div>
+
+            {showRetryAction && (
+              <p className="mt-2 text-[10px] text-white/60 uppercase tracking-[0.25em] text-center">
+                Update permissions or plug in a device, then tap to try again.
+              </p>
             )}
 
             {showFallbackCta && (

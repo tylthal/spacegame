@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { mediaPreflightCheck, type MediaPreflightResult } from '../utils/deviceDiagnostics';
+import { CameraStreamService } from '../services/CameraStreamService';
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -59,14 +60,14 @@ const WebcamFeed: React.FC<Props> = ({
     if (!accessRequestToken) return;
 
     let active = true;
-    let currentStream: MediaStream | null = null;
+    let currentStream: MediaStream | null = CameraStreamService.getActiveStream();
     let currentDeviceId: string | null = null;
     let lastConstraints: MediaStreamConstraints | null = null;
     let lastDeviceLabel: string | undefined;
     let lastDeviceId: string | undefined;
     let lastKnownVideoInputCount = 0;
     let noDeviceLockout = false;
-    let permissionProbeStream: MediaStream | null = null;
+    let permissionProbeStream: MediaStream | null = CameraStreamService.getProbeStream();
 
     const markNoDeviceLockout = (message?: string) => {
       if (noDeviceLockout) return;
@@ -82,15 +83,11 @@ const WebcamFeed: React.FC<Props> = ({
     };
 
     const stopCurrentStream = (includeProbe = false) => {
-      if (currentStream) {
-        if (includeProbe || currentStream !== permissionProbeStream) {
-          currentStream.getTracks().forEach(track => track.stop());
-        }
-        currentStream = null;
-      }
+      CameraStreamService.stopActiveStream();
+      currentStream = null;
 
-      if (includeProbe && permissionProbeStream) {
-        permissionProbeStream.getTracks().forEach(track => track.stop());
+      if (includeProbe) {
+        CameraStreamService.stopProbeStream();
         permissionProbeStream = null;
       }
     };
@@ -103,6 +100,7 @@ const WebcamFeed: React.FC<Props> = ({
         try {
           if (!permissionProbeStream) {
             permissionProbeStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            CameraStreamService.useProbeStream(permissionProbeStream);
           }
           devices = await navigator.mediaDevices.enumerateDevices();
           videoInputs = devices.filter(device => device.kind === 'videoinput');
@@ -229,6 +227,7 @@ const WebcamFeed: React.FC<Props> = ({
             });
             stream = await navigator.mediaDevices.getUserMedia(constraints);
             permissionProbeStream = stream;
+            CameraStreamService.useProbeStream(stream);
           }
         } else {
           onDiagnostics?.({
@@ -248,6 +247,7 @@ const WebcamFeed: React.FC<Props> = ({
 
         stopCurrentStream();
         currentStream = stream;
+        CameraStreamService.useActiveStream(stream);
         currentDeviceId = preferredDevice.deviceId;
 
         const appliedSettings = stream.getVideoTracks()[0]?.getSettings();
@@ -392,6 +392,7 @@ const WebcamFeed: React.FC<Props> = ({
       active = false;
       navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
       stopCurrentStream(true);
+      CameraStreamService.stopAll();
       // Cleanup: Stop all tracks on unmount
       if (videoRef.current && videoRef.current.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
