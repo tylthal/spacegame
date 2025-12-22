@@ -14,7 +14,7 @@ const App: React.FC = () => {
   // --- Game State ---
   const [score, setScore] = useState(0);
   const [fps, setFps] = useState(0);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [useFallbackControls, setUseFallbackControls] = useState(false);
   const [handTrackingReady, setHandTrackingReady] = useState(false);
@@ -28,6 +28,8 @@ const App: React.FC = () => {
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
   const [showSplash, setShowSplash] = useState(true);
+  const [experienceStarted, setExperienceStarted] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
 
   const telemetryEnabled = isDevFeatureEnabled('benchmark');
   const cameraDiagnosticsOverlayEnabled = isDevFeatureEnabled('cameradiag');
@@ -42,6 +44,7 @@ const App: React.FC = () => {
 
   const initializeHandTracking = useCallback(async () => {
     setIsInitializing(true);
+    setIsCalibrating(true);
     setInitError(null);
     setUseFallbackControls(false);
     setCameraPermissionGranted(false);
@@ -57,13 +60,16 @@ const App: React.FC = () => {
       setInitError(message);
     } finally {
       setIsInitializing(false);
+      setIsCalibrating(false);
     }
   }, []);
 
   // Initialization: Boot hand tracking engine
   useEffect(() => {
-    initializeHandTracking();
-  }, [initializeHandTracking]);
+    if (experienceStarted) {
+      initializeHandTracking();
+    }
+  }, [experienceStarted, initializeHandTracking]);
 
   useEffect(() => {
     if (!handTrackingReady || useFallbackControls || !cameraPermissionGranted) {
@@ -107,6 +113,10 @@ const App: React.FC = () => {
       animationId = requestAnimationFrame(detect);
     };
 
+    if (!experienceStarted || (!isInitializing && !handTrackingActive)) {
+      return undefined;
+    }
+
     if (!isInitializing && handTrackingActive) {
       animationId = requestAnimationFrame(detect);
     }
@@ -114,7 +124,7 @@ const App: React.FC = () => {
     return () => {
       if (animationId) cancelAnimationFrame(animationId);
     };
-  }, [isInitializing, telemetryEnabled, handTrackingReady, cameraPermissionGranted, useFallbackControls]);
+  }, [experienceStarted, isInitializing, telemetryEnabled, handTrackingReady, cameraPermissionGranted, useFallbackControls]);
 
   /**
    * handleDamage
@@ -165,6 +175,8 @@ const App: React.FC = () => {
 
   const handleStartExperience = useCallback(() => {
     setShowSplash(false);
+    setExperienceStarted(true);
+    setIsCalibrating(true);
     requestCameraAccess();
   }, [requestCameraAccess]);
 
@@ -211,8 +223,9 @@ const App: React.FC = () => {
           <button
             className="inline-flex items-center justify-center px-6 py-3 rounded-md bg-cyan-500 text-black font-black tracking-[0.2em] uppercase text-sm md:text-base shadow-[0_0_25px_rgba(6,182,212,0.45)] hover:bg-cyan-400 transition"
             onClick={handleStartExperience}
+            disabled={isCalibrating}
           >
-            Start & Calibrate Camera
+            {isCalibrating ? 'Calibrating...' : 'Start & Calibrate Camera'}
           </button>
         </div>
       </div>
