@@ -22,7 +22,7 @@ const App: React.FC = () => {
   const [cameraInitError, setCameraInitError] = useState<CameraError | null>(null);
   const [cameraRequestPending, setCameraRequestPending] = useState(false);
   const [cameraRestartToken, setCameraRestartToken] = useState(0);
-  const [cameraAccessRequestToken, setCameraAccessRequestToken] = useState(0);
+  const [cameraAccessRequestToken, setCameraAccessRequestToken] = useState(1);
   const [cameraErrorCode, setCameraErrorCode] = useState<CameraErrorCode | null>(null);
   const [cameraDiagnostics, setCameraDiagnostics] = useState<CameraDiagnostics | null>(null);
   const [hull, setHull] = useState(100);
