@@ -5,6 +5,7 @@ import CalibrationGuide from './components/CalibrationGuide';
 import { HandTracker } from './services/handTracker';
 import { calibrateCamera } from './services/CalibrationService';
 import { perfTracer } from './telemetry/PerfTracer';
+import { logCameraError } from './telemetry/CameraTelemetry';
 import { isDevFeatureEnabled } from './utils/devMode';
 
 /**
@@ -197,14 +198,21 @@ const App: React.FC = () => {
     setCameraPermissionPending(false);
   }, []);
 
-  const handleCameraError = useCallback((error: CameraError) => {
-    setCameraPermissionGranted(false);
-    setCameraPermissionPending(false);
-    setCameraInitError(error);
-    setUseFallbackControls(true);
-    setCameraStream(null);
-    setCameraVideoReady(false);
-  }, []);
+  const handleCameraError = useCallback(
+    (error: CameraError) => {
+      setCameraPermissionGranted(false);
+      setCameraPermissionPending(false);
+      setCameraInitError(error);
+      setUseFallbackControls(true);
+      setCameraStream(null);
+      setCameraVideoReady(false);
+
+      if (telemetryEnabled) {
+        logCameraError(error);
+      }
+    },
+    [telemetryEnabled],
+  );
 
   const handleCameraVideoReadyChange = useCallback((isReady: boolean) => {
     setCameraVideoReady(isReady);
@@ -288,6 +296,7 @@ const App: React.FC = () => {
             cameraPermissionGranted={cameraPermissionGranted}
             cameraReady={cameraReady}
             cameraPermissionPending={cameraPermissionPending}
+            cameraErrorMessage={cameraInitError?.message ?? null}
             onRetryCamera={handleRetryCamera}
             videoStream={cameraStream}
             videoRef={videoRef}
