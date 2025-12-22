@@ -6,6 +6,7 @@ import { WeaponStatus } from '../../systems/WeaponController';
 export interface CalibrationStatus {
   stalled: boolean;
   cameraReady?: boolean;
+  permissionPending?: boolean;
   fallbackCta?: boolean;
   message?: string;
 }
@@ -43,6 +44,7 @@ const isEqual = (a: OverlayState, b: OverlayState) =>
       !!b.calibrationStatus &&
       a.calibrationStatus.stalled === b.calibrationStatus.stalled &&
       a.calibrationStatus.cameraReady === b.calibrationStatus.cameraReady &&
+      a.calibrationStatus.permissionPending === b.calibrationStatus.permissionPending &&
       a.calibrationStatus.fallbackCta === b.calibrationStatus.fallbackCta &&
       a.calibrationStatus.message === b.calibrationStatus.message)) &&
   ((!a.helpState && !b.helpState) ||

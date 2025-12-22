@@ -43,14 +43,26 @@ interface Props {
   lives: number;
   handTrackingEnabled: boolean;
   cameraPermissionGranted: boolean;
+  cameraReady: boolean;
+  cameraPermissionPending: boolean;
   onRetryCamera?: () => void;
   videoStream?: MediaStream | null;
   videoRef: React.RefObject<HTMLVideoElement>;
 }
 
-const getCameraMessage = (cameraPermissionGranted: boolean) => {
-  if (cameraPermissionGranted) return undefined;
-  return 'Camera access required. Turn on a webcam and allow browser permissions to continue.';
+const getCameraMessage = (
+  cameraPermissionGranted: boolean,
+  cameraReady: boolean,
+  cameraPermissionPending: boolean,
+) => {
+  if (cameraPermissionPending && !cameraPermissionGranted) {
+    return 'Enable camera access in your browser prompt to continue calibration.';
+  }
+  if (!cameraPermissionGranted) {
+    return 'Camera access required. Turn on a webcam and allow browser permissions to continue.';
+  }
+  if (!cameraReady) return 'Starting camera feed — ensure your webcam is connected and accessible.';
+  return undefined;
 };
 
 // Memory Optimization Globals - Pooled strictly to avoid GC and per-frame allocations
@@ -76,6 +88,8 @@ const GameScene: React.FC<Props> = ({
   lives,
   handTrackingEnabled,
   cameraPermissionGranted,
+  cameraReady,
+  cameraPermissionPending,
   onRetryCamera,
   videoStream,
   videoRef,
@@ -102,15 +116,17 @@ const GameScene: React.FC<Props> = ({
     helpState: { page: 0, enemyIndex: 0 },
     calibrationStatus: {
       stalled: false,
-      cameraReady: cameraPermissionGranted,
+      cameraReady,
+      permissionPending: cameraPermissionPending,
       fallbackCta: !cameraPermissionGranted,
-      message: getCameraMessage(cameraPermissionGranted),
+      message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending),
     },
   });
 
   const calibrationStartRef = useRef<number | null>(null);
   const lastLandmarkTimeRef = useRef<number | null>(null);
   const fallbackReadyTriggeredRef = useRef(false);
+  const hasLiveHandDataRef = useRef(false);
   const manualGestureBypassRef = useRef(false);
   const phaseManagerRef = useRef<PhaseManager | null>(null);
   const totalPlayTimeRef = useRef(0);
@@ -133,26 +149,28 @@ const GameScene: React.FC<Props> = ({
     };
     overlayStateRef.current.calibrationStatus = {
       ...currentStatus,
-      cameraReady: cameraPermissionGranted,
+      cameraReady,
+      permissionPending: cameraPermissionPending,
       fallbackCta: !cameraPermissionGranted,
-      message: getCameraMessage(cameraPermissionGranted),
+      message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending),
     };
-  }, [cameraPermissionGranted, noGestureDevBypass]);
+  }, [cameraPermissionGranted, cameraReady, cameraPermissionPending]);
 
   useEffect(() => {
     const handler = () => {
-      const now = performance.now();
       calibrationServiceRef.current.resetHold();
-      calibrationStartRef.current = now;
+      calibrationStartRef.current = null;
       lastLandmarkTimeRef.current = null;
       fallbackReadyTriggeredRef.current = false;
+      hasLiveHandDataRef.current = false;
       manualGestureBypassRef.current = noGestureDevBypass;
       overlayStateRef.current.calibrationProgress = 0;
       overlayStateRef.current.calibrationStatus = {
         stalled: false,
         fallbackCta: !cameraPermissionGranted,
-        cameraReady: cameraPermissionGranted,
-        message: getCameraMessage(cameraPermissionGranted),
+        cameraReady,
+        permissionPending: cameraPermissionPending,
+        message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending),
       };
 
       const phaseManager = phaseManagerRef.current;
@@ -165,7 +183,7 @@ const GameScene: React.FC<Props> = ({
     setCalibrateCameraHandler(handler);
 
     return () => clearCalibrateCameraHandler(handler);
-  }, [cameraPermissionGranted, noGestureDevBypass]);
+  }, [cameraPermissionGranted, cameraReady, cameraPermissionPending, noGestureDevBypass]);
 
   const overlayState = useOverlayStateAdapter(overlayStateRef, 90);
 
@@ -460,13 +478,15 @@ const GameScene: React.FC<Props> = ({
         if (phase === 'CALIBRATING') {
           overlayStateRef.current.calibrationProgress = 0;
           calibrationServiceRef.current.resetHold();
-          calibrationStartRef.current = performance.now();
+          calibrationStartRef.current = null;
           lastLandmarkTimeRef.current = null;
           fallbackReadyTriggeredRef.current = false;
+          hasLiveHandDataRef.current = false;
           overlayStateRef.current.calibrationStatus = {
             stalled: false,
-            fallbackCta: false,
-            cameraReady: cameraPermissionGranted,
+            fallbackCta: !cameraPermissionGranted,
+            cameraReady,
+            permissionPending: cameraPermissionPending,
           };
           if (!manualGestureBypassRef.current) manualGestureBypassRef.current = noGestureDevBypass;
         }
@@ -522,6 +542,7 @@ const GameScene: React.FC<Props> = ({
       const shouldUseFallback = !handTrackingEnabled || shouldBypassGestures || !handSnapshot?.gestures?.tip;
       const snapshot = shouldUseFallback ? buildFallbackSnapshot() : handSnapshot;
 
+      hasLiveHandDataRef.current = !!handSnapshot && !shouldUseFallback;
       inputSnapshotRef.current = snapshot || buildFallbackSnapshot();
       overlayStateRef.current.trackingStatus = handSnapshot?.tracking || snapshot?.tracking || overlayStateRef.current.trackingStatus;
     };
@@ -710,22 +731,41 @@ const GameScene: React.FC<Props> = ({
       missilePool.update(timeScale, now, shouldDetonate, detonateMissile);
 
       if (currentPhase === 'CALIBRATING') {
+        if (!cameraPermissionGranted || !cameraReady) {
+          calibrationServiceRef.current.resetHold();
+          calibrationStartRef.current = null;
+          lastLandmarkTimeRef.current = null;
+          fallbackReadyTriggeredRef.current = false;
+          hasLiveHandDataRef.current = false;
+          overlayStateRef.current.calibrationProgress = 0;
+          overlayStateRef.current.calibrationStatus = {
+            stalled: false,
+            fallbackCta: !cameraPermissionGranted,
+            cameraReady,
+            permissionPending: cameraPermissionPending,
+            message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending),
+          };
+        } else {
+          if (calibrationStartRef.current === null) {
+            calibrationStartRef.current = now;
+            lastLandmarkTimeRef.current = null;
+            hasLiveHandDataRef.current = false;
+          }
+
           const lastSeen = lastLandmarkTimeRef.current ?? calibrationStartRef.current ?? now;
           const timeSinceLandmark = now - lastSeen;
-          const stalled = cameraPermissionGranted && timeSinceLandmark > CALIBRATION_STALL_MS;
+          const stalled = timeSinceLandmark > CALIBRATION_STALL_MS;
           overlayStateRef.current.calibrationStatus = {
             stalled,
-            fallbackCta: !cameraPermissionGranted || stalled,
-            cameraReady: cameraPermissionGranted,
-            message: !cameraPermissionGranted
-              ? getCameraMessage(cameraPermissionGranted)
-              : stalled
-                  ? 'No hand data received. Verify the camera is connected and your hands are visible.'
-                  : undefined,
+            fallbackCta: stalled,
+            cameraReady,
+            permissionPending: cameraPermissionPending,
+            message: stalled
+              ? 'No hand data received. Verify the camera is connected and your hands are visible.'
+              : undefined,
           };
 
           if (
-            cameraPermissionGranted &&
             timeSinceLandmark > CALIBRATION_AUTO_READY_MS &&
             !fallbackReadyTriggeredRef.current
           ) {
@@ -734,22 +774,24 @@ const GameScene: React.FC<Props> = ({
             transitionPhase('READY');
           }
 
-          if (handTrackingEnabled && !manualGestureBypassRef.current && gestures && aimData) {
-              const { progress, completed } = calibrationServiceRef.current.update(gestures.pinch, aimData.tip, now);
-              overlayStateRef.current.calibrationProgress = progress;
-              if (completed) transitionPhase('READY');
+          if (handTrackingEnabled && !manualGestureBypassRef.current && gestures && aimData && hasLiveHandDataRef.current) {
+            const { progress, completed } = calibrationServiceRef.current.update(gestures.pinch, aimData.tip, now);
+            overlayStateRef.current.calibrationProgress = progress;
+            if (completed) transitionPhase('READY');
           } else {
-              calibrationServiceRef.current.resetHold();
-              overlayStateRef.current.calibrationProgress = 0;
+            calibrationServiceRef.current.resetHold();
+            overlayStateRef.current.calibrationProgress = 0;
           }
+        }
       } else {
-          calibrationServiceRef.current.resetHold();
-          overlayStateRef.current.calibrationStatus = {
-            stalled: false,
-            fallbackCta: !cameraPermissionGranted,
-            cameraReady: cameraPermissionGranted,
-            message: getCameraMessage(cameraPermissionGranted),
-          };
+        calibrationServiceRef.current.resetHold();
+        overlayStateRef.current.calibrationStatus = {
+          stalled: false,
+          fallbackCta: !cameraPermissionGranted,
+          cameraReady,
+          permissionPending: cameraPermissionPending,
+          message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending),
+        };
       }
 
       if (gestures) {

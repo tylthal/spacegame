@@ -27,18 +27,25 @@ const CalibrationOverlay: React.FC<Props> = ({
 }) => {
     const stalled = calibrationStatus?.stalled ?? false;
     const cameraReady = calibrationStatus?.cameraReady ?? true;
-    const showFallbackCta = !!onStartWithoutTracking && (!cameraReady || calibrationStatus?.fallbackCta);
-    const showRetryAction = !!onRetryCamera && !cameraReady;
+    const permissionPending = calibrationStatus?.permissionPending ?? false;
+    const waitingForCamera = !cameraReady;
+    const showFallbackCta = !!onStartWithoutTracking && (waitingForCamera || calibrationStatus?.fallbackCta);
+    const showRetryAction = !!onRetryCamera && waitingForCamera;
     const pointerEventsClass =
       showFallbackCta || showRetryAction || onRestartCalibration || onContinue
         ? 'pointer-events-auto'
         : 'pointer-events-none';
 
+    const headerLabel = waitingForCamera ? 'Enable Camera Access' : 'Calibrating Neural Link';
+    const progressValue = waitingForCamera ? '---' : `${Math.round(progress * 100)}%`;
+
     const guidanceText = (() => {
-      if (!cameraReady)
+      if (waitingForCamera)
         return (
           calibrationStatus?.message ??
-          'Camera access required. Enable your webcam and allow permissions, then press Retry.'
+          (permissionPending
+            ? 'Approve the camera permission prompt, then hit Retry if needed.'
+            : 'Camera access required. Enable your webcam and allow permissions, then press Retry.')
         );
       if (stalled)
         return calibrationStatus?.message ?? 'We cannot see your hands. Move them into the guide box or adjust lighting.';
@@ -107,7 +114,7 @@ const CalibrationOverlay: React.FC<Props> = ({
               <div className="flex flex-col items-center md:items-start gap-3">
                 <div className="px-3 py-1 rounded-full bg-cyan-900/60 border border-cyan-500/40 text-[11px] uppercase tracking-[0.25em] text-cyan-100 flex items-center gap-2 shadow-lg shadow-cyan-900/40">
                   <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                  Calibrating Neural Link
+                  {headerLabel}
                 </div>
                 <p className="text-xs uppercase tracking-[0.3em] text-white/70 bg-black/50 px-4 py-2 rounded-full border border-white/10">
                   Hold your left-hand pinch steady to lock in
@@ -121,7 +128,7 @@ const CalibrationOverlay: React.FC<Props> = ({
                        <circle cx="100" cy="100" r="85" fill="transparent" stroke="#00ffff" strokeWidth="8" strokeDasharray={2 * Math.PI * 85} strokeDashoffset={2 * Math.PI * 85 * (1 - progress)} className="transition-all duration-100 ease-linear" />
                     </svg>
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-cyan-400 font-black text-3xl">
-                       {Math.round(progress * 100)}%
+                       {progressValue}
                     </div>
                  </div>
 
