@@ -15,5 +15,9 @@ while signaling that major systems are stubbed out.
 ## Components in use
 - **Phase list buttons:** Rounded cards with subtle borders to show status (pending, active, done).
 - **Placeholder panels:** Glassy cyan borders and rounded corners; include clear headings and short guidance bullets.
+- **HUD overlay:** Text-first stat badges for score, hull, and lives with polite `aria-live` announcements and a visible hull
+  meter. When effects are unavailable, the sr-only summary keeps the HUD readable.
+- **Menu targets:** Circular hit areas arranged on the `MENU_Z` plane; each target should pair its 3D affordance with a text
+  label for keyboard/screen reader fallback.
 
 As new features land, evolve this guide to cover the rebuilt calibration, ready/menu, HUD, and gameplay overlays.
