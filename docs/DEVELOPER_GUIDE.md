@@ -4,6 +4,9 @@ This guide is a quick walkthrough of how the simulation is stitched together and
 
 ## Phased Rebuild Checklist
 
+### Legacy quarantine guard
+- Legacy entry points from the previous prototype are intentionally removed. The guard test at `systems/__tests__/legacyGuards.test.ts` walks the source tree to ensure no one reintroduces imports of those files; add new code under the current scaffold (`components/GameScene.tsx`, `services/handTracker.ts`, `systems/*`) instead of reviving deprecated modules.
+
 1. **Input Stack** — stabilize MediaPipe ingestion before touching rendering.
    - **Modules**: `services/handTracker.ts`, `config/constants.ts` (calibration), `types.ts` (`HandResult`).
    - **Contract**: `handResultRef.current` always set to the latest `HandResult | null` plus calibration metadata so downstream reads never throw.
