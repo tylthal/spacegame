@@ -27,6 +27,7 @@ const App: React.FC = () => {
   const [cameraDiagnostics, setCameraDiagnostics] = useState<CameraDiagnostics | null>(null);
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
+  const [showSplash, setShowSplash] = useState(true);
 
   const telemetryEnabled = isDevFeatureEnabled('benchmark');
   const cameraDiagnosticsOverlayEnabled = isDevFeatureEnabled('cameradiag');
@@ -162,6 +163,11 @@ const App: React.FC = () => {
     setCameraAccessRequestToken(token => token + 1);
   }, []);
 
+  const handleStartExperience = useCallback(() => {
+    setShowSplash(false);
+    requestCameraAccess();
+  }, [requestCameraAccess]);
+
   const handleCameraDiagnostics = useCallback((info: CameraDiagnostics) => {
     setCameraDiagnostics(info);
     setCameraRequestPending(info.event === 'request');
@@ -187,6 +193,31 @@ const App: React.FC = () => {
   }, []);
 
   const handTrackingActive = handTrackingReady && cameraPermissionGranted && !useFallbackControls;
+
+  if (showSplash) {
+    return (
+      <div className="relative min-h-screen w-screen bg-gradient-to-br from-black via-slate-950 to-cyan-950 text-cyan-100 overflow-hidden font-mono select-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.08),transparent_55%)]" />
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center space-y-8">
+          <div className="space-y-3">
+            <p className="text-xs md:text-sm uppercase tracking-[0.4em] text-cyan-500">Orbital Defense Simulator</p>
+            <h1 className="text-3xl md:text-5xl font-black tracking-[0.3em] uppercase text-cyan-300 drop-shadow-[0_0_20px_rgba(6,182,212,0.35)]">
+              Void Breach
+            </h1>
+            <p className="max-w-2xl mx-auto text-sm md:text-base text-white/70 leading-relaxed">
+              Link your neural visor and calibrate your camera feed before launching into the void. Keep your hull intact, intercept incoming threats, and survive the breach.
+            </p>
+          </div>
+          <button
+            className="inline-flex items-center justify-center px-6 py-3 rounded-md bg-cyan-500 text-black font-black tracking-[0.2em] uppercase text-sm md:text-base shadow-[0_0_25px_rgba(6,182,212,0.45)] hover:bg-cyan-400 transition"
+            onClick={handleStartExperience}
+          >
+            Start & Calibrate Camera
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-screen h-screen bg-black overflow-hidden font-mono text-cyan-400 select-none">
