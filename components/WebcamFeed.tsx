@@ -174,18 +174,6 @@ const WebcamFeed: React.FC<Props> = ({
 
         const preferredDeviceId = sanitizeDeviceId(preferredDevice.deviceId);
 
-        onDiagnostics?.({
-          event: 'decision',
-          deviceLabel: preferredDevice.label,
-          deviceId: preferredDevice.deviceId,
-          constraints: {
-            video: {
-              deviceId: preferredDeviceId,
-            },
-          },
-          message: `Selected camera from ${videoInputs.length} devices (target: ${targetDeviceId ?? 'none'})`,
-        });
-
         /**
          * Vision Optimization:
          * 320x240 is used to reduce data transfer to the GPU and inference time.
