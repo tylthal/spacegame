@@ -156,7 +156,6 @@ const App: React.FC = () => {
   }, []);
 
   const requestCameraAccess = useCallback(() => {
-    setCameraRequestPending(true);
     setCameraInitError(null);
     setCameraErrorCode(null);
     setUseFallbackControls(false);

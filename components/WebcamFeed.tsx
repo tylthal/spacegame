@@ -64,7 +64,22 @@ const WebcamFeed: React.FC<Props> = ({
     let lastConstraints: MediaStreamConstraints | null = null;
     let lastDeviceLabel: string | undefined;
     let lastDeviceId: string | undefined;
+    let lastKnownVideoInputCount = 0;
+    let noDeviceLockout = false;
     let permissionProbeStream: MediaStream | null = null;
+
+    const markNoDeviceLockout = (message?: string) => {
+      if (noDeviceLockout) return;
+      noDeviceLockout = true;
+      onDiagnostics?.({
+        event: 'error',
+        deviceLabel: lastDeviceLabel,
+        deviceId: lastDeviceId,
+        constraints: lastConstraints ?? undefined,
+        errorName: 'NoDevicesLockout',
+        message,
+      });
+    };
 
     const stopCurrentStream = (includeProbe = false) => {
       if (currentStream) {
@@ -103,6 +118,7 @@ const WebcamFeed: React.FC<Props> = ({
         }
       }
 
+      lastKnownVideoInputCount = videoInputs.length;
       return videoInputs;
     };
 
@@ -143,6 +159,7 @@ const WebcamFeed: React.FC<Props> = ({
 
         const videoInputs = await getVideoInputs();
         if (videoInputs.length === 0) {
+          markNoDeviceLockout('No cameras detected. Waiting for user retry or device change.');
           throw createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.');
         }
 
@@ -249,6 +266,9 @@ const WebcamFeed: React.FC<Props> = ({
           message: err instanceof Error ? err.message : String(err),
         });
         if ((err as CameraError)?.code) {
+          if ((err as CameraError).code === 'NO_DEVICES') {
+            markNoDeviceLockout('Camera access halted until a new device is available or the user retries.');
+          }
           onError?.(err as CameraError);
           return;
         }
@@ -262,6 +282,12 @@ const WebcamFeed: React.FC<Props> = ({
             errorName: err.name,
             message: 'Requested device not found. Retrying with default camera.',
           });
+          if (lastKnownVideoInputCount === 0) {
+            markNoDeviceLockout('No cameras reported. Suppressing immediate retry.');
+            onError?.(createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.', err));
+            return;
+          }
+
           await startCamera(undefined, false);
           return;
         }
@@ -291,6 +317,7 @@ const WebcamFeed: React.FC<Props> = ({
 
     const handleDeviceChange = async () => {
       if (!navigator.mediaDevices?.enumerateDevices) return;
+      noDeviceLockout = false;
       try {
         const videoInputs = await getVideoInputs();
         if (videoInputs.length === 0) {
