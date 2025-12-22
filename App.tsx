@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameScene from './components/GameScene';
 import WebcamFeed, { CameraDiagnostics, CameraError, CameraErrorCode } from './components/WebcamFeed';
+import CalibrationGuide from './components/CalibrationGuide';
 import { HandTracker } from './services/handTracker';
+import { calibrateCamera } from './services/CalibrationService';
 import { perfTracer } from './telemetry/PerfTracer';
 import { isDevFeatureEnabled } from './utils/devMode';
 
@@ -30,6 +32,7 @@ const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [experienceStarted, setExperienceStarted] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const [showCalibrationGuide, setShowCalibrationGuide] = useState(false);
 
   const telemetryEnabled = isDevFeatureEnabled('benchmark');
   const cameraDiagnosticsOverlayEnabled = isDevFeatureEnabled('cameradiag');
@@ -177,8 +180,14 @@ const App: React.FC = () => {
     setShowSplash(false);
     setExperienceStarted(true);
     setIsCalibrating(true);
+    setShowCalibrationGuide(true);
     requestCameraAccess();
   }, [requestCameraAccess]);
+
+  const handleCalibrateFromGuide = useCallback(() => {
+    calibrateCamera();
+    setShowCalibrationGuide(false);
+  }, []);
 
   const handleCameraDiagnostics = useCallback((info: CameraDiagnostics) => {
     setCameraDiagnostics(info);
@@ -267,6 +276,12 @@ const App: React.FC = () => {
           <p className="mt-4 text-cyan-700 uppercase tracking-widest text-xs">Loading Hand Tracking Engine</p>
         </div>
       )}
+      <CalibrationGuide
+        open={showCalibrationGuide}
+        onClose={handleCalibrateFromGuide}
+        onConfirm={handleCalibrateFromGuide}
+        cameraReady={cameraPermissionGranted}
+      />
       {initError && !useFallbackControls && !isInitializing && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 px-4">
           <div className="max-w-xl w-full bg-gray-900 border border-red-500/40 rounded-lg p-6 shadow-2xl text-center space-y-4">

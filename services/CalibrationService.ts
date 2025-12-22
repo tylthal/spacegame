@@ -49,4 +49,20 @@ export class CalibrationService {
   }
 }
 
+type CalibrateCameraHandler = () => void;
+
+let calibrateCameraHandler: CalibrateCameraHandler | null = null;
+
+export function setCalibrateCameraHandler(handler: CalibrateCameraHandler) {
+  calibrateCameraHandler = handler;
+}
+
+export function clearCalibrateCameraHandler(handler: CalibrateCameraHandler) {
+  if (calibrateCameraHandler === handler) calibrateCameraHandler = null;
+}
+
+export function calibrateCamera() {
+  calibrateCameraHandler?.();
+}
+
 export default CalibrationService;

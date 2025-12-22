@@ -13,7 +13,7 @@ import { PhaseManager } from '../systems/PhaseManager';
 import { WeaponController, WeaponStatus } from '../systems/WeaponController';
 import { BulletPool } from '../systems/BulletPool';
 import { MissilePool } from '../systems/MissilePool';
-import { CalibrationService } from '../services/CalibrationService';
+import { CalibrationService, clearCalibrateCameraHandler, setCalibrateCameraHandler } from '../services/CalibrationService';
 import { ResourceLifecycle } from '../systems/ResourceLifecycle';
 import { isDevFeatureEnabled } from '../utils/devMode';
 import { PerfTracer, perfTracer } from '../telemetry/PerfTracer';
@@ -148,7 +148,35 @@ const GameScene: React.FC<Props> = ({
       fallbackCta: !cameraPermissionGranted,
       message: getCameraMessage(cameraPermissionGranted, cameraErrorCode),
     };
-  }, [cameraPermissionGranted, cameraErrorCode]);
+  }, [cameraPermissionGranted, cameraErrorCode, noGestureDevBypass]);
+
+  useEffect(() => {
+    const handler = () => {
+      const now = performance.now();
+      calibrationServiceRef.current.resetHold();
+      calibrationStartRef.current = now;
+      lastLandmarkTimeRef.current = null;
+      fallbackReadyTriggeredRef.current = false;
+      manualGestureBypassRef.current = noGestureDevBypass;
+      overlayStateRef.current.calibrationProgress = 0;
+      overlayStateRef.current.calibrationStatus = {
+        stalled: false,
+        fallbackCta: !cameraPermissionGranted,
+        cameraReady: cameraPermissionGranted,
+        message: getCameraMessage(cameraPermissionGranted, cameraErrorCode),
+      };
+
+      const phaseManager = phaseManagerRef.current;
+      const currentPhase = phaseManager?.getPhase();
+      if (phaseManager && currentPhase !== 'CALIBRATING') {
+        phaseManager.transitionTo('CALIBRATING');
+      }
+    };
+
+    setCalibrateCameraHandler(handler);
+
+    return () => clearCalibrateCameraHandler(handler);
+  }, [cameraPermissionGranted, cameraErrorCode, noGestureDevBypass]);
 
   const benchmarkModeEnabled = isDevFeatureEnabled('benchmark');
   const noGestureDevBypass = isDevFeatureEnabled('nogestures');

@@ -38,7 +38,7 @@ export class PhaseManager {
 
   private static transitions: Record<GamePhase, GamePhase[]> = {
     CALIBRATING: ['READY'],
-    READY: ['PLAYING'],
+    READY: ['PLAYING', 'CALIBRATING'],
     PLAYING: ['PAUSED', 'GAMEOVER'],
     PAUSED: ['PLAYING', 'READY', 'CALIBRATING', 'HELP'],
     HELP: ['PAUSED'],
