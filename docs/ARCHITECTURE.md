@@ -4,18 +4,20 @@ The codebase has been reset to a thin React shell so the rebuild can progress wi
 
 ## Current state
 
-- **Rendering/input removed**: No Three.js or MediaPipe code remains. The app is a simple React UI that swaps placeholder
-  screens representing the future calibration, ready/menu, and gameplay flows.
-- **No global singletons**: The placeholder screens are plain components with local state, keeping the surface ready for future
-  dependency-injected systems.
+- **HUD/menu rebuilt**: An accessible HUD overlay (score, hull, lives) and MENU_Z menu target helpers now live in the shell
+  with Testing Library/Vitest coverage.
+- **Rendering/input still stubbed**: No Three.js or MediaPipe wiring is present yet; the app remains a React UI with
+  placeholder screens representing the future calibration, ready/menu, and gameplay flows.
+- **No global singletons**: Components and helpers stay local and typed so future systems can be dependency-injected.
 - **Guardrails**: Tests fail if legacy modules or paths (old scenes, services, telemetry) reappear.
 
 ## Near-term layering strategy
 
-1. **Input stack**: Introduce a new hand/input adapter behind a deterministic contract and unit tests.
-2. **Phase manager**: Add a pure-state phase controller and wire the placeholder screens to it.
-3. **Rendering spine**: Reintroduce the render loop and asset management as isolated modules with pooled resources and tests.
-4. **Gameplay + UI**: Layer gameplay systems and HUD components after the spine stabilizes.
+1. **Input stack**: Introduce a new hand/input adapter behind a deterministic contract and unit tests. ✅
+2. **Phase manager**: Add a pure-state phase controller and wire the placeholder screens to it. ✅
+3. **Rendering spine**: Reintroduce the render loop and asset management as isolated modules with pooled resources and tests. ✅
+4. **Gameplay + UI**: Layer gameplay systems and HUD components after the spine stabilizes. ✅ (HUD/menu landed; combat systems in place.)
+5. **Telemetry + deployment**: Add diagnostics, smoke checks, and CI deploy guards.
 
 ## File layout (clean base)
 

@@ -4,9 +4,10 @@ This guide explains how to work with the cleaned-up rebuild shell.
 
 ## Working in the placeholder shell
 
-- The app currently renders only placeholder screens. There is no MediaPipe, no Three.js renderer, and no legacy gameplay logic.
+- The app currently renders placeholder screens plus an accessible HUD overlay preview. There is still no MediaPipe or
+  Three.js renderer, and no legacy gameplay logic.
 - Use the phase list in the UI to view the scaffolding for calibration, ready/menu, and gameplay; each is intentionally simple
-  so future modules can be slotted in.
+  so future modules can be slotted in. The ready/menu view demonstrates MENU_Z target helpers used by the renderer.
 
 ## Guardrails
 
