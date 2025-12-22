@@ -13,3 +13,12 @@ in this version. Use it to preview the screens where future features will land.
 - Interact with Three.js scenes or HUD overlays.
 
 This guide will expand once the rebuilt input, rendering, and gameplay systems are added.
+
+## Early troubleshooting
+
+- When hand tracking returns, enable the debug panels with the `VITE_DEBUG_PANELS` flag to confirm whether calibration and
+  gesture events are flowing. The panels summarize the current phase, spawn counts, and hull state.
+- If gestures feel jumpy or misfire, try rerunning the diagnostics mode (`VITE_DIAGNOSTICS_MODE=1`) to verify the pipeline with
+  known-good frames before testing against a live camera feed.
+- For tracking loss, re-run calibration in a stable, well-lit background and ensure your hand remains inside the virtual
+  mousepad bounds noted in the technical reference.

@@ -2,6 +2,9 @@ import React, { useMemo, useState } from 'react';
 import PlaceholderScreen from './components/PlaceholderScreen';
 import PhaseList, { PhaseDescriptor, PhaseId } from './components/PhaseList';
 import HudOverlay from './components/HudOverlay';
+import DebugPanel from './components/DebugPanel';
+import { resolveDebugConfig } from './observability/DebugConfig';
+import { runDiagnosticsPipeline } from './observability/DiagnosticsHarness';
 
 const phases: PhaseDescriptor[] = [
   {
@@ -34,6 +37,11 @@ const foundationChecklist = [
 
 const App: React.FC = () => {
   const [activePhase, setActivePhase] = useState<PhaseId>('foundation');
+  const debugConfig = useMemo(() => resolveDebugConfig(), []);
+  const diagnostics = useMemo(
+    () => (debugConfig.diagnosticsMode ? runDiagnosticsPipeline() : undefined),
+    [debugConfig.diagnosticsMode],
+  );
 
   const active = useMemo(() => phases.find(phase => phase.id === activePhase) ?? phases[0], [activePhase]);
 
@@ -107,6 +115,8 @@ const App: React.FC = () => {
             isLastPhase={activePhase === phases[phases.length - 1].id}
           />
         </div>
+
+        {debugConfig.debugPanels && <DebugPanel config={debugConfig} diagnostics={diagnostics} />}
 
         <section className="grid gap-3 md:grid-cols-3" aria-label="Foundation checklist">
           {foundationChecklist.map(item => (
