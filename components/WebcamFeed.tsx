@@ -23,7 +23,7 @@ export interface CameraError extends Error {
 }
 
 export interface CameraDiagnostics {
-  event: 'preflight' | 'request' | 'acquired' | 'devicechange' | 'error';
+  event: 'preflight' | 'decision' | 'request' | 'acquired' | 'devicechange' | 'error';
   deviceLabel?: string;
   deviceId?: string;
   constraints?: MediaStreamConstraints;
@@ -212,13 +212,31 @@ const WebcamFeed: React.FC<Props> = ({
             !preferredDevice.deviceId || probeSettings?.deviceId === preferredDevice.deviceId || !probeSettings?.deviceId;
 
           if (deviceMatches) {
+            onDiagnostics?.({
+              event: 'decision',
+              deviceLabel: preferredDevice.label,
+              deviceId: preferredDevice.deviceId,
+              message: 'Reusing permission probe stream for preferred device',
+            });
             await applyPreferredConstraints(permissionProbeStream, constraints);
             stream = permissionProbeStream;
           } else {
+            onDiagnostics?.({
+              event: 'decision',
+              deviceLabel: preferredDevice.label,
+              deviceId: preferredDevice.deviceId,
+              message: 'Permission probe device did not match; requesting new stream',
+            });
             stream = await navigator.mediaDevices.getUserMedia(constraints);
             permissionProbeStream = stream;
           }
         } else {
+          onDiagnostics?.({
+            event: 'decision',
+            deviceLabel: preferredDevice.label,
+            deviceId: preferredDevice.deviceId,
+            message: 'No permission probe stream available; requesting new stream',
+          });
           stream = await navigator.mediaDevices.getUserMedia(constraints);
           permissionProbeStream = stream;
         }
