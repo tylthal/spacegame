@@ -346,7 +346,7 @@ const App: React.FC = () => {
 
           {/* Mini Webcam Preview: Visual feedback for neural alignment */}
           {/* Responsive: Smaller on mobile, standard on desktop. Moved higher on mobile to clear Weapon Status */}
-          <div className="absolute bottom-24 right-4 md:bottom-8 md:right-8 w-20 h-14 md:w-48 md:h-36 border-2 border-cyan-500/30 rounded-lg overflow-hidden shadow-2xl z-[100] bg-black transition-all">
+          <div className="fixed bottom-4 right-4 md:bottom-8 md:right-8 w-24 h-16 md:w-48 md:h-36 border-2 border-cyan-500/30 rounded-lg overflow-hidden shadow-2xl z-[200] bg-black transition-all pointer-events-auto">
             <WebcamFeed
               videoRef={videoRef}
               onPermissionGranted={handleCameraPermissionGranted}
