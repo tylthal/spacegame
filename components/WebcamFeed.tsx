@@ -60,17 +60,54 @@ const WebcamFeed: React.FC<Props> = ({
     let currentDeviceId: string | null = null;
     let lastConstraints: MediaStreamConstraints | null = null;
     let lastDeviceLabel: string | undefined;
+    let permissionProbeStream: MediaStream | null = null;
 
-    const stopCurrentStream = () => {
+    const stopCurrentStream = (includeProbe = false) => {
       if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
+        if (includeProbe || currentStream !== permissionProbeStream) {
+          currentStream.getTracks().forEach(track => track.stop());
+        }
         currentStream = null;
+      }
+
+      if (includeProbe && permissionProbeStream) {
+        permissionProbeStream.getTracks().forEach(track => track.stop());
+        permissionProbeStream = null;
       }
     };
 
     const getVideoInputs = async () => {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      return devices.filter(device => device.kind === 'videoinput');
+      let devices = await navigator.mediaDevices.enumerateDevices();
+      let videoInputs = devices.filter(device => device.kind === 'videoinput');
+
+      if (videoInputs.length === 0 && navigator.mediaDevices?.getUserMedia) {
+        try {
+          if (!permissionProbeStream) {
+            permissionProbeStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          }
+          devices = await navigator.mediaDevices.enumerateDevices();
+          videoInputs = devices.filter(device => device.kind === 'videoinput');
+        } catch (probeError) {
+          if (probeError instanceof DOMException && (probeError.name === 'NotAllowedError' || probeError.name === 'SecurityError')) {
+            throw createCameraError(
+              'PERMISSION_DENIED',
+              'Camera permission denied. Enable access to continue.',
+              probeError,
+            );
+          }
+          throw probeError;
+        }
+      }
+
+      return videoInputs;
+    };
+
+    const applyPreferredConstraints = async (stream: MediaStream, constraints: MediaStreamConstraints) => {
+      if (!constraints.video || typeof constraints.video !== 'object') return;
+      const [videoTrack] = stream.getVideoTracks();
+      if (videoTrack) {
+        await videoTrack.applyConstraints(constraints.video as MediaTrackConstraints);
+      }
     };
 
     const startCamera = async (targetDeviceId?: string, allowFallbackRetry = true) => {
@@ -122,7 +159,24 @@ const WebcamFeed: React.FC<Props> = ({
         });
         onDiagnostics?.({ event: 'request', deviceLabel: preferredDevice.label, constraints });
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        let stream: MediaStream;
+
+        if (permissionProbeStream) {
+          const probeSettings = permissionProbeStream.getVideoTracks()[0]?.getSettings();
+          const deviceMatches =
+            !preferredDevice.deviceId || probeSettings?.deviceId === preferredDevice.deviceId || !probeSettings?.deviceId;
+
+          if (deviceMatches) {
+            await applyPreferredConstraints(permissionProbeStream, constraints);
+            stream = permissionProbeStream;
+          } else {
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            permissionProbeStream = stream;
+          }
+        } else {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          permissionProbeStream = stream;
+        }
 
         if (!active) {
           stream.getTracks().forEach(track => track.stop());
@@ -161,6 +215,10 @@ const WebcamFeed: React.FC<Props> = ({
           errorName: err instanceof DOMException ? err.name : undefined,
           message: err instanceof Error ? err.message : String(err),
         });
+        if ((err as CameraError)?.code) {
+          onError?.(err as CameraError);
+          return;
+        }
         if (err instanceof DOMException && err.name === 'NotFoundError' && allowFallbackRetry) {
           console.warn('Preferred camera missing, retrying without device constraint.');
           onDiagnostics?.({
@@ -225,7 +283,7 @@ const WebcamFeed: React.FC<Props> = ({
     return () => {
       active = false;
       navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
-      stopCurrentStream();
+      stopCurrentStream(true);
       // Cleanup: Stop all tracks on unmount
       if (videoRef.current && videoRef.current.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
