@@ -8,7 +8,7 @@ describe('RenderingShell', () => {
   it('builds a predictable scene graph and renders with injected dependencies', () => {
     let now = 0;
     const clock: Clock = { now: () => now };
-    const render = vi.fn<Parameters<Renderer['render']>, void>();
+    const render = vi.fn<Renderer['render']>();
     const renderer: Renderer = { render };
 
     const shell = new RenderingShell(renderer, clock, { starCount: 42 });

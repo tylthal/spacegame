@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import PlaceholderScreen from './components/PlaceholderScreen';
 import PhaseList, { PhaseDescriptor, PhaseId } from './components/PhaseList';
+import HudOverlay from './components/HudOverlay';
 
 const phases: PhaseDescriptor[] = [
   {
@@ -36,6 +37,13 @@ const App: React.FC = () => {
 
   const active = useMemo(() => phases.find(phase => phase.id === activePhase) ?? phases[0], [activePhase]);
 
+  const hudPreview = {
+    score: 48250,
+    hull: 86,
+    lives: 3,
+    multiplier: 2.4,
+  };
+
   const advance = () => {
     const index = phases.findIndex(phase => phase.id === activePhase);
     const next = phases[index + 1];
@@ -57,6 +65,22 @@ const App: React.FC = () => {
             placeholder screens so we can layer the rebuild plan piece by piece without fighting old dependencies.
           </p>
         </header>
+
+        <section className="grid gap-4 md:grid-cols-[1.4fr,1fr]" aria-label="HUD preview and guidance">
+          <HudOverlay {...hudPreview} />
+          <div className="border border-slate-700/70 rounded-xl p-4 bg-slate-900/60 shadow-lg space-y-2">
+            <h2 className="text-lg font-semibold text-white">HUD and menu rebuild slice</h2>
+            <p className="text-sm text-slate-200/80 leading-relaxed">
+              The new HUD overlay stands alone from the gameplay loop and exposes text-first fallbacks for accessibility. Menu
+              targets will reuse the same injection points when the ready screen is wired to the rebuilt phase manager.
+            </p>
+            <ul className="list-disc list-inside text-sm text-slate-100/80 space-y-1">
+              <li>Score, hull, and lives surface via aria-live regions.</li>
+              <li>Menu targets live at the `MENU_Z` plane for ray-hit testing.</li>
+              <li>Components stay dependency-injection friendly for future kernels.</li>
+            </ul>
+          </div>
+        </section>
 
         <div className="grid gap-6 md:grid-cols-[1.2fr,1.8fr] items-start">
           <div className="space-y-4">
