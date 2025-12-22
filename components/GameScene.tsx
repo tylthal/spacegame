@@ -45,6 +45,7 @@ interface Props {
   cameraPermissionGranted: boolean;
   cameraReady: boolean;
   cameraPermissionPending: boolean;
+  cameraErrorMessage?: string | null;
   onRetryCamera?: () => void;
   videoStream?: MediaStream | null;
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -54,7 +55,11 @@ const getCameraMessage = (
   cameraPermissionGranted: boolean,
   cameraReady: boolean,
   cameraPermissionPending: boolean,
+  cameraErrorMessage?: string | null,
 ) => {
+  if (cameraErrorMessage) {
+    return cameraErrorMessage;
+  }
   if (cameraPermissionPending && !cameraPermissionGranted) {
     return 'Enable camera access in your browser prompt to continue calibration.';
   }
@@ -90,6 +95,7 @@ const GameScene: React.FC<Props> = ({
   cameraPermissionGranted,
   cameraReady,
   cameraPermissionPending,
+  cameraErrorMessage,
   onRetryCamera,
   videoStream,
   videoRef,
@@ -119,7 +125,7 @@ const GameScene: React.FC<Props> = ({
       cameraReady,
       permissionPending: cameraPermissionPending,
       fallbackCta: !cameraPermissionGranted,
-      message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending),
+      message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending, cameraErrorMessage),
     },
   });
 
@@ -152,9 +158,14 @@ const GameScene: React.FC<Props> = ({
       cameraReady,
       permissionPending: cameraPermissionPending,
       fallbackCta: !cameraPermissionGranted,
-      message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending),
+      message: getCameraMessage(
+        cameraPermissionGranted,
+        cameraReady,
+        cameraPermissionPending,
+        cameraErrorMessage,
+      ),
     };
-  }, [cameraPermissionGranted, cameraReady, cameraPermissionPending]);
+  }, [cameraPermissionGranted, cameraReady, cameraPermissionPending, cameraErrorMessage]);
 
   useEffect(() => {
     const handler = () => {
@@ -170,7 +181,12 @@ const GameScene: React.FC<Props> = ({
         fallbackCta: !cameraPermissionGranted,
         cameraReady,
         permissionPending: cameraPermissionPending,
-        message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending),
+        message: getCameraMessage(
+          cameraPermissionGranted,
+          cameraReady,
+          cameraPermissionPending,
+          cameraErrorMessage,
+        ),
       };
 
       const phaseManager = phaseManagerRef.current;
@@ -183,7 +199,7 @@ const GameScene: React.FC<Props> = ({
     setCalibrateCameraHandler(handler);
 
     return () => clearCalibrateCameraHandler(handler);
-  }, [cameraPermissionGranted, cameraReady, cameraPermissionPending, noGestureDevBypass]);
+  }, [cameraPermissionGranted, cameraReady, cameraPermissionPending, cameraErrorMessage, noGestureDevBypass]);
 
   const overlayState = useOverlayStateAdapter(overlayStateRef, 90);
 
@@ -743,7 +759,7 @@ const GameScene: React.FC<Props> = ({
             fallbackCta: !cameraPermissionGranted,
             cameraReady,
             permissionPending: cameraPermissionPending,
-            message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending),
+            message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending, cameraErrorMessage),
           };
         } else {
           if (calibrationStartRef.current === null) {
@@ -790,7 +806,7 @@ const GameScene: React.FC<Props> = ({
           fallbackCta: !cameraPermissionGranted,
           cameraReady,
           permissionPending: cameraPermissionPending,
-          message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending),
+          message: getCameraMessage(cameraPermissionGranted, cameraReady, cameraPermissionPending, cameraErrorMessage),
         };
       }
 

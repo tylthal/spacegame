@@ -39,14 +39,23 @@ const CalibrationOverlay: React.FC<Props> = ({
     const headerLabel = waitingForCamera ? 'Enable Camera Access' : 'Calibrating Neural Link';
     const progressValue = waitingForCamera ? '---' : `${Math.round(progress * 100)}%`;
 
-    const guidanceText = (() => {
-      if (waitingForCamera)
-        return (
+    const guidanceText: React.ReactNode = (() => {
+      if (waitingForCamera) {
+        const waitingMessage =
           calibrationStatus?.message ??
           (permissionPending
             ? 'Approve the camera permission prompt, then hit Retry if needed.'
-            : 'Camera access required. Enable your webcam and allow permissions, then press Retry.')
+            : 'Camera access required. Enable your webcam and allow permissions, then press Retry.');
+
+        return (
+          <div className="space-y-1 text-left md:text-left">
+            <p className="font-semibold text-sm md:text-base text-red-200 leading-relaxed">{waitingMessage}</p>
+            <p className="text-[11px] md:text-xs text-amber-100/80 normal-case tracking-normal leading-relaxed">
+              Close any other apps using the webcam, verify site permissions, then press <span className="font-semibold">Retry camera</span> to request a new feed.
+            </p>
+          </div>
         );
+      }
       if (stalled)
         return calibrationStatus?.message ?? 'We cannot see your hands. Move them into the guide box or adjust lighting.';
       if (progress > 0) return 'HOLD STEADY';
@@ -147,9 +156,9 @@ const CalibrationOverlay: React.FC<Props> = ({
                  </div>
 
                  <div className="bg-black/75 border border-cyan-500/30 px-4 md:px-6 py-4 rounded-xl w-full max-w-xl shadow-lg shadow-black/50">
-                    <p className="text-white font-mono text-xs md:text-sm tracking-widest uppercase text-center md:text-left">
+                    <div className="text-white font-mono text-xs md:text-sm tracking-widest uppercase text-center md:text-left space-y-1">
                        {guidanceText}
-                    </p>
+                    </div>
                  </div>
 
                  <div className="mt-6 flex flex-col md:flex-row justify-center md:justify-start gap-3 md:gap-4 items-center">
@@ -167,7 +176,7 @@ const CalibrationOverlay: React.FC<Props> = ({
                        className="px-4 py-2 bg-cyan-700/80 hover:bg-cyan-600 text-white font-bold uppercase tracking-[0.25em] rounded shadow-lg transition"
                        onClick={onRetryCamera}
                      >
-                       Re-request camera access
+                       Retry camera
                      </button>
                    )}
 
