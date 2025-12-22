@@ -27,11 +27,11 @@ a task stub of concrete steps to execute.
 - Keep documentation references pointed at the new scaffold locations and explicitly note that legacy assets/screens are removed until reintroduced via the phased rebuild. ✅ Completed.
 :::
 
-**Issue 4: Rebuild input stack with deterministic tests**
+**Issue 4: Rebuild input stack with deterministic tests** — **Status: Done**
 :::task-stub{title="Implement and test HandTracker/InputProcessor"}
-- Define `HandTracker` interface and mockable adapter for MediaPipe; create deterministic fixtures for landmark frames.
-- Reintroduce `InputProcessor` with `OneEuroFilter` and gesture classification (Pinch/Fist/Palm); unit-test gesture detection and smoothing boundaries.
-- Document calibration flow and virtual mousepad transform, including tolerance values, in `docs/TECHNICAL_REFERENCE.md`.
+- Define `HandTracker` interface and mockable adapter for MediaPipe; create deterministic fixtures for landmark frames. ✅ Completed: interface, in-memory adapter, and fixtures added.
+- Reintroduce `InputProcessor` with `OneEuroFilter` and gesture classification (Pinch/Fist/Palm); unit-test gesture detection and smoothing boundaries. ✅ Completed: smoothing, gestures, and coverage shipped.
+- Document calibration flow and virtual mousepad transform, including tolerance values, in `docs/TECHNICAL_REFERENCE.md`. ✅ Completed: calibration guidance and tolerance table recorded.
 :::
 
 **Issue 5: Reconstruct phase/state machine with guards**
