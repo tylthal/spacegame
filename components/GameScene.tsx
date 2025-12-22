@@ -132,6 +132,10 @@ const GameScene: React.FC<Props> = ({
   const TARGET_FPS = 60;
 
   const propsRef = useRef({ hull, lives, score });
+
+  const benchmarkModeEnabled = isDevFeatureEnabled('benchmark');
+  const noGestureDevBypass = isDevFeatureEnabled('nogestures');
+
   useEffect(() => {
     propsRef.current = { hull, lives, score };
     overlayStateRef.current.score = score;
@@ -177,9 +181,6 @@ const GameScene: React.FC<Props> = ({
 
     return () => clearCalibrateCameraHandler(handler);
   }, [cameraPermissionGranted, cameraErrorCode, noGestureDevBypass]);
-
-  const benchmarkModeEnabled = isDevFeatureEnabled('benchmark');
-  const noGestureDevBypass = isDevFeatureEnabled('nogestures');
 
   const overlayState = useOverlayStateAdapter(overlayStateRef, 90);
 
