@@ -23,7 +23,7 @@ export interface CameraError extends Error {
 }
 
 export interface CameraDiagnostics {
-  event: 'preflight' | 'request' | 'acquired' | 'devicechange' | 'error';
+  event: 'preflight' | 'decision' | 'request' | 'acquired' | 'devicechange' | 'error';
   deviceLabel?: string;
   deviceId?: string;
   constraints?: MediaStreamConstraints;
@@ -163,10 +163,28 @@ const WebcamFeed: React.FC<Props> = ({
           throw createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.');
         }
 
+        const sanitizeDeviceId = (deviceId?: string) =>
+          deviceId && deviceId !== 'default' && deviceId !== 'communications' ? deviceId : undefined;
+
         const preferredDevice =
-          videoInputs.find(device => device.deviceId === targetDeviceId) ??
+          videoInputs.find(device => sanitizeDeviceId(device.deviceId) === targetDeviceId) ??
           videoInputs.find(device => device.label.toLowerCase().includes('front')) ??
+          videoInputs.find(device => sanitizeDeviceId(device.deviceId)) ??
           videoInputs[0];
+
+        const preferredDeviceId = sanitizeDeviceId(preferredDevice.deviceId);
+
+        onDiagnostics?.({
+          event: 'decision',
+          deviceLabel: preferredDevice.label,
+          deviceId: preferredDevice.deviceId,
+          constraints: {
+            video: {
+              deviceId: preferredDeviceId,
+            },
+          },
+          message: `Selected camera from ${videoInputs.length} devices (target: ${targetDeviceId ?? 'none'})`,
+        });
 
         /**
          * Vision Optimization:
@@ -175,7 +193,7 @@ const WebcamFeed: React.FC<Props> = ({
          */
         const constraints: MediaStreamConstraints = {
           video: {
-            deviceId: preferredDevice.deviceId ? { exact: preferredDevice.deviceId } : undefined,
+            deviceId: preferredDeviceId ? { exact: preferredDeviceId } : undefined,
             width: { ideal: 320 },
             height: { ideal: 240 },
             frameRate: { ideal: 30 },
@@ -206,13 +224,31 @@ const WebcamFeed: React.FC<Props> = ({
             !preferredDevice.deviceId || probeSettings?.deviceId === preferredDevice.deviceId || !probeSettings?.deviceId;
 
           if (deviceMatches) {
+            onDiagnostics?.({
+              event: 'decision',
+              deviceLabel: preferredDevice.label,
+              deviceId: preferredDevice.deviceId,
+              message: 'Reusing permission probe stream for preferred device',
+            });
             await applyPreferredConstraints(permissionProbeStream, constraints);
             stream = permissionProbeStream;
           } else {
+            onDiagnostics?.({
+              event: 'decision',
+              deviceLabel: preferredDevice.label,
+              deviceId: preferredDevice.deviceId,
+              message: 'Permission probe device did not match; requesting new stream',
+            });
             stream = await navigator.mediaDevices.getUserMedia(constraints);
             permissionProbeStream = stream;
           }
         } else {
+          onDiagnostics?.({
+            event: 'decision',
+            deviceLabel: preferredDevice.label,
+            deviceId: preferredDevice.deviceId,
+            message: 'No permission probe stream available; requesting new stream',
+          });
           stream = await navigator.mediaDevices.getUserMedia(constraints);
           permissionProbeStream = stream;
         }
