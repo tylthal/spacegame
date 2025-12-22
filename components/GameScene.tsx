@@ -45,23 +45,24 @@ interface Props {
   handTrackingEnabled: boolean;
   cameraPermissionGranted: boolean;
   cameraErrorCode?: CameraErrorCode | null;
+  onRetryCamera?: () => void;
 }
 
 const getCameraMessage = (cameraPermissionGranted: boolean, cameraErrorCode?: CameraErrorCode | null) => {
   if (cameraPermissionGranted) return undefined;
   switch (cameraErrorCode) {
     case 'NO_DEVICES':
-      return 'No camera detected. Plug in a webcam, ensure it is enabled, then press Retry to reconnect.';
+      return 'No camera detected. Plug in a webcam or enable it in system settings, then press Re-request to scan again.';
     case 'PERMISSION_DENIED':
-      return 'Camera permission denied. Allow access in your browser settings and hit Retry.';
+      return 'Camera permission denied. Allow access in your browser and OS privacy settings, then hit Re-request.';
     case 'DEVICE_LOST':
       return 'Camera disconnected during capture. Reseat the cable or select another device, then Retry.';
     case 'DEVICE_IN_USE':
       return 'Camera is in use by another application. Close it or pick a different device, then Retry.';
     case 'UNSUPPORTED':
-      return 'Camera API unavailable. Use HTTPS or a supported browser to enable video capture.';
+      return 'Camera API unavailable. Use HTTPS, a supported browser, or disable restrictive extensions to enable capture.';
     default:
-      return 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.';
+      return 'Camera offline. Reconnect or select a webcam, confirm privacy permissions, then press Retry.';
   }
 };
 
@@ -89,6 +90,7 @@ const GameScene: React.FC<Props> = ({
   handTrackingEnabled,
   cameraPermissionGranted,
   cameraErrorCode,
+  onRetryCamera,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   
@@ -842,7 +844,11 @@ const GameScene: React.FC<Props> = ({
   return (
     <div className="relative w-full h-full">
       <div ref={mountRef} className="w-full h-full" />
-      <SceneOverlays {...overlayState} onStartWithoutTracking={handleStartWithoutTracking} />
+      <SceneOverlays
+        {...overlayState}
+        onStartWithoutTracking={handleStartWithoutTracking}
+        onRetryCamera={onRetryCamera}
+      />
     </div>
   );
 };

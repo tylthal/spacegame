@@ -7,7 +7,7 @@ import GameOverOverlay from './ui/GameOverOverlay';
 import HelpOverlay from './ui/HelpOverlay';
 import { OverlayState } from './ui/OverlayStateAdapter';
 
-type Props = OverlayState & { onStartWithoutTracking?: () => void };
+type Props = OverlayState & { onStartWithoutTracking?: () => void; onRetryCamera?: () => void };
 
 const SceneOverlays: React.FC<Props> = ({
   phase,
@@ -18,6 +18,7 @@ const SceneOverlays: React.FC<Props> = ({
   helpState,
   calibrationStatus,
   onStartWithoutTracking,
+  onRetryCamera,
 }) => {
   return (
     <>
@@ -37,6 +38,7 @@ const SceneOverlays: React.FC<Props> = ({
           trackingStatus={trackingStatus}
           calibrationStatus={calibrationStatus}
           onStartWithoutTracking={onStartWithoutTracking}
+          onRetryCamera={onRetryCamera}
         />
       )}
 
