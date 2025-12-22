@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameScene from './components/GameScene';
-import WebcamFeed, { CameraError } from './components/WebcamFeed';
+import WebcamFeed, { CameraDiagnostics, CameraError, CameraErrorCode } from './components/WebcamFeed';
 import { HandTracker } from './services/handTracker';
 import { perfTracer } from './telemetry/PerfTracer';
 import { isDevFeatureEnabled } from './utils/devMode';
@@ -21,10 +21,13 @@ const App: React.FC = () => {
   const [cameraPermissionGranted, setCameraPermissionGranted] = useState(false);
   const [cameraInitError, setCameraInitError] = useState<CameraError | null>(null);
   const [cameraRestartToken, setCameraRestartToken] = useState(0);
+  const [cameraErrorCode, setCameraErrorCode] = useState<CameraErrorCode | null>(null);
+  const [cameraDiagnostics, setCameraDiagnostics] = useState<CameraDiagnostics | null>(null);
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
 
   const telemetryEnabled = isDevFeatureEnabled('benchmark');
+  const cameraDiagnosticsOverlayEnabled = isDevFeatureEnabled('cameradiag');
   
   // --- Refs for Performance ---
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -143,14 +146,32 @@ const App: React.FC = () => {
   const handleRetryCamera = useCallback(() => {
     setCameraPermissionGranted(false);
     setCameraInitError(null);
+    setCameraErrorCode(null);
+    setCameraDiagnostics(null);
     setUseFallbackControls(false);
     setCameraRestartToken(token => token + 1);
+  }, []);
+
+  const handleCameraDiagnostics = useCallback((info: CameraDiagnostics) => {
+    setCameraDiagnostics(info);
   }, []);
 
   const handTrackingActive = handTrackingReady && cameraPermissionGranted && !useFallbackControls;
 
   return (
     <div className="relative w-screen h-screen bg-black overflow-hidden font-mono text-cyan-400 select-none">
+      {cameraDiagnosticsOverlayEnabled && cameraDiagnostics && (
+        <div className="absolute top-2 left-2 z-[120] bg-black/80 border border-cyan-500/40 rounded p-3 text-[10px] md:text-xs pointer-events-auto space-y-1 shadow-lg">
+          <div className="font-black uppercase tracking-[0.2em] text-cyan-400">Camera Diagnostics</div>
+          <div className="text-white/80">Device: {cameraDiagnostics.deviceLabel ?? 'Unknown'}</div>
+          {cameraDiagnostics.constraints?.video && (
+            <div className="text-white/60">
+              Constraints: {JSON.stringify(cameraDiagnostics.constraints.video)}
+            </div>
+          )}
+          {cameraDiagnostics.message && <div className="text-red-300">{cameraDiagnostics.message}</div>}
+        </div>
+      )}
       {isInitializing && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black">
           <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-8" />
@@ -193,6 +214,7 @@ const App: React.FC = () => {
             lives={lives}
             handTrackingEnabled={handTrackingActive}
             cameraPermissionGranted={cameraPermissionGranted}
+            cameraErrorCode={cameraErrorCode}
           />
 
           {/* Top HUD: Tactical Information Display */}
@@ -278,13 +300,17 @@ const App: React.FC = () => {
               onPermissionGranted={() => {
                 setCameraPermissionGranted(true);
                 setCameraInitError(null);
+                setCameraErrorCode(null);
                 if (cameraInitError) {
                   setUseFallbackControls(false);
                 }
               }}
+              onDiagnostics={handleCameraDiagnostics}
               onError={error => {
                 setCameraPermissionGranted(false);
                 setCameraInitError(error);
+                setCameraErrorCode(error.code);
+                setCameraDiagnostics(prev => ({ ...prev, event: 'error', message: error.message }));
                 setUseFallbackControls(true);
               }}
             />

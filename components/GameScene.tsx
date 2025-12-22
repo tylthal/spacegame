@@ -18,6 +18,7 @@ import { ResourceLifecycle } from '../systems/ResourceLifecycle';
 import { isDevFeatureEnabled } from '../utils/devMode';
 import { PerfTracer, perfTracer } from '../telemetry/PerfTracer';
 import useOverlayStateAdapter, { OverlayState } from './ui/OverlayStateAdapter';
+import { CameraErrorCode } from './WebcamFeed';
 
 /**
  * GameScene
@@ -43,7 +44,26 @@ interface Props {
   lives: number;
   handTrackingEnabled: boolean;
   cameraPermissionGranted: boolean;
+  cameraErrorCode?: CameraErrorCode | null;
 }
+
+const getCameraMessage = (cameraPermissionGranted: boolean, cameraErrorCode?: CameraErrorCode | null) => {
+  if (cameraPermissionGranted) return undefined;
+  switch (cameraErrorCode) {
+    case 'NO_DEVICES':
+      return 'No camera detected. Plug in a webcam, ensure it is enabled, then press Retry to reconnect.';
+    case 'PERMISSION_DENIED':
+      return 'Camera permission denied. Allow access in your browser settings and hit Retry.';
+    case 'DEVICE_LOST':
+      return 'Camera disconnected during capture. Reseat the cable or select another device, then Retry.';
+    case 'DEVICE_IN_USE':
+      return 'Camera is in use by another application. Close it or pick a different device, then Retry.';
+    case 'UNSUPPORTED':
+      return 'Camera API unavailable. Use HTTPS or a supported browser to enable video capture.';
+    default:
+      return 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.';
+  }
+};
 
 // Memory Optimization Globals - Pooled strictly to avoid GC and per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -68,6 +88,7 @@ const GameScene: React.FC<Props> = ({
   lives,
   handTrackingEnabled,
   cameraPermissionGranted,
+  cameraErrorCode,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   
@@ -93,9 +114,7 @@ const GameScene: React.FC<Props> = ({
       stalled: false,
       cameraReady: cameraPermissionGranted,
       fallbackCta: !cameraPermissionGranted,
-      message: cameraPermissionGranted
-        ? undefined
-        : 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.',
+      message: getCameraMessage(cameraPermissionGranted, cameraErrorCode),
     },
   });
 
@@ -122,11 +141,9 @@ const GameScene: React.FC<Props> = ({
       ...currentStatus,
       cameraReady: cameraPermissionGranted,
       fallbackCta: !cameraPermissionGranted,
-      message: cameraPermissionGranted
-        ? undefined
-        : 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.',
+      message: getCameraMessage(cameraPermissionGranted, cameraErrorCode),
     };
-  }, [cameraPermissionGranted]);
+  }, [cameraPermissionGranted, cameraErrorCode]);
 
   const benchmarkModeEnabled = isDevFeatureEnabled('benchmark');
   const noGestureDevBypass = isDevFeatureEnabled('nogestures');
@@ -682,7 +699,7 @@ const GameScene: React.FC<Props> = ({
             fallbackCta: !cameraPermissionGranted || stalled,
             cameraReady: cameraPermissionGranted,
             message: !cameraPermissionGranted
-              ? 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.'
+              ? getCameraMessage(cameraPermissionGranted, cameraErrorCode)
               : stalled
                   ? 'No hand data received. Verify the camera is connected and your hands are visible.'
                   : undefined,
@@ -712,9 +729,7 @@ const GameScene: React.FC<Props> = ({
             stalled: false,
             fallbackCta: !cameraPermissionGranted,
             cameraReady: cameraPermissionGranted,
-            message: cameraPermissionGranted
-              ? undefined
-              : 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.',
+            message: getCameraMessage(cameraPermissionGranted, cameraErrorCode),
           };
       }
 
