@@ -41,11 +41,11 @@ a task stub of concrete steps to execute.
 - Expose a small event emitter or callback API; test that events fire with correct payloads.
 :::
 
-**Issue 6: Rendering shell and asset management**
+**Issue 6: Rendering shell and asset management — Status: Done**
 :::task-stub{title="Three.js scene bootstrap with pooled assets"}
-- Recreate scene setup (camera, lights, starfield) behind an interface that accepts injected clock and renderer for testing.
-- Implement `AssetManager`/`EnemyFactory` stubs that return predictable mock meshes in tests; add pooling tests (reuse vs. allocate).
-- Add a snapshot-like assertion for scene graph counts per spawn/despawn cycle.
+- Recreate scene setup (camera, lights, starfield) behind an interface that accepts injected clock and renderer for testing. ✅ Completed: deterministic `RenderingShell` scene graph built around injected renderer/clock.
+- Implement `AssetManager`/`EnemyFactory` stubs that return predictable mock meshes in tests; add pooling tests (reuse vs. allocate). ✅ Completed: pooled assets with predictable enemy identifiers and reuse tests.
+- Add a snapshot-like assertion for scene graph counts per spawn/despawn cycle. ✅ Completed: scene graph node counts asserted across spawn/despawn cycles.
 :::
 
 **Issue 7: Gameplay systems and difficulty curve**
