@@ -55,11 +55,11 @@ a task stub of concrete steps to execute.
 - Add integration-style test simulating N seconds of gameplay to assert spawn distribution and hull damage rules. ✅ Completed: CombatLoop integration test validates spawn mix and hull attrition.
 :::
 
-**Issue 8: UI/HUD and menu modules**
+**Issue 8: UI/HUD and menu modules — Status: Done**
 :::task-stub{title="Reassemble HUD and interactive menu targets"}
-- Recreate HUD overlays (score, hull, lives) as isolated React components with Testing Library assertions.
-- Implement 3D menu targets at `MENU_Z` with hit-detection glue; add unit tests for target selection via mocked ray hits.
-- Ensure accessibility fallbacks and document in `docs/UI_STYLE_GUIDE.md`.
+- Recreate HUD overlays (score, hull, lives) as isolated React components with Testing Library assertions. ✅ Completed: `HudOverlay` renders badges + hull meter with aria-live and sr-only fallbacks.
+- Implement 3D menu targets at `MENU_Z` with hit-detection glue; add unit tests for target selection via mocked ray hits. ✅ Completed: `MenuTargets` projects rays to `MENU_Z` and selects nearest targets under test.
+- Ensure accessibility fallbacks and document in `docs/UI_STYLE_GUIDE.md`. ✅ Completed: Style guide notes HUD/menu a11y expectations.
 :::
 
 **Issue 9: Telemetry, debugging, and developer ergonomics**

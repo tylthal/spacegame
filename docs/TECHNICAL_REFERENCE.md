@@ -5,8 +5,9 @@
 ```
 /
 ├── index.tsx                  # React entry point
-├── App.tsx                    # Placeholder shell and phase selector
+├── App.tsx                    # Placeholder shell, HUD preview, and phase selector
 ├── components/
+│   ├── HudOverlay.tsx         # Accessible HUD badges + hull meter with sr-only fallbacks
 │   ├── PhaseList.tsx          # Lists placeholder phases and their status
 │   └── PlaceholderScreen.tsx  # Panel describing the active placeholder screen
 ├── phase/
@@ -21,9 +22,12 @@
 │   ├── InputProcessor.ts      # One Euro smoothing + gesture classification + virtual pad mapping
 │   ├── OneEuroFilter.ts       # Numeric smoothing utility
 │   └── fixtures/handFrames.ts # Deterministic fixtures for unit tests
+├── rendering/MenuTargets.ts          # MENU_Z plane math + hit-detection helpers
 ├── __tests__/legacyCleanup.test.ts   # Guard test confirming legacy modules are removed
 ├── __tests__/inputProcessor.test.ts  # Deterministic gesture + smoothing coverage
+├── __tests__/menuTargets.test.ts     # MENU_Z target selection tests
 ├── components/__tests__/AppShell.test.ts # UI sanity checks for the shell
+├── components/__tests__/HudOverlay.test.tsx # HUD accessibility + render assertions
 └── docs/                      # Architecture, rebuild plan, and guides
 ```
 
@@ -35,14 +39,26 @@
 - **Guard tests**: The `legacyCleanup` test enforces that removed modules stay quarantined; add to its list if more legacy paths
   are identified.
 
+## HUD overlay (Issue 8)
+
+- `HudOverlay` renders score, hull, and lives as text-first badges with `aria-live` updates and a visible hull meter.
+- Screen-reader fallbacks summarize hull state when the meter is not visible; default props keep the overlay deterministic in
+  tests.
+- The component is showcased inside `App.tsx` to preview the rebuilt HUD in isolation from the yet-to-be-added renderer.
+
+## Menu targets at `MENU_Z` (Issue 8)
+
+- `rendering/MenuTargets.ts` models the menu plane at z = `MENU_Z` with helpers to build target points and detect ray hits.
+- `projectMenuPlane` translates screen x/y into plane coordinates; `hitTestTargets` selects the nearest interactive target
+  within a configurable radius.
+- Unit tests cover projection math and tie-breaking when multiple targets fall inside the hit radius.
+
 ## Next implementation steps
 
-The rebuild will layer in new modules behind tests. Recommended order:
+The rebuild will continue layering modules behind tests. Remaining work focuses on diagnostics and deployment:
 
-1. Add a new input adapter with deterministic fixtures.
-2. Introduce a pure-state phase manager and connect it to the placeholder screens.
-3. Reintroduce rendering and asset management behind injected dependencies.
-4. Build gameplay loops and HUD components once the spine is stable.
+1. Add observability/diagnostics toggles for input/phase/render systems.
+2. Provide a headless-friendly smoke test pipeline before shipping builds.
 
 ## Phase/state machine (Issue 5)
 
