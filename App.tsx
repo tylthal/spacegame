@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [cameraInitError, setCameraInitError] = useState<CameraError | null>(null);
   const [cameraRequestPending, setCameraRequestPending] = useState(false);
   const [cameraRestartToken, setCameraRestartToken] = useState(0);
+  const [cameraAccessRequestToken, setCameraAccessRequestToken] = useState(0);
   const [cameraErrorCode, setCameraErrorCode] = useState<CameraErrorCode | null>(null);
   const [cameraDiagnostics, setCameraDiagnostics] = useState<CameraDiagnostics | null>(null);
   const [hull, setHull] = useState(100);
@@ -151,6 +152,15 @@ const App: React.FC = () => {
     setCameraDiagnostics(null);
     setUseFallbackControls(false);
     setCameraRestartToken(token => token + 1);
+    setCameraAccessRequestToken(token => token + 1);
+  }, []);
+
+  const requestCameraAccess = useCallback(() => {
+    setCameraRequestPending(true);
+    setCameraInitError(null);
+    setCameraErrorCode(null);
+    setUseFallbackControls(false);
+    setCameraAccessRequestToken(token => token + 1);
   }, []);
 
   const handleCameraDiagnostics = useCallback((info: CameraDiagnostics) => {
@@ -322,25 +332,39 @@ const App: React.FC = () => {
               onPermissionGranted={handleCameraPermissionGranted}
               onDiagnostics={handleCameraDiagnostics}
               onError={handleCameraError}
+              accessRequestToken={cameraAccessRequestToken}
             />
             {!cameraPermissionGranted && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-300 text-center px-2">
                 <div className="space-y-2">
-                  <div>
-                    {cameraRequestPending
-                      ? 'Requesting camera access — approve the browser prompt to link your webcam'
-                      : 'Camera unavailable — mouse + keyboard fallback active'}
-                  </div>
-                  <p className="text-[9px] md:text-[10px] text-red-100/80 normal-case tracking-normal">
-                    {cameraRequestPending
-                      ? 'If you dismissed the prompt, use the button below after enabling permissions.'
-                      : 'Reconnect or select a webcam, then press retry to reinitialize the feed.'}
-                  </p>
-                  {cameraInitError && (
-                    <div className="text-[9px] md:text-[10px] text-red-200/70 normal-case">
-                      {cameraInitError.message}
+                  <div className="space-y-1">
+                    <div>
+                      {cameraRequestPending
+                        ? 'Requesting camera access — approve the browser prompt to link your webcam'
+                        : 'Camera unavailable — mouse + keyboard fallback active'}
                     </div>
-                  )}
+                    <p className="text-[9px] md:text-[10px] text-red-100/80 normal-case tracking-normal">
+                      {cameraRequestPending
+                        ? 'If you dismissed the prompt, use the button below after enabling permissions.'
+                        : 'Reconnect or select a webcam, then press retry to reinitialize the feed.'}
+                    </p>
+                    <p className="text-[9px] md:text-[10px] text-amber-100/80 normal-case tracking-normal">
+                      {cameraInitError?.code === 'UNSUPPORTED'
+                        ? cameraInitError.message
+                        : 'Use HTTPS or localhost and confirm permissions before retrying.'}
+                    </p>
+                    {cameraInitError && cameraInitError.code !== 'UNSUPPORTED' && (
+                      <div className="text-[9px] md:text-[10px] text-red-200/70 normal-case">
+                        {cameraInitError.message}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="mt-2 px-3 py-1 text-[9px] md:text-[10px] rounded bg-cyan-600/80 text-white uppercase tracking-widest hover:bg-cyan-500 transition"
+                    onClick={requestCameraAccess}
+                  >
+                    Enable Camera
+                  </button>
                   <button
                     className="mt-2 px-3 py-1 text-[9px] md:text-[10px] rounded bg-red-600/80 text-white uppercase tracking-widest hover:bg-red-500 transition"
                     onClick={handleRetryCamera}

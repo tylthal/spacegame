@@ -6,6 +6,7 @@ interface Props {
   onPermissionGranted?: () => void;
   onError?: (error: CameraError) => void;
   onDiagnostics?: (info: CameraDiagnostics) => void;
+  accessRequestToken?: number;
 }
 
 export type CameraErrorCode =
@@ -44,8 +45,16 @@ const createCameraError = (code: CameraErrorCode, message: string, cause?: unkno
  * Requests and manages the user's camera stream.
  * Optimized for computer vision tasks with low-resolution and specific frame rate.
  */
-const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, onDiagnostics }) => {
+const WebcamFeed: React.FC<Props> = ({
+  videoRef,
+  onPermissionGranted,
+  onError,
+  onDiagnostics,
+  accessRequestToken,
+}) => {
   useEffect(() => {
+    if (!accessRequestToken) return;
+
     let active = true;
     let currentStream: MediaStream | null = null;
     let currentDeviceId: string | null = null;
@@ -68,7 +77,16 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, o
       try {
         const preflight = mediaPreflightCheck();
         if (!preflight.ok) {
-          throw createCameraError('UNSUPPORTED', preflight.issues.join(' '));
+          const preflightError = createCameraError('UNSUPPORTED', preflight.issues.join(' '));
+          onDiagnostics?.({
+            event: 'error',
+            deviceLabel: lastDeviceLabel,
+            constraints: lastConstraints ?? undefined,
+            errorName: 'PreflightFailed',
+            message: preflightError.message,
+          });
+          onError?.(preflightError);
+          return;
         }
 
         const videoInputs = await getVideoInputs();
@@ -213,7 +231,7 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, o
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
       }
     };
-  }, [onError, onPermissionGranted, videoRef]);
+  }, [accessRequestToken, onDiagnostics, onError, onPermissionGranted, videoRef]);
 
   // scale-x-[-1] mirrors the feed for intuitive human movement matching
   return <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" playsInline muted />;
