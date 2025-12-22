@@ -215,6 +215,7 @@ const App: React.FC = () => {
             handTrackingEnabled={handTrackingActive}
             cameraPermissionGranted={cameraPermissionGranted}
             cameraErrorCode={cameraErrorCode}
+            onRetryCamera={handleRetryCamera}
           />
 
           {/* Top HUD: Tactical Information Display */}

@@ -7,17 +7,30 @@ interface Props {
     trackingStatus: TrackingStatus;
     calibrationStatus?: CalibrationStatus;
     onStartWithoutTracking?: () => void;
+    onRetryCamera?: () => void;
 }
 
-const CalibrationOverlay: React.FC<Props> = ({ progress, trackingStatus, calibrationStatus, onStartWithoutTracking }) => {
+const CalibrationOverlay: React.FC<Props> = ({
+  progress,
+  trackingStatus,
+  calibrationStatus,
+  onStartWithoutTracking,
+  onRetryCamera,
+}) => {
     const stalled = calibrationStatus?.stalled ?? false;
     const cameraReady = calibrationStatus?.cameraReady ?? true;
     const showFallbackCta = !!onStartWithoutTracking && (!cameraReady || calibrationStatus?.fallbackCta);
-    const pointerEventsClass = showFallbackCta ? 'pointer-events-auto' : 'pointer-events-none';
+    const showRetryAction = !!onRetryCamera && !cameraReady;
+    const pointerEventsClass = showFallbackCta || showRetryAction ? 'pointer-events-auto' : 'pointer-events-none';
 
     const guidanceText = (() => {
-      if (!cameraReady) return calibrationStatus?.message ?? 'Camera offline. Reconnect or select a webcam, then press Retry to restore the feed.';
-      if (stalled) return calibrationStatus?.message ?? 'We cannot see your hands. Move them into view or start without tracking.';
+      if (!cameraReady)
+        return (
+          calibrationStatus?.message ??
+          'Camera offline. Plug in a webcam, verify privacy permissions, then press Re-request to try again.'
+        );
+      if (stalled)
+        return calibrationStatus?.message ?? 'We cannot see your hands. Move them into the guide box or adjust lighting.';
       if (progress > 0) return 'HOLD STEADY';
       return 'Pinch LEFT Index & Thumb to Align';
     })();
@@ -53,6 +66,20 @@ const CalibrationOverlay: React.FC<Props> = ({ progress, trackingStatus, calibra
                   {guidanceText}
                </p>
             </div>
+
+            {showRetryAction && (
+              <div className="mt-4 flex flex-col gap-2 items-center pointer-events-auto">
+                <button
+                  className="px-4 py-2 bg-cyan-700/80 hover:bg-cyan-500 text-white font-bold uppercase tracking-widest rounded shadow-lg transition"
+                  onClick={onRetryCamera}
+                >
+                  Re-request camera access
+                </button>
+                <p className="text-[10px] text-white/60 uppercase tracking-[0.25em] text-center">
+                  Update permissions or plug in a device, then tap to try again.
+                </p>
+              </div>
+            )}
 
             {showFallbackCta && (
               <div className="mt-6 flex flex-col gap-3 items-center pointer-events-auto">
