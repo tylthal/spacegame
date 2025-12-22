@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [handTrackingReady, setHandTrackingReady] = useState(false);
   const [cameraPermissionGranted, setCameraPermissionGranted] = useState(false);
   const [cameraInitError, setCameraInitError] = useState<CameraError | null>(null);
+  const [cameraRequestPending, setCameraRequestPending] = useState(false);
   const [cameraRestartToken, setCameraRestartToken] = useState(0);
   const [cameraErrorCode, setCameraErrorCode] = useState<CameraErrorCode | null>(null);
   const [cameraDiagnostics, setCameraDiagnostics] = useState<CameraDiagnostics | null>(null);
@@ -154,6 +155,26 @@ const App: React.FC = () => {
 
   const handleCameraDiagnostics = useCallback((info: CameraDiagnostics) => {
     setCameraDiagnostics(info);
+    setCameraRequestPending(info.event === 'request');
+  }, []);
+
+  const handleCameraPermissionGranted = useCallback(() => {
+    setCameraPermissionGranted(true);
+    setCameraInitError(null);
+    setCameraErrorCode(null);
+    setCameraRequestPending(false);
+    if (cameraInitError) {
+      setUseFallbackControls(false);
+    }
+  }, [cameraInitError]);
+
+  const handleCameraError = useCallback((error: CameraError) => {
+    setCameraPermissionGranted(false);
+    setCameraInitError(error);
+    setCameraErrorCode(error.code);
+    setCameraDiagnostics(prev => ({ ...prev, event: 'error', message: error.message }));
+    setCameraRequestPending(false);
+    setUseFallbackControls(true);
   }, []);
 
   const handTrackingActive = handTrackingReady && cameraPermissionGranted && !useFallbackControls;
@@ -298,29 +319,22 @@ const App: React.FC = () => {
             <WebcamFeed
               key={cameraRestartToken}
               videoRef={videoRef}
-              onPermissionGranted={() => {
-                setCameraPermissionGranted(true);
-                setCameraInitError(null);
-                setCameraErrorCode(null);
-                if (cameraInitError) {
-                  setUseFallbackControls(false);
-                }
-              }}
+              onPermissionGranted={handleCameraPermissionGranted}
               onDiagnostics={handleCameraDiagnostics}
-              onError={error => {
-                setCameraPermissionGranted(false);
-                setCameraInitError(error);
-                setCameraErrorCode(error.code);
-                setCameraDiagnostics(prev => ({ ...prev, event: 'error', message: error.message }));
-                setUseFallbackControls(true);
-              }}
+              onError={handleCameraError}
             />
             {!cameraPermissionGranted && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-300 text-center px-2">
                 <div className="space-y-2">
-                  <div>Camera unavailable — mouse + keyboard fallback active</div>
+                  <div>
+                    {cameraRequestPending
+                      ? 'Requesting camera access — approve the browser prompt to link your webcam'
+                      : 'Camera unavailable — mouse + keyboard fallback active'}
+                  </div>
                   <p className="text-[9px] md:text-[10px] text-red-100/80 normal-case tracking-normal">
-                    Reconnect or select a webcam, then press retry to reinitialize the feed.
+                    {cameraRequestPending
+                      ? 'If you dismissed the prompt, use the button below after enabling permissions.'
+                      : 'Reconnect or select a webcam, then press retry to reinitialize the feed.'}
                   </p>
                   {cameraInitError && (
                     <div className="text-[9px] md:text-[10px] text-red-200/70 normal-case">
