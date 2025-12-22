@@ -21,9 +21,11 @@ const App: React.FC = () => {
   const [useFallbackControls, setUseFallbackControls] = useState(false);
   const [handTrackingReady, setHandTrackingReady] = useState(false);
   const [cameraPermissionGranted, setCameraPermissionGranted] = useState(false);
+  const [cameraPermissionPending, setCameraPermissionPending] = useState(false);
   const [cameraInitError, setCameraInitError] = useState<CameraError | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraAccessRequestToken, setCameraAccessRequestToken] = useState(1);
+  const [cameraVideoReady, setCameraVideoReady] = useState(false);
   const [hull, setHull] = useState(100);
   const [lives, setLives] = useState(3);
   const [showSplash, setShowSplash] = useState(true);
@@ -31,7 +33,7 @@ const App: React.FC = () => {
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [showCalibrationGuide, setShowCalibrationGuide] = useState(false);
 
-  const cameraReady = cameraPermissionGranted;
+  const cameraReady = cameraPermissionGranted && cameraVideoReady;
   const handTrackingActive = handTrackingReady && cameraReady && !useFallbackControls;
 
   const telemetryEnabled = isDevFeatureEnabled('benchmark');
@@ -158,6 +160,9 @@ const App: React.FC = () => {
   const handleRetryCamera = useCallback(() => {
     setCameraInitError(null);
     setUseFallbackControls(false);
+    setCameraPermissionGranted(false);
+    setCameraPermissionPending(true);
+    setCameraVideoReady(false);
     setCameraAccessRequestToken(token => token + 1);
     setCameraStream(null);
   }, []);
@@ -165,6 +170,9 @@ const App: React.FC = () => {
   const requestCameraAccess = useCallback(() => {
     setCameraInitError(null);
     setUseFallbackControls(false);
+    setCameraPermissionGranted(false);
+    setCameraPermissionPending(true);
+    setCameraVideoReady(false);
     setCameraAccessRequestToken(token => token + 1);
     setCameraStream(null);
   }, []);
@@ -186,13 +194,20 @@ const App: React.FC = () => {
     setCameraPermissionGranted(true);
     setCameraInitError(null);
     setUseFallbackControls(false);
+    setCameraPermissionPending(false);
   }, []);
 
   const handleCameraError = useCallback((error: CameraError) => {
     setCameraPermissionGranted(false);
+    setCameraPermissionPending(false);
     setCameraInitError(error);
     setUseFallbackControls(true);
     setCameraStream(null);
+    setCameraVideoReady(false);
+  }, []);
+
+  const handleCameraVideoReadyChange = useCallback((isReady: boolean) => {
+    setCameraVideoReady(isReady);
   }, []);
 
   if (showSplash) {
@@ -270,7 +285,9 @@ const App: React.FC = () => {
             hull={hull}
             lives={lives}
             handTrackingEnabled={handTrackingActive}
-            cameraPermissionGranted={cameraReady}
+            cameraPermissionGranted={cameraPermissionGranted}
+            cameraReady={cameraReady}
+            cameraPermissionPending={cameraPermissionPending}
             onRetryCamera={handleRetryCamera}
             videoStream={cameraStream}
             videoRef={videoRef}
@@ -358,6 +375,7 @@ const App: React.FC = () => {
               onPermissionGranted={handleCameraPermissionGranted}
               onStreamReady={setCameraStream}
               onError={handleCameraError}
+              onVideoReadyChange={handleCameraVideoReadyChange}
               accessRequestToken={cameraAccessRequestToken}
             />
             {!cameraReady && (

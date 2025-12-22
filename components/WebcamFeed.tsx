@@ -4,6 +4,7 @@ interface Props {
   videoRef: React.RefObject<HTMLVideoElement>;
   onPermissionGranted?: () => void;
   onStreamReady?: (stream: MediaStream | null) => void;
+  onVideoReadyChange?: (ready: boolean) => void;
   onError?: (error: CameraError) => void;
   accessRequestToken?: number;
 }
@@ -33,12 +34,23 @@ const stopStreamTracks = (stream: MediaStream | null) => {
  * WebcamFeed Component
  * Requests and manages the user's camera stream.
  */
-const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onStreamReady, onError, accessRequestToken }) => {
+const WebcamFeed: React.FC<Props> = ({
+  videoRef,
+  onPermissionGranted,
+  onStreamReady,
+  onVideoReadyChange,
+  onError,
+  accessRequestToken,
+}) => {
   useEffect(() => {
     if (!accessRequestToken) return undefined;
 
     let cancelled = false;
     let currentStream: MediaStream | null = null;
+
+    const markReadyState = (ready: boolean) => {
+      onVideoReadyChange?.(ready);
+    };
 
     const requestCamera = async () => {
       try {
@@ -53,12 +65,15 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onStreamRe
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          videoRef.current.addEventListener('playing', () => markReadyState(true), { once: true });
           await videoRef.current.play();
+          markReadyState(true);
         }
 
         onStreamReady?.(stream);
         onPermissionGranted?.();
       } catch (err) {
+        markReadyState(false);
         let cameraError: CameraError;
 
         if (err instanceof DOMException && err.name === 'NotAllowedError') {
@@ -73,18 +88,20 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onStreamRe
       }
     };
 
+    markReadyState(false);
     requestCamera();
 
     return () => {
       cancelled = true;
       onStreamReady?.(null);
+      markReadyState(false);
       stopStreamTracks(currentStream);
       if (videoRef.current?.srcObject) {
         stopStreamTracks(videoRef.current.srcObject as MediaStream);
         videoRef.current.srcObject = null;
       }
     };
-  }, [accessRequestToken, onPermissionGranted, onStreamReady, onError, videoRef]);
+  }, [accessRequestToken, onPermissionGranted, onStreamReady, onVideoReadyChange, onError, videoRef]);
 
   // scale-x-[-1] mirrors the feed for intuitive human movement matching
   return (
