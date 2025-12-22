@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
+import { mediaPreflightCheck } from '../utils/deviceDiagnostics';
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement>;
   onPermissionGranted?: () => void;
   onError?: (error: CameraError) => void;
+  onDiagnostics?: (info: CameraDiagnostics) => void;
 }
 
 export type CameraErrorCode =
@@ -17,6 +19,14 @@ export type CameraErrorCode =
 export interface CameraError extends Error {
   code: CameraErrorCode;
   cause?: unknown;
+}
+
+export interface CameraDiagnostics {
+  event: 'request' | 'acquired' | 'error';
+  deviceLabel?: string;
+  constraints?: MediaStreamConstraints;
+  errorName?: string;
+  message?: string;
 }
 
 const createCameraError = (code: CameraErrorCode, message: string, cause?: unknown): CameraError => {
@@ -34,11 +44,13 @@ const createCameraError = (code: CameraErrorCode, message: string, cause?: unkno
  * Requests and manages the user's camera stream.
  * Optimized for computer vision tasks with low-resolution and specific frame rate.
  */
-const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError }) => {
+const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, onDiagnostics }) => {
   useEffect(() => {
     let active = true;
     let currentStream: MediaStream | null = null;
     let currentDeviceId: string | null = null;
+    let lastConstraints: MediaStreamConstraints | null = null;
+    let lastDeviceLabel: string | undefined;
 
     const stopCurrentStream = () => {
       if (currentStream) {
@@ -54,8 +66,9 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError })
 
     const startCamera = async (targetDeviceId?: string) => {
       try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw createCameraError('UNSUPPORTED', 'Camera API unavailable in this browser.');
+        const preflight = mediaPreflightCheck();
+        if (!preflight.ok) {
+          throw createCameraError('UNSUPPORTED', preflight.issues.join(' '));
         }
 
         const videoInputs = await getVideoInputs();
@@ -73,15 +86,25 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError })
          * 320x240 is used to reduce data transfer to the GPU and inference time.
          * Higher resolutions significantly impact "Neural FPS" without increasing tracking accuracy.
          */
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const constraints: MediaStreamConstraints = {
           video: {
             deviceId: preferredDevice.deviceId ? { exact: preferredDevice.deviceId } : undefined,
             width: { ideal: 320 },
             height: { ideal: 240 },
-            frameRate: { ideal: 30 }
+            frameRate: { ideal: 30 },
           },
-          audio: false
+          audio: false,
+        };
+
+        lastConstraints = constraints;
+        lastDeviceLabel = preferredDevice.label;
+        console.info('[CameraDiagnostics] Requesting camera', {
+          label: preferredDevice.label || 'Unknown device',
+          constraints,
         });
+        onDiagnostics?.({ event: 'request', deviceLabel: preferredDevice.label, constraints });
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
         if (!active) {
           stream.getTracks().forEach(track => track.stop());
@@ -91,6 +114,12 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError })
         stopCurrentStream();
         currentStream = stream;
         currentDeviceId = preferredDevice.deviceId;
+
+        console.info('[CameraDiagnostics] Stream acquired', {
+          label: preferredDevice.label || 'Unknown device',
+          constraints,
+        });
+        onDiagnostics?.({ event: 'acquired', deviceLabel: preferredDevice.label, constraints });
 
         stream.getTracks().forEach(track => {
           track.onended = () => {
@@ -107,6 +136,13 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError })
         onPermissionGranted?.();
       } catch (err) {
         console.error('Neural Uplink Error (Camera Access):', err);
+        onDiagnostics?.({
+          event: 'error',
+          deviceLabel: lastDeviceLabel,
+          constraints: lastConstraints ?? undefined,
+          errorName: err instanceof DOMException ? err.name : undefined,
+          message: err instanceof Error ? err.message : String(err),
+        });
         if (err instanceof DOMException) {
           switch (err.name) {
             case 'NotAllowedError':
