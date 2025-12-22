@@ -18,7 +18,6 @@ import { ResourceLifecycle } from '../systems/ResourceLifecycle';
 import { isDevFeatureEnabled } from '../utils/devMode';
 import { PerfTracer, perfTracer } from '../telemetry/PerfTracer';
 import useOverlayStateAdapter, { OverlayState } from './ui/OverlayStateAdapter';
-import { CameraErrorCode } from './WebcamFeed';
 
 /**
  * GameScene
@@ -44,23 +43,12 @@ interface Props {
   lives: number;
   handTrackingEnabled: boolean;
   cameraPermissionGranted: boolean;
-  cameraErrorCode?: CameraErrorCode | null;
   onRetryCamera?: () => void;
 }
 
-const getCameraMessage = (cameraPermissionGranted: boolean, cameraErrorCode?: CameraErrorCode | null) => {
+const getCameraMessage = (cameraPermissionGranted: boolean) => {
   if (cameraPermissionGranted) return undefined;
-  if (!cameraErrorCode) {
-    return 'Requesting camera access. Approve the browser prompt or enable permissions to continue.';
-  }
-  switch (cameraErrorCode) {
-    case 'NO_DEVICES':
-      return 'No camera detected. Plug in a webcam or enable it in system settings, then press Retry to scan again.';
-    case 'PERMISSION_DENIED':
-      return 'Camera permission denied. Allow access in your browser and OS privacy settings, then hit Retry.';
-    default:
-      return 'Camera offline. Reconnect or select a webcam, confirm privacy permissions, then press Retry.';
-  }
+  return 'Camera access required. Turn on a webcam and allow browser permissions to continue.';
 };
 
 // Memory Optimization Globals - Pooled strictly to avoid GC and per-frame allocations
@@ -86,7 +74,6 @@ const GameScene: React.FC<Props> = ({
   lives,
   handTrackingEnabled,
   cameraPermissionGranted,
-  cameraErrorCode,
   onRetryCamera,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -113,7 +100,7 @@ const GameScene: React.FC<Props> = ({
       stalled: false,
       cameraReady: cameraPermissionGranted,
       fallbackCta: !cameraPermissionGranted,
-      message: getCameraMessage(cameraPermissionGranted, cameraErrorCode),
+      message: getCameraMessage(cameraPermissionGranted),
     },
   });
 
@@ -144,9 +131,9 @@ const GameScene: React.FC<Props> = ({
       ...currentStatus,
       cameraReady: cameraPermissionGranted,
       fallbackCta: !cameraPermissionGranted,
-      message: getCameraMessage(cameraPermissionGranted, cameraErrorCode),
+      message: getCameraMessage(cameraPermissionGranted),
     };
-  }, [cameraPermissionGranted, cameraErrorCode, noGestureDevBypass]);
+  }, [cameraPermissionGranted, noGestureDevBypass]);
 
   useEffect(() => {
     const handler = () => {
@@ -161,7 +148,7 @@ const GameScene: React.FC<Props> = ({
         stalled: false,
         fallbackCta: !cameraPermissionGranted,
         cameraReady: cameraPermissionGranted,
-        message: getCameraMessage(cameraPermissionGranted, cameraErrorCode),
+        message: getCameraMessage(cameraPermissionGranted),
       };
 
       const phaseManager = phaseManagerRef.current;
@@ -174,7 +161,7 @@ const GameScene: React.FC<Props> = ({
     setCalibrateCameraHandler(handler);
 
     return () => clearCalibrateCameraHandler(handler);
-  }, [cameraPermissionGranted, cameraErrorCode, noGestureDevBypass]);
+  }, [cameraPermissionGranted, noGestureDevBypass]);
 
   const overlayState = useOverlayStateAdapter(overlayStateRef, 90);
 
@@ -727,7 +714,7 @@ const GameScene: React.FC<Props> = ({
             fallbackCta: !cameraPermissionGranted || stalled,
             cameraReady: cameraPermissionGranted,
             message: !cameraPermissionGranted
-              ? getCameraMessage(cameraPermissionGranted, cameraErrorCode)
+              ? getCameraMessage(cameraPermissionGranted)
               : stalled
                   ? 'No hand data received. Verify the camera is connected and your hands are visible.'
                   : undefined,
@@ -757,7 +744,7 @@ const GameScene: React.FC<Props> = ({
             stalled: false,
             fallbackCta: !cameraPermissionGranted,
             cameraReady: cameraPermissionGranted,
-            message: getCameraMessage(cameraPermissionGranted, cameraErrorCode),
+            message: getCameraMessage(cameraPermissionGranted),
           };
       }
 
