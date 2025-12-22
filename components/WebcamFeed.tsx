@@ -84,7 +84,15 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, a
   }, [accessRequestToken, onPermissionGranted, onError, videoRef]);
 
   // scale-x-[-1] mirrors the feed for intuitive human movement matching
-  return <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" autoPlay playsInline muted />;
+  return (
+    <video
+      ref={videoRef}
+      className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
+      autoPlay
+      playsInline
+      muted
+    />
+  );
 };
 
 export default WebcamFeed;
