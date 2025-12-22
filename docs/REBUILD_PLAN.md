@@ -62,11 +62,11 @@ a task stub of concrete steps to execute.
 - Ensure accessibility fallbacks and document in `docs/UI_STYLE_GUIDE.md`. ✅ Completed: Style guide notes HUD/menu a11y expectations.
 :::
 
-**Issue 9: Telemetry, debugging, and developer ergonomics**
+**Issue 9: Telemetry, debugging, and developer ergonomics — Status: Done**
 :::task-stub{title="Add observability and dev tooling hooks"}
-- Add optional logging/debug panels gated by environment flags; include tests for configuration parsing.
-- Provide a minimal “diagnostics” mode that runs input + phase + spawn subsystems without rendering; write a smoke test to validate the pipeline.
-- Document troubleshooting steps in `docs/DEVELOPER_GUIDE.md` and `docs/USER_GUIDE.md` (tracking loss, gesture misfires).
+- Add optional logging/debug panels gated by environment flags; include tests for configuration parsing. ✅ Completed: env-driven debug config and panel rendering covered by tests.
+- Provide a minimal “diagnostics” mode that runs input + phase + spawn subsystems without rendering; write a smoke test to validate the pipeline. ✅ Completed: headless diagnostics harness exercises the subsystems with a smoke test.
+- Document troubleshooting steps in `docs/DEVELOPER_GUIDE.md` and `docs/USER_GUIDE.md` (tracking loss, gesture misfires). ✅ Completed: guides updated with flags and troubleshooting notes.
 :::
 
 **Issue 10: Build, deploy, and regression safety**

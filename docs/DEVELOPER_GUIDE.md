@@ -26,3 +26,15 @@ This guide explains how to work with the cleaned-up rebuild shell.
 - `npm run dev` — start the Vite dev server to view the placeholder shell.
 - `npm run test` — run the Vitest suite (including guardrails and UI checks).
 - `npm run lint` — type-check the project.
+
+## Diagnostics and troubleshooting
+
+- Toggle `VITE_DEBUG_PANELS` to surface the in-app debug summary, and `VITE_TRACE_LOGGING` to allow verbose traces while
+  developing. These flags are parsed via `observability/DebugConfig.ts` so they work locally and in CI.
+- Set `VITE_DIAGNOSTICS_MODE=1` to run the headless pipeline (hand tracking → phase transitions → spawn scheduler) without
+  touching the renderer. The pipeline is exercised via `runDiagnosticsPipeline` and guarded by
+  `__tests__/diagnosticsMode.test.ts`.
+- If the phase machine refuses to leave calibration, inspect stability tolerance in `InputProcessor` and ensure your test
+  frames reflect at least `requiredCalibrationStableMs` of stable samples.
+- Gesture misfires usually come from reintroducing noisy data; use the diagnostics harness to emit known landmarks and observe
+  transitions before wiring new adapters.
