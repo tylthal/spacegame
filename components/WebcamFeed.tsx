@@ -1,37 +1,17 @@
 import React, { useEffect } from 'react';
-import { mediaPreflightCheck, type MediaPreflightResult } from '../utils/deviceDiagnostics';
-import { CameraStreamService } from '../services/CameraStreamService';
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement>;
   onPermissionGranted?: () => void;
   onError?: (error: CameraError) => void;
-  onDiagnostics?: (info: CameraDiagnostics) => void;
   accessRequestToken?: number;
 }
 
-export type CameraErrorCode =
-  | 'NO_DEVICES'
-  | 'PERMISSION_DENIED'
-  | 'DEVICE_IN_USE'
-  | 'DEVICE_LOST'
-  | 'UNSUPPORTED'
-  | 'UNKNOWN';
+export type CameraErrorCode = 'PERMISSION_DENIED' | 'NO_DEVICES' | 'UNKNOWN';
 
 export interface CameraError extends Error {
   code: CameraErrorCode;
   cause?: unknown;
-}
-
-export interface CameraDiagnostics {
-  event: 'preflight' | 'decision' | 'request' | 'acquired' | 'devicechange' | 'error';
-  deviceLabel?: string;
-  deviceId?: string;
-  constraints?: MediaStreamConstraints;
-  appliedSettings?: MediaTrackSettings;
-  preflightDetails?: MediaPreflightResult['details'];
-  errorName?: string;
-  message?: string;
 }
 
 const createCameraError = (code: CameraErrorCode, message: string, cause?: unknown): CameraError => {
@@ -44,361 +24,64 @@ const createCameraError = (code: CameraErrorCode, message: string, cause?: unkno
   return error;
 };
 
+const stopStreamTracks = (stream: MediaStream | null) => {
+  stream?.getTracks().forEach(track => track.stop());
+};
+
 /**
  * WebcamFeed Component
  * Requests and manages the user's camera stream.
- * Optimized for computer vision tasks with low-resolution and specific frame rate.
  */
-const WebcamFeed: React.FC<Props> = ({
-  videoRef,
-  onPermissionGranted,
-  onError,
-  onDiagnostics,
-  accessRequestToken,
-}) => {
+const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, accessRequestToken }) => {
   useEffect(() => {
-    if (!accessRequestToken) return;
+    if (!accessRequestToken) return undefined;
 
-    let active = true;
-    let currentStream: MediaStream | null = CameraStreamService.getActiveStream();
-    let currentDeviceId: string | null = null;
-    let lastConstraints: MediaStreamConstraints | null = null;
-    let lastDeviceLabel: string | undefined;
-    let lastDeviceId: string | undefined;
-    let lastKnownVideoInputCount = 0;
-    let noDeviceLockout = false;
-    let permissionProbeStream: MediaStream | null = CameraStreamService.getProbeStream();
+    let cancelled = false;
+    let currentStream: MediaStream | null = null;
 
-    const markNoDeviceLockout = (message?: string) => {
-      if (noDeviceLockout) return;
-      noDeviceLockout = true;
-      onDiagnostics?.({
-        event: 'error',
-        deviceLabel: lastDeviceLabel,
-        deviceId: lastDeviceId,
-        constraints: lastConstraints ?? undefined,
-        errorName: 'NoDevicesLockout',
-        message,
-      });
-    };
-
-    const stopCurrentStream = (includeProbe = false) => {
-      CameraStreamService.stopActiveStream();
-      currentStream = null;
-
-      if (includeProbe) {
-        CameraStreamService.stopProbeStream();
-        permissionProbeStream = null;
-      }
-    };
-
-    const getVideoInputs = async () => {
-      let devices = await navigator.mediaDevices.enumerateDevices();
-      let videoInputs = devices.filter(device => device.kind === 'videoinput');
-
-      if (videoInputs.length === 0 && navigator.mediaDevices?.getUserMedia) {
-        try {
-          if (!permissionProbeStream) {
-            permissionProbeStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            CameraStreamService.useProbeStream(permissionProbeStream);
-          }
-          devices = await navigator.mediaDevices.enumerateDevices();
-          videoInputs = devices.filter(device => device.kind === 'videoinput');
-        } catch (probeError) {
-          if (probeError instanceof DOMException && (probeError.name === 'NotAllowedError' || probeError.name === 'SecurityError')) {
-            throw createCameraError(
-              'PERMISSION_DENIED',
-              'Camera permission denied. Enable access to continue.',
-              probeError,
-            );
-          }
-          throw probeError;
-        }
-      }
-
-      lastKnownVideoInputCount = videoInputs.length;
-      return videoInputs;
-    };
-
-    const applyPreferredConstraints = async (stream: MediaStream, constraints: MediaStreamConstraints) => {
-      if (!constraints.video || typeof constraints.video !== 'object') return;
-      const [videoTrack] = stream.getVideoTracks();
-      if (videoTrack) {
-        await videoTrack.applyConstraints(constraints.video as MediaTrackConstraints);
-      }
-    };
-
-    const startCamera = async (targetDeviceId?: string, allowFallbackRetry = true) => {
+    const requestCamera = async () => {
       try {
-        const preflight = mediaPreflightCheck();
-        onDiagnostics?.({
-          event: 'preflight',
-          deviceLabel: lastDeviceLabel,
-          deviceId: lastDeviceId,
-          constraints: lastConstraints ?? undefined,
-          preflightDetails: preflight.details,
-          message: preflight.ok ? 'Preflight passed' : preflight.issues.join(' '),
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
 
-        if (!preflight.ok) {
-          const preflightError = createCameraError('UNSUPPORTED', preflight.issues.join(' '));
-          onDiagnostics?.({
-            event: 'error',
-            deviceLabel: lastDeviceLabel,
-            deviceId: lastDeviceId,
-            constraints: lastConstraints ?? undefined,
-            preflightDetails: preflight.details,
-            errorName: 'PreflightFailed',
-            message: preflightError.message,
-          });
-          onError?.(preflightError);
+        if (cancelled) {
+          stopStreamTracks(stream);
           return;
         }
 
-        const videoInputs = await getVideoInputs();
-        if (videoInputs.length === 0) {
-          markNoDeviceLockout('No cameras detected. Waiting for user retry or device change.');
-          throw createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.');
-        }
-
-        const sanitizeDeviceId = (deviceId?: string) =>
-          deviceId && deviceId !== 'default' && deviceId !== 'communications' ? deviceId : undefined;
-
-        const preferredDevice =
-          videoInputs.find(device => sanitizeDeviceId(device.deviceId) === targetDeviceId) ??
-          videoInputs.find(device => device.label.toLowerCase().includes('front')) ??
-          videoInputs.find(device => sanitizeDeviceId(device.deviceId)) ??
-          videoInputs[0];
-
-        const preferredDeviceId = sanitizeDeviceId(preferredDevice.deviceId);
-
-        /**
-         * Vision Optimization:
-         * 320x240 is used to reduce data transfer to the GPU and inference time.
-         * Higher resolutions significantly impact "Neural FPS" without increasing tracking accuracy.
-         */
-        const constraints: MediaStreamConstraints = {
-          video: {
-            deviceId: preferredDeviceId ? { exact: preferredDeviceId } : undefined,
-            width: { ideal: 320 },
-            height: { ideal: 240 },
-            frameRate: { ideal: 30 },
-          },
-          audio: false,
-        };
-
-        lastConstraints = constraints;
-        lastDeviceLabel = preferredDevice.label;
-        lastDeviceId = preferredDevice.deviceId;
-        console.info('[CameraDiagnostics] Requesting camera', {
-          label: preferredDevice.label || 'Unknown device',
-          deviceId: preferredDevice.deviceId || 'unknown',
-          constraints,
-        });
-        onDiagnostics?.({
-          event: 'request',
-          deviceLabel: preferredDevice.label,
-          deviceId: preferredDevice.deviceId,
-          constraints,
-        });
-
-        let stream: MediaStream;
-
-        if (permissionProbeStream) {
-          const probeSettings = permissionProbeStream.getVideoTracks()[0]?.getSettings();
-          const deviceMatches =
-            !preferredDevice.deviceId || probeSettings?.deviceId === preferredDevice.deviceId || !probeSettings?.deviceId;
-
-          if (deviceMatches) {
-            onDiagnostics?.({
-              event: 'decision',
-              deviceLabel: preferredDevice.label,
-              deviceId: preferredDevice.deviceId,
-              message: 'Reusing permission probe stream for preferred device',
-            });
-            await applyPreferredConstraints(permissionProbeStream, constraints);
-            stream = permissionProbeStream;
-          } else {
-            onDiagnostics?.({
-              event: 'decision',
-              deviceLabel: preferredDevice.label,
-              deviceId: preferredDevice.deviceId,
-              message: 'Permission probe device did not match; requesting new stream',
-            });
-            stream = await navigator.mediaDevices.getUserMedia(constraints);
-            permissionProbeStream = stream;
-            CameraStreamService.useProbeStream(stream);
-          }
-        } else {
-          onDiagnostics?.({
-            event: 'decision',
-            deviceLabel: preferredDevice.label,
-            deviceId: preferredDevice.deviceId,
-            message: 'No permission probe stream available; requesting new stream',
-          });
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-          permissionProbeStream = stream;
-        }
-
-        if (!active) {
-          stream.getTracks().forEach(track => track.stop());
-          return;
-        }
-
-        stopCurrentStream();
         currentStream = stream;
-        CameraStreamService.useActiveStream(stream);
-        currentDeviceId = preferredDevice.deviceId;
-
-        const appliedSettings = stream.getVideoTracks()[0]?.getSettings();
-
-        console.info('[CameraDiagnostics] Stream acquired', {
-          label: preferredDevice.label || 'Unknown device',
-          deviceId: preferredDevice.deviceId || 'unknown',
-          constraints,
-          appliedSettings,
-        });
-        onDiagnostics?.({
-          event: 'acquired',
-          deviceLabel: preferredDevice.label,
-          deviceId: preferredDevice.deviceId,
-          constraints,
-          appliedSettings,
-        });
-
-        stream.getTracks().forEach(track => {
-          track.onended = () => {
-            if (!active) return;
-            const deviceLostError = createCameraError('DEVICE_LOST', 'Camera disconnected during capture.');
-            onError?.(deviceLostError);
-          };
-        });
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
         }
+
         onPermissionGranted?.();
       } catch (err) {
-        console.error('Neural Uplink Error (Camera Access):', err);
-        onDiagnostics?.({
-          event: 'error',
-          deviceLabel: lastDeviceLabel,
-          deviceId: lastDeviceId,
-          constraints: lastConstraints ?? undefined,
-          errorName: err instanceof DOMException ? err.name : undefined,
-          message: err instanceof Error ? err.message : String(err),
-        });
-        if ((err as CameraError)?.code) {
-          if ((err as CameraError).code === 'NO_DEVICES') {
-            markNoDeviceLockout('Camera access halted until a new device is available or the user retries.');
-          }
-          onError?.(err as CameraError);
-          return;
-        }
-        if (err instanceof DOMException && err.name === 'NotFoundError' && allowFallbackRetry) {
-          console.warn('Preferred camera missing, retrying without device constraint.');
-          onDiagnostics?.({
-            event: 'devicechange',
-            deviceLabel: lastDeviceLabel,
-            deviceId: lastDeviceId,
-            constraints: lastConstraints ?? undefined,
-            errorName: err.name,
-            message: 'Requested device not found. Retrying with default camera.',
-          });
-          if (lastKnownVideoInputCount === 0) {
-            markNoDeviceLockout('No cameras reported. Suppressing immediate retry.');
-            onError?.(createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.', err));
-            return;
-          }
+        let cameraError: CameraError;
 
-          await startCamera(undefined, false);
-          return;
-        }
-        if (err instanceof DOMException) {
-          switch (err.name) {
-            case 'NotAllowedError':
-            case 'SecurityError':
-              onError?.(createCameraError('PERMISSION_DENIED', 'Camera permission denied. Enable access to continue.', err));
-              return;
-            case 'NotFoundError':
-              onError?.(createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.', err));
-              return;
-            case 'NotReadableError':
-              onError?.(createCameraError('DEVICE_IN_USE', 'Camera is in use by another application.', err));
-              return;
-            case 'AbortError':
-              onError?.(createCameraError('DEVICE_LOST', 'Camera disconnected during capture.', err));
-              return;
-            default:
-              onError?.(createCameraError('UNKNOWN', err.message, err));
-              return;
-          }
-        }
-        onError?.(createCameraError('UNKNOWN', 'Unable to access camera. Verify permissions and hardware.', err));
-      }
-    };
-
-    const handleDeviceChange = async () => {
-      if (!navigator.mediaDevices?.enumerateDevices) return;
-      noDeviceLockout = false;
-      try {
-        const videoInputs = await getVideoInputs();
-        if (videoInputs.length === 0) {
-          stopCurrentStream();
-          onError?.(createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.'));
-          onDiagnostics?.({
-            event: 'devicechange',
-            deviceLabel: lastDeviceLabel,
-            deviceId: lastDeviceId,
-            constraints: lastConstraints ?? undefined,
-            message: 'All cameras removed. Waiting for device to reconnect.',
-          });
-          return;
-        }
-
-        const activeDeviceAvailable = currentDeviceId
-          ? videoInputs.some(device => device.deviceId === currentDeviceId)
-          : false;
-
-        if (!activeDeviceAvailable) {
-          const fallbackDevice = videoInputs[0];
-          onDiagnostics?.({
-            event: 'devicechange',
-            deviceLabel: fallbackDevice?.label,
-            deviceId: fallbackDevice?.deviceId,
-            constraints: lastConstraints ?? undefined,
-            message: 'Active camera unplugged, retrying with available device.',
-          });
-          await startCamera(videoInputs[0]?.deviceId);
+        if (err instanceof DOMException && err.name === 'NotAllowedError') {
+          cameraError = createCameraError('PERMISSION_DENIED', 'Camera permission denied. Enable access to continue.', err);
+        } else if (err instanceof DOMException && err.name === 'NotFoundError') {
+          cameraError = createCameraError('NO_DEVICES', 'No camera detected. Connect a device and try again.', err);
         } else {
-          onDiagnostics?.({
-            event: 'devicechange',
-            deviceLabel: lastDeviceLabel,
-            deviceId: lastDeviceId,
-            constraints: lastConstraints ?? undefined,
-            message: 'Device change detected but active camera remains available.',
-          });
+          cameraError = createCameraError('UNKNOWN', 'Unable to access camera. Verify permissions and hardware.', err);
         }
-      } catch (err) {
-        console.error('Camera device change handling failed:', err);
+
+        onError?.(cameraError);
       }
     };
 
-    startCamera();
-    navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange);
+    requestCamera();
 
     return () => {
-      active = false;
-      navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
-      stopCurrentStream(true);
-      CameraStreamService.stopAll();
-      // Cleanup: Stop all tracks on unmount
-      if (videoRef.current && videoRef.current.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+      cancelled = true;
+      stopStreamTracks(currentStream);
+      if (videoRef.current?.srcObject) {
+        stopStreamTracks(videoRef.current.srcObject as MediaStream);
+        videoRef.current.srcObject = null;
       }
     };
-  }, [accessRequestToken, onDiagnostics, onError, onPermissionGranted, videoRef]);
+  }, [accessRequestToken, onPermissionGranted, onError, videoRef]);
 
   // scale-x-[-1] mirrors the feed for intuitive human movement matching
   return <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" playsInline muted />;
