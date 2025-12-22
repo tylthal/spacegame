@@ -55,15 +55,9 @@ const getCameraMessage = (cameraPermissionGranted: boolean, cameraErrorCode?: Ca
   }
   switch (cameraErrorCode) {
     case 'NO_DEVICES':
-      return 'No camera detected. Plug in a webcam or enable it in system settings, then press Re-request to scan again.';
+      return 'No camera detected. Plug in a webcam or enable it in system settings, then press Retry to scan again.';
     case 'PERMISSION_DENIED':
-      return 'Camera permission denied. Allow access in your browser and OS privacy settings, then hit Re-request.';
-    case 'DEVICE_LOST':
-      return 'Camera disconnected during capture. Reseat the cable or select another device, then Retry.';
-    case 'DEVICE_IN_USE':
-      return 'Camera is in use by another application. Close it or pick a different device, then Retry.';
-    case 'UNSUPPORTED':
-      return 'Camera API unavailable. Use HTTPS, a supported browser, or disable restrictive extensions to enable capture.';
+      return 'Camera permission denied. Allow access in your browser and OS privacy settings, then hit Retry.';
     default:
       return 'Camera offline. Reconnect or select a webcam, confirm privacy permissions, then press Retry.';
   }
