@@ -2,14 +2,14 @@
 
 A phased plan for rebuilding the game from scratch with testing embedded throughout. Each issue is followed by a task stub of concrete steps to execute.
 
-**Issue 1: Align docs with the rebuild strategy before coding**
+**Issue 1: Align docs with the rebuild strategy before coding** — **Status: Done**
 :::task-stub{title="Refresh foundational docs for the rebuild"}
 - Update `docs/ARCHITECTURE.md` and `docs/DEVELOPER_GUIDE.md` with a high-level phased rebuild plan (input, phase machine, rendering, gameplay, UI), including module boundaries and data contracts.
 - Add a “Testing Strategy” section outlining unit (Vitest) and integration (playwright or Cypress, if available) layers, plus minimal smoke scripts (`npm run test:unit`, `npm run test:ci`).
 - Ensure `README.md` references the phased rebuild/testing flow and any new scripts.
 :::
 
-**Issue 2: Establish a clean, testable core scaffold**
+**Issue 2: Establish a clean, testable core scaffold** — **Status: Done**
 :::task-stub{title="Bootstrap core scaffold and testing harness"}
 - Verify/initialize Vitest + Testing Library configuration; add `npm run test` and `npm run test:watch`.
 - Add a lightweight CI script (e.g., `npm run lint && npm run test --runInBand`).
