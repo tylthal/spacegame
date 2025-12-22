@@ -64,7 +64,7 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, o
       return devices.filter(device => device.kind === 'videoinput');
     };
 
-    const startCamera = async (targetDeviceId?: string) => {
+    const startCamera = async (targetDeviceId?: string, allowFallbackRetry = true) => {
       try {
         const preflight = mediaPreflightCheck();
         if (!preflight.ok) {
@@ -143,6 +143,18 @@ const WebcamFeed: React.FC<Props> = ({ videoRef, onPermissionGranted, onError, o
           errorName: err instanceof DOMException ? err.name : undefined,
           message: err instanceof Error ? err.message : String(err),
         });
+        if (err instanceof DOMException && err.name === 'NotFoundError' && allowFallbackRetry) {
+          console.warn('Preferred camera missing, retrying without device constraint.');
+          onDiagnostics?.({
+            event: 'error',
+            deviceLabel: lastDeviceLabel,
+            constraints: lastConstraints ?? undefined,
+            errorName: err.name,
+            message: 'Requested device not found. Retrying with default camera.',
+          });
+          await startCamera(undefined, false);
+          return;
+        }
         if (err instanceof DOMException) {
           switch (err.name) {
             case 'NotAllowedError':
