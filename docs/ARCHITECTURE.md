@@ -3,6 +3,34 @@
 ## 1. High-Level Concept
 The application is a hybrid **React/Three.js** system. Unlike standard React Three Fiber applications, this project manages the Three.js render loop manually within a `useEffect` hook to ensure maximum performance and absolute control over the frame timing, essential for synchronizing with the asynchronous MediaPipe inference.
 
+## 1.1 Phased Rebuild Plan
+To support incremental refactors, the runtime can be rebuilt in five phases with clear module boundaries and hand-offs:
+
+1. **Input Stack**
+   - **Modules**: `services/handTracker.ts`, `config/constants.ts` (calibration), `types.ts` for landmark payloads.
+   - **Data Contract**: `HandResult | null` written to `handResultRef.current`, plus calibration metadata ({ zeroPoint, timestamp }).
+   - **Goal**: Guarantee stable input snapshots at ~30Hz before other systems consume them.
+
+2. **Phase Machine**
+   - **Modules**: `App.tsx` (state), `components/GameScene.tsx` (imperative mirror), `config/constants.ts` for timers.
+   - **Data Contract**: `{ phase, phaseRef, phaseTimestamps }` with explicit transitions (CALIBRATING → READY → PLAYING → PAUSED/HELP → GAMEOVER).
+   - **Goal**: Provide deterministic transition hooks that other systems can subscribe to without reading React state directly.
+
+3. **Rendering Spine**
+   - **Modules**: `components/GameScene.tsx`, `systems/AssetManager.ts`, `systems/SceneComposer.ts`, `styles/` for shared uniforms.
+   - **Data Contract**: `SceneContext` object exposing `camera`, `scene`, pooled meshes, and a `render(dt, inputState)` callback signature.
+   - **Goal**: Stabilize the render loop and resource lifecycle so gameplay code can swap in/out without reallocating GPU assets.
+
+4. **Gameplay & Simulation**
+   - **Modules**: `systems/EnemyFactory.ts`, `systems/InputProcessor.ts`, projectile pools, AI utilities under `utils/`.
+   - **Data Contract**: `SimulationState` ({ enemies, projectiles, particles, scores }) updated per frame; gesture flags ({ fire, missile, pause }) read-only for simulation.
+   - **Goal**: Keep simulation pure and frame-bound, receiving only the immutable input snapshot and returning a diff to render/app layers.
+
+5. **UI & Telemetry**
+   - **Modules**: `components/SceneOverlays.tsx`, `telemetry/` (if enabled), `styles/`.
+   - **Data Contract**: `UiModel` derived from the phase machine and simulation summaries (score, hull, prompts).
+   - **Goal**: Allow React overlays to iterate independently (low frequency) while reading stable summaries instead of raw frame data.
+
 ## 2. Core Components
 
 ### A. The React Shell (`App.tsx`)
@@ -77,3 +105,9 @@ The visual stack is composed as follows (Back to Front):
 5.  **Weapon/Reticle**: `Z = 0 to 15`. Attached to the camera group.
 6.  **2D HUD**: HTML/CSS Overlay (Score, Health).
 7.  **2D Overlays**: HTML/CSS Overlay (Pause Menu, Calibration, Webcam, Help).
+
+## Testing Strategy
+
+- **Unit (Vitest)**: Validate isolated math helpers, gesture classifiers, and phase reducers with deterministic fixtures. Favor pure functions in `utils/` and `systems/` to keep tests renderer-agnostic. Run locally with `npm run test:unit`.
+- **Integration (Playwright/Cypress)**: When available, drive the Vite preview build to confirm the phase machine, overlay hand-offs, and rendering spine work together. Scenarios include calibration → ready → playing transitions, pause menu targeting, and HUD updates.
+- **Smoke Scripts**: `npm run test:unit` for fast checks; `npm run test:ci` for CI smoke (mirrors unit suite, expandable to include headless browser flows).

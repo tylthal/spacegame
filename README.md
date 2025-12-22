@@ -2,6 +2,8 @@
 
 A high-fidelity space combat simulator utilizing Three.js for 3D rendering and MediaPipe Hands for zero-latency gesture control.
 
+The runtime is being modernized through a **five-phase rebuild** (Input → Phase Machine → Rendering Spine → Gameplay/Simulation → UI/Telemetry). Each phase has explicit module boundaries and data contracts to keep refactors isolated; see `docs/ARCHITECTURE.md` and `docs/DEVELOPER_GUIDE.md` for the current contracts.
+
 ## Quickstart
 
 1. Install dependencies: `npm install`
@@ -9,6 +11,9 @@ A high-fidelity space combat simulator utilizing Three.js for 3D rendering and M
 3. Open the provided localhost URL (Vite defaults to `5173`) in a Chromium-based browser. WebGL2/WebGPU and webcam access are required for gameplay.
 
 For production-style checks, run `npm run build` to type-check and bundle the project.
+
+- Smoke/unit tests: `npm run test:unit`
+- CI-friendly entry point (extendable to headless integration): `npm run test:ci`
 
 > **Note on large assets**: MediaPipe binaries are stored with [Git LFS](https://git-lfs.com/). Install LFS (`git lfs install`) before cloning/pulling so the WASM and model files download correctly and pull requests that touch them can be opened on GitHub.
 
@@ -100,9 +105,9 @@ The game flows through six distinct states managed by `phaseRef`:
 
 ## Documentation Map
 
-- **`docs/ARCHITECTURE.md`**: High-level system design and rendering/data-flow model.
+- **`docs/ARCHITECTURE.md`**: High-level system design, phased rebuild plan, rendering/data-flow model, and testing strategy.
 - **`docs/TECHNICAL_REFERENCE.md`**: File-by-file structure, configuration references, and performance notes.
-- **`docs/DEVELOPER_GUIDE.md`**: Practical walkthrough of the frame pipeline, phase management, and contribution tips.
+- **`docs/DEVELOPER_GUIDE.md`**: Practical walkthrough of the frame pipeline, phased rebuild checklist, phase management, and contribution tips.
 - **`docs/DEPLOYMENT.md`**: Steps for configuring GitHub Pages to deploy the built site from GitHub Actions on the `main` branch.
 - **`docs/UI_STYLE_GUIDE.md`**: Visual language, colors, and component styling conventions.
 - **`docs/USER_GUIDE.md`**: Player-facing instructions and troubleshooting.

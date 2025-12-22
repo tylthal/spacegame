@@ -2,6 +2,33 @@
 
 This guide is a quick walkthrough of how the simulation is stitched together and how to extend it safely. It complements the high-level notes in `README.md` and `docs/ARCHITECTURE.md`.
 
+## Phased Rebuild Checklist
+
+1. **Input Stack** — stabilize MediaPipe ingestion before touching rendering.
+   - **Modules**: `services/handTracker.ts`, `config/constants.ts` (calibration), `types.ts` (`HandResult`).
+   - **Contract**: `handResultRef.current` always set to the latest `HandResult | null` plus calibration metadata so downstream reads never throw.
+   - **Exit Criteria**: 30Hz input updates observed in logs; null-handling verified.
+
+2. **Phase Machine** — codify transitions before layering visuals.
+   - **Modules**: `App.tsx` (React state) and `components/GameScene.tsx` (imperative mirror) with timers in `config/constants.ts`.
+   - **Contract**: `{ phase, phaseRef }` stay in sync; transition helpers emit hooks/callbacks for other systems.
+   - **Exit Criteria**: Deterministic CALIBRATING → READY → PLAYING → PAUSED/HELP → GAMEOVER flows reproducible without renderer.
+
+3. **Rendering Spine** — lock down WebGL lifecycle and shared assets.
+   - **Modules**: `components/GameScene.tsx`, `systems/AssetManager.ts`, `systems/SceneComposer.ts`.
+   - **Contract**: `SceneContext` with `camera`, `scene`, pooled meshes, and a `render(dt, inputState)` hook that gameplay systems can call.
+   - **Exit Criteria**: Scene initializes/tears down without leaks; pooled meshes recycle correctly during phase resets.
+
+4. **Gameplay & Simulation** — keep pure, frame-bounded logic.
+   - **Modules**: `systems/InputProcessor.ts`, `systems/EnemyFactory.ts`, projectile pools, AI utilities in `utils/`.
+   - **Contract**: Functions accept immutable `{ handResult, dt, phase }` snapshots and return `SimulationState` diffs (spawned enemies, despawns, score deltas).
+   - **Exit Criteria**: Simulation can run headless with mocked input; deterministic test fixtures pass.
+
+5. **UI & Overlays** — bind low-frequency summaries to React.
+   - **Modules**: `components/SceneOverlays.tsx`, HUD helpers, telemetry emitters.
+   - **Contract**: Consume summarized `UiModel` derived from simulation and phase machine; never subscribe to per-frame vectors.
+   - **Exit Criteria**: Overlays update on phase/score changes without coupling to the render loop.
+
 ## Frame Pipeline
 
 1. **Neural Input (App.tsx)**
@@ -50,3 +77,9 @@ This guide is a quick walkthrough of how the simulation is stitched together and
 - Keep the webcam preview visible when iterating on gesture logic; it is intentionally translucent to blend with the HUD.
 - For hard-to-debug transforms, temporarily lower enemy counts by reducing `DIFFICULTY.MAX_ON_SCREEN` or disable fog in `GameScene.tsx`.
 - If MediaPipe initialization fails, the fallback logs are printed from `services/handTracker.ts` to help diagnose WASM/GPU issues.
+
+## Testing Strategy
+
+- **Unit (Vitest)**: Target pure helpers (`utils/*`) and deterministic systems (`InputProcessor`, phase reducers) with fixtures. Prefer `vitest run` via `npm run test:unit` for rapid feedback.
+- **Integration (Playwright/Cypress)**: When browser runners are available, script calibration → ready → playing and pause/overlay flows against `npm run dev` or `vite preview` to validate the phase machine plus render spine end-to-end.
+- **Smoke Scripts**: `npm run test:unit` for local gating, `npm run test:ci` as the CI-friendly entry point that can expand to include headless browser specs.
