@@ -34,7 +34,7 @@ const CalibrationOverlay: React.FC<Props> = ({
       if (!cameraReady)
         return (
           calibrationStatus?.message ??
-          'Camera offline. Plug in a webcam, verify privacy permissions, then press Re-request to try again.'
+          'Camera access required. Enable your webcam and allow permissions, then press Retry.'
         );
       if (stalled)
         return calibrationStatus?.message ?? 'We cannot see your hands. Move them into the guide box or adjust lighting.';

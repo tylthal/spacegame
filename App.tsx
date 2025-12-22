@@ -269,7 +269,6 @@ const App: React.FC = () => {
             lives={lives}
             handTrackingEnabled={handTrackingActive}
             cameraPermissionGranted={cameraPermissionGranted}
-            cameraErrorCode={cameraInitError?.code}
             onRetryCamera={handleRetryCamera}
           />
 
