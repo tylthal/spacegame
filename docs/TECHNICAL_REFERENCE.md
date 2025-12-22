@@ -11,6 +11,11 @@
 │   └── PlaceholderScreen.tsx  # Panel describing the active placeholder screen
 ├── phase/
 │   └── PhaseManager.ts        # Pure-state phase controller with guarded transitions and events
+├── gameplay/
+│   ├── CombatLoop.ts          # Tick-based combat simulation with deterministic RNG + hull attrition
+│   ├── Collision.ts           # Ray/segment intersection helpers for high-speed projectiles
+│   ├── Rng.ts                 # Seeded random generator interface and implementation
+│   └── SpawnScheduler.ts      # Time-based difficulty curve with weighted enemy rolls
 ├── input/                     # New input stack (hand tracking + gesture classification)
 │   ├── HandTracker.ts         # Interface + in-memory adapter for MediaPipe-like sources
 │   ├── InputProcessor.ts      # One Euro smoothing + gesture classification + virtual pad mapping
@@ -82,3 +87,19 @@ The rebuild will layer in new modules behind tests. Recommended order:
   1. Align the hand within the camera view so the centroid sits roughly mid-frame (ensuring landmarks fall inside the pad).
   2. Hold a flat palm to confirm baseline gesture detection (`palm`) and cursor centering near the pad midpoint.
   3. Perform deliberate pinches/fists to verify thresholds; adjust `pinchThreshold`/`fistThreshold` if hardware scale differs.
+
+## Gameplay systems (Issue 7)
+
+- `SeededRng` offers deterministic random values for repeatable simulations and weighted rolls.
+- `SpawnScheduler` advances a time-based difficulty curve:
+  - 0–20s: interval 1200ms, drones only.
+  - 20–40s: interval 900ms, drones with a light scout mix.
+  - 40–60s: interval 700ms, drones/scouts plus occasional bombers.
+  - 60s+: interval 550ms, balanced drones/scouts with heavier bomber representation.
+- `Collision.segmentHitsCircle` handles fast projectiles by clamping closest-point math on the shot segment, covering tangential
+  misses and shots fired from inside the target volume.
+- `CombatLoop` orchestrates deterministic ticks:
+  - Spawns via `SpawnScheduler` with per-kind radius, speed, and hull damage budgets.
+  - Fires a cadence-based vertical shot (default 450ms) using `segmentHitsCircle` to cull targets.
+  - Advances enemies toward the base (`baseY=1`), deducting hull (`drone=5`, `scout=8`, `bomber=15`) when they breach.
+  - Exposes summary stats for hull, spawns, kills, and elapsed time to keep integration tests deterministic.

@@ -48,11 +48,11 @@ a task stub of concrete steps to execute.
 - Add a snapshot-like assertion for scene graph counts per spawn/despawn cycle. ✅ Completed: scene graph node counts asserted across spawn/despawn cycles.
 :::
 
-**Issue 7: Gameplay systems and difficulty curve**
+**Issue 7: Gameplay systems and difficulty curve — Status: Done**
 :::task-stub{title="Enemy spawning and combat loop with deterministic RNG"}
-- Rebuild spawn scheduler with the documented time-based difficulty curve; inject a seeded RNG for reproducible tests.
-- Implement collision/raycast utilities with unit tests covering edge cases (high-speed projectiles).
-- Add integration-style test simulating N seconds of gameplay to assert spawn distribution and hull damage rules.
+- Rebuild spawn scheduler with the documented time-based difficulty curve; inject a seeded RNG for reproducible tests. ✅ Completed: deterministic scheduler and RNG added.
+- Implement collision/raycast utilities with unit tests covering edge cases (high-speed projectiles). ✅ Completed: segment/radius helpers tested for edge cases.
+- Add integration-style test simulating N seconds of gameplay to assert spawn distribution and hull damage rules. ✅ Completed: CombatLoop integration test validates spawn mix and hull attrition.
 :::
 
 **Issue 8: UI/HUD and menu modules**
