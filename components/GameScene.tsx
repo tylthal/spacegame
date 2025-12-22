@@ -44,6 +44,8 @@ interface Props {
   handTrackingEnabled: boolean;
   cameraPermissionGranted: boolean;
   onRetryCamera?: () => void;
+  videoStream?: MediaStream | null;
+  videoRef: React.RefObject<HTMLVideoElement>;
 }
 
 const getCameraMessage = (cameraPermissionGranted: boolean) => {
@@ -75,6 +77,8 @@ const GameScene: React.FC<Props> = ({
   handTrackingEnabled,
   cameraPermissionGranted,
   onRetryCamera,
+  videoStream,
+  videoRef,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   
@@ -886,6 +890,8 @@ const GameScene: React.FC<Props> = ({
         onRetryCamera={onRetryCamera}
         onRestartCalibration={handleRestartCalibration}
         onContinueFromCalibration={handleContinueAfterCalibration}
+        videoStream={videoStream}
+        videoRef={videoRef}
       />
     </div>
   );
