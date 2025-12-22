@@ -30,6 +30,9 @@ const App: React.FC = () => {
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [showCalibrationGuide, setShowCalibrationGuide] = useState(false);
 
+  const cameraReady = cameraPermissionGranted;
+  const handTrackingActive = handTrackingReady && cameraReady && !useFallbackControls;
+
   const telemetryEnabled = isDevFeatureEnabled('benchmark');
   
   // --- Refs for Performance ---
@@ -45,7 +48,6 @@ const App: React.FC = () => {
     setIsCalibrating(true);
     setInitError(null);
     setUseFallbackControls(false);
-    setCameraPermissionGranted(false);
     setCameraInitError(null);
 
     try {
@@ -70,16 +72,14 @@ const App: React.FC = () => {
   }, [experienceStarted, initializeHandTracking]);
 
   useEffect(() => {
-    if (!handTrackingReady || useFallbackControls || !cameraPermissionGranted) {
+    if (!handTrackingReady || useFallbackControls || !cameraReady) {
       handResultRef.current = null;
     }
-  }, [handTrackingReady, useFallbackControls, cameraPermissionGranted]);
+  }, [handTrackingReady, useFallbackControls, cameraReady]);
 
   // Neural Link Loop: High-frequency hand detection
   useEffect(() => {
     let animationId: number | null = null;
-
-    const handTrackingActive = handTrackingReady && cameraPermissionGranted && !useFallbackControls;
 
     const detect = async () => {
       if (!handTrackingActive) return;
@@ -122,7 +122,7 @@ const App: React.FC = () => {
     return () => {
       if (animationId) cancelAnimationFrame(animationId);
     };
-  }, [experienceStarted, isInitializing, telemetryEnabled, handTrackingReady, cameraPermissionGranted, useFallbackControls]);
+  }, [experienceStarted, isInitializing, telemetryEnabled, handTrackingActive]);
 
   /**
    * handleDamage
@@ -191,8 +191,6 @@ const App: React.FC = () => {
     setUseFallbackControls(true);
   }, []);
 
-  const handTrackingActive = handTrackingReady && cameraPermissionGranted && !useFallbackControls;
-
   if (showSplash) {
     return (
       <div className="relative min-h-screen w-screen bg-gradient-to-br from-black via-slate-950 to-cyan-950 text-cyan-100 overflow-hidden font-mono select-none">
@@ -228,12 +226,12 @@ const App: React.FC = () => {
           <p className="mt-4 text-cyan-700 uppercase tracking-widest text-xs">Loading Hand Tracking Engine</p>
         </div>
       )}
-      <CalibrationGuide
-        open={showCalibrationGuide}
-        onClose={handleCalibrateFromGuide}
-        onConfirm={handleCalibrateFromGuide}
-        cameraReady={cameraPermissionGranted}
-      />
+        <CalibrationGuide
+          open={showCalibrationGuide}
+          onClose={handleCalibrateFromGuide}
+          onConfirm={handleCalibrateFromGuide}
+          cameraReady={cameraReady}
+        />
       {initError && !useFallbackControls && !isInitializing && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 px-4">
           <div className="max-w-xl w-full bg-gray-900 border border-red-500/40 rounded-lg p-6 shadow-2xl text-center space-y-4">
@@ -268,7 +266,7 @@ const App: React.FC = () => {
             hull={hull}
             lives={lives}
             handTrackingEnabled={handTrackingActive}
-            cameraPermissionGranted={cameraPermissionGranted}
+            cameraPermissionGranted={cameraReady}
             onRetryCamera={handleRetryCamera}
           />
 
@@ -355,7 +353,7 @@ const App: React.FC = () => {
               onError={handleCameraError}
               accessRequestToken={cameraAccessRequestToken}
             />
-            {!cameraPermissionGranted && (
+            {!cameraReady && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-300 text-center px-2">
                 <div className="space-y-2">
                   <div className="space-y-1">

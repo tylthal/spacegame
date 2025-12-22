@@ -169,8 +169,17 @@ export class HandTracker {
      * Uses performance.now() as the timestamp for MediaPipe's internal temporal tracking.
      */
     static async detect(video: HTMLVideoElement) {
+        if (!this.handLandmarker) return null;
+
+        const stream = video.srcObject;
+        if (!(stream instanceof MediaStream)) {
+            console.warn("HandTracker.detect requires an attached MediaStream on the video element.");
+            return null;
+        }
+
+        const hasLiveTrack = stream.getVideoTracks().some(track => track.readyState === 'live');
         // Relaxed readyState check to allow detection as soon as we have current data
-        if (!this.handLandmarker || video.readyState < 2) return null;
+        if (!hasLiveTrack || video.readyState < 2) return null;
         try {
             return this.handLandmarker.detectForVideo(video, performance.now());
         } catch (error) {
