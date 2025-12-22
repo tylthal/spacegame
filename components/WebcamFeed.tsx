@@ -5,6 +5,7 @@ interface Props {
   onPermissionGranted?: () => void;
   onStreamReady?: (stream: MediaStream | null) => void;
   onVideoReadyChange?: (ready: boolean) => void;
+  onVideoElementAvailable?: (video: HTMLVideoElement | null) => void;
   onError?: (error: CameraError) => void;
   accessRequestToken?: number;
 }
@@ -39,9 +40,15 @@ const WebcamFeed: React.FC<Props> = ({
   onPermissionGranted,
   onStreamReady,
   onVideoReadyChange,
+  onVideoElementAvailable,
   onError,
   accessRequestToken,
 }) => {
+  useEffect(() => {
+    onVideoElementAvailable?.(videoRef.current);
+    return () => onVideoElementAvailable?.(null);
+  }, [onVideoElementAvailable, videoRef]);
+
   useEffect(() => {
     if (!accessRequestToken) return undefined;
 

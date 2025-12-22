@@ -38,9 +38,10 @@ const App: React.FC = () => {
   const handTrackingActive = handTrackingReady && cameraReady && !useFallbackControls;
 
   const telemetryEnabled = isDevFeatureEnabled('benchmark');
-  
+
   // --- Refs for Performance ---
   const videoRef = useRef<HTMLVideoElement>(null);
+  const detectionVideoRef = useRef<HTMLVideoElement | null>(null);
   const handResultRef = useRef<any>(null); // Shared hand data reference
   const isDetecting = useRef(false);
   const lastDetectionTime = useRef(0);
@@ -87,13 +88,14 @@ const App: React.FC = () => {
 
     const detect = async () => {
       if (!handTrackingActive) return;
-      if (videoRef.current && !isDetecting.current) {
+      const sourceVideo = detectionVideoRef.current ?? videoRef.current;
+      if (sourceVideo && !isDetecting.current) {
         const now = performance.now();
         // Target ~30Hz detection to balance accuracy and CPU overhead
         if (now - lastDetectionTime.current >= 33) {
           isDetecting.current = true;
           const detectStart = telemetryEnabled ? perfTracer.startSpan('hand-detect') : null;
-          const result = await HandTracker.detect(videoRef.current);
+          const result = await HandTracker.detect(sourceVideo);
           perfTracer.endSpan('hand-detect', detectStart);
           if (result) {
             handResultRef.current = result;
@@ -127,6 +129,10 @@ const App: React.FC = () => {
       if (animationId) cancelAnimationFrame(animationId);
     };
   }, [experienceStarted, isInitializing, telemetryEnabled, handTrackingActive]);
+
+  const handleVideoElementAvailable = useCallback((videoEl: HTMLVideoElement | null) => {
+    detectionVideoRef.current = videoEl;
+  }, []);
 
   /**
    * handleDamage
@@ -383,6 +389,7 @@ const App: React.FC = () => {
               videoRef={videoRef}
               onPermissionGranted={handleCameraPermissionGranted}
               onStreamReady={setCameraStream}
+              onVideoElementAvailable={handleVideoElementAvailable}
               onError={handleCameraError}
               onVideoReadyChange={handleCameraVideoReadyChange}
               accessRequestToken={cameraAccessRequestToken}

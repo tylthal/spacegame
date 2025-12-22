@@ -14,6 +14,7 @@ type AssetSource = {
 export class HandTracker {
     private static handLandmarker: HandLandmarker | null = null;
     private static delegate: 'GPU' | 'CPU' | null = null;
+    private static lastNotReadyLog = 0;
 
     /**
      * init
@@ -179,7 +180,19 @@ export class HandTracker {
 
         const hasLiveTrack = stream.getVideoTracks().some(track => track.readyState === 'live');
         // Relaxed readyState check to allow detection as soon as we have current data
-        if (!hasLiveTrack || video.readyState < 2) return null;
+        if (!hasLiveTrack || video.readyState < 2 || video.paused) {
+            const now = performance.now();
+            if (now - this.lastNotReadyLog > 2000) {
+                console.debug("HandTracker.detect skipping frame: source video not ready", {
+                    readyState: video.readyState,
+                    paused: video.paused,
+                    hasLiveTrack,
+                    trackStates: stream.getVideoTracks().map(track => track.readyState)
+                });
+                this.lastNotReadyLog = now;
+            }
+            return null;
+        }
         try {
             return this.handLandmarker.detectForVideo(video, performance.now());
         } catch (error) {
