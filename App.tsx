@@ -1,439 +1,102 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import GameScene from './components/GameScene';
-import WebcamFeed, { CameraError } from './components/WebcamFeed';
-import CalibrationGuide from './components/CalibrationGuide';
-import { HandTracker } from './services/handTracker';
-import { calibrateCamera } from './services/CalibrationService';
-import { perfTracer } from './telemetry/PerfTracer';
-import { logCameraError } from './telemetry/CameraTelemetry';
-import { isDevFeatureEnabled } from './utils/devMode';
+import React, { useMemo, useState } from 'react';
+import PlaceholderScreen from './components/PlaceholderScreen';
+import PhaseList, { PhaseDescriptor, PhaseId } from './components/PhaseList';
 
-/**
- * App Component
- * Acts as the Central Command Unit, managing game state (score, health, lives)
- * and the high-frequency MediaPipe detection loop.
- */
+const phases: PhaseDescriptor[] = [
+  {
+    id: 'foundation',
+    title: 'Foundation',
+    summary: 'Keep the repository stripped to the new shell so rebuilt systems land on a clean base.',
+  },
+  {
+    id: 'calibration',
+    title: 'Calibration placeholder',
+    summary: 'Add the new calibration UX and input plumbing once the input stack is rebuilt.',
+  },
+  {
+    id: 'ready',
+    title: 'Ready/menu placeholder',
+    summary: 'Wire the future phase manager and menu targets here after the phase system is reconstructed.',
+  },
+  {
+    id: 'gameplay',
+    title: 'Gameplay placeholder',
+    summary: 'Reintroduce the render loop, spawning, and HUD after new kernels and tests exist.',
+  },
+];
+
+const foundationChecklist = [
+  'Legacy gameplay systems, assets, and MediaPipe/Three.js hooks removed.',
+  'New placeholder screens swap without relying on globals or refs.',
+  'Guard tests prevent reintroducing quarantined modules by accident.',
+];
+
 const App: React.FC = () => {
-  // --- Game State ---
-  const [score, setScore] = useState(0);
-  const [fps, setFps] = useState(0);
-  const [isInitializing, setIsInitializing] = useState(false);
-  const [initError, setInitError] = useState<string | null>(null);
-  const [useFallbackControls, setUseFallbackControls] = useState(false);
-  const [handTrackingReady, setHandTrackingReady] = useState(false);
-  const [cameraPermissionGranted, setCameraPermissionGranted] = useState(false);
-  const [cameraPermissionPending, setCameraPermissionPending] = useState(false);
-  const [cameraInitError, setCameraInitError] = useState<CameraError | null>(null);
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
-  const [cameraAccessRequestToken, setCameraAccessRequestToken] = useState(1);
-  const [cameraVideoReady, setCameraVideoReady] = useState(false);
-  const [hull, setHull] = useState(100);
-  const [lives, setLives] = useState(3);
-  const [showSplash, setShowSplash] = useState(true);
-  const [experienceStarted, setExperienceStarted] = useState(false);
-  const [isCalibrating, setIsCalibrating] = useState(false);
-  const [showCalibrationGuide, setShowCalibrationGuide] = useState(false);
+  const [activePhase, setActivePhase] = useState<PhaseId>('foundation');
 
-  const cameraReady = cameraPermissionGranted && cameraVideoReady;
-  const handTrackingActive = handTrackingReady && cameraReady && !useFallbackControls;
+  const active = useMemo(() => phases.find(phase => phase.id === activePhase) ?? phases[0], [activePhase]);
 
-  const telemetryEnabled = isDevFeatureEnabled('benchmark');
-
-  // --- Refs for Performance ---
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const detectionVideoRef = useRef<HTMLVideoElement | null>(null);
-  const handResultRef = useRef<any>(null); // Shared hand data reference
-  const isDetecting = useRef(false);
-  const lastDetectionTime = useRef(0);
-  const frameCount = useRef(0);
-  const lastFpsTime = useRef(performance.now());
-
-  const initializeHandTracking = useCallback(async () => {
-    setIsInitializing(true);
-    setIsCalibrating(true);
-    setInitError(null);
-    setUseFallbackControls(false);
-    setCameraInitError(null);
-
-    try {
-      await HandTracker.init();
-      setHandTrackingReady(true);
-    } catch (error) {
-      console.error('Hand tracking failed to initialize:', error);
-      setHandTrackingReady(false);
-      const message = error instanceof Error ? error.message : 'Failed to initialize hand tracking.';
-      setInitError(message);
-    } finally {
-      setIsInitializing(false);
-      setIsCalibrating(false);
+  const advance = () => {
+    const index = phases.findIndex(phase => phase.id === activePhase);
+    const next = phases[index + 1];
+    if (!next) {
+      setActivePhase('foundation');
+      return;
     }
-  }, []);
-
-  // Initialization: Boot hand tracking engine
-  useEffect(() => {
-    if (experienceStarted) {
-      initializeHandTracking();
-    }
-  }, [experienceStarted, initializeHandTracking]);
-
-  useEffect(() => {
-    if (!handTrackingReady || useFallbackControls || !cameraReady) {
-      handResultRef.current = null;
-    }
-  }, [handTrackingReady, useFallbackControls, cameraReady]);
-
-  // Neural Link Loop: High-frequency hand detection
-  useEffect(() => {
-    let animationId: number | null = null;
-
-    const detect = async () => {
-      if (!handTrackingActive) return;
-      const sourceVideo = detectionVideoRef.current ?? videoRef.current;
-      if (sourceVideo && !isDetecting.current) {
-        const now = performance.now();
-        // Target ~30Hz detection to balance accuracy and CPU overhead
-        if (now - lastDetectionTime.current >= 33) {
-          isDetecting.current = true;
-          const detectStart = telemetryEnabled ? perfTracer.startSpan('hand-detect') : null;
-          const result = await HandTracker.detect(sourceVideo);
-          perfTracer.endSpan('hand-detect', detectStart);
-          if (result) {
-            handResultRef.current = result;
-          }
-          isDetecting.current = false;
-          lastDetectionTime.current = now;
-        }
-      }
-
-      // Performance monitoring (Neural FPS)
-      frameCount.current++;
-      const time = performance.now();
-      if (time - lastFpsTime.current >= 1000) {
-        setFps(frameCount.current);
-        frameCount.current = 0;
-        lastFpsTime.current = time;
-      }
-
-      animationId = requestAnimationFrame(detect);
-    };
-
-    if (!experienceStarted || (!isInitializing && !handTrackingActive)) {
-      return undefined;
-    }
-
-    if (!isInitializing && handTrackingActive) {
-      animationId = requestAnimationFrame(detect);
-    }
-
-    return () => {
-      if (animationId) cancelAnimationFrame(animationId);
-    };
-  }, [experienceStarted, isInitializing, telemetryEnabled, handTrackingActive]);
-
-  const handleVideoElementAvailable = useCallback((videoEl: HTMLVideoElement | null) => {
-    detectionVideoRef.current = videoEl;
-  }, []);
-
-  /**
-   * handleDamage
-   * Reduces hull integrity. If hull hits 0, subtracts a life and resets hull.
-   * Memoized to prevent re-creating function on every render.
-   */
-  const handleDamage = useCallback((amount: number) => {
-    setHull(prev => {
-      const nextHull = prev - amount;
-      if (nextHull <= 0) {
-        setLives(l => Math.max(0, l - 1));
-        return 100;
-      }
-      return nextHull;
-    });
-  }, []);
-
-  /**
-   * handleReset
-   * Full system restart (Score 0, 3 lives, 100% hull).
-   */
-  const handleReset = useCallback(() => {
-    setScore(0);
-    setHull(100);
-    setLives(3);
-  }, []);
-
-  const handleScoreUpdate = useCallback((p: number) => {
-    setScore(s => s + p);
-  }, []);
-
-  const handleRetryCamera = useCallback(() => {
-    setCameraInitError(null);
-    setUseFallbackControls(false);
-    setCameraPermissionGranted(false);
-    setCameraPermissionPending(true);
-    setCameraVideoReady(false);
-    setCameraAccessRequestToken(token => token + 1);
-    setCameraStream(null);
-  }, []);
-
-  const requestCameraAccess = useCallback(() => {
-    setCameraInitError(null);
-    setUseFallbackControls(false);
-    setCameraPermissionGranted(false);
-    setCameraPermissionPending(true);
-    setCameraVideoReady(false);
-    setCameraAccessRequestToken(token => token + 1);
-    setCameraStream(null);
-  }, []);
-
-  const handleStartExperience = useCallback(() => {
-    setShowSplash(false);
-    setExperienceStarted(true);
-    setIsCalibrating(true);
-    setShowCalibrationGuide(true);
-    requestCameraAccess();
-  }, [requestCameraAccess]);
-
-  const handleCalibrateFromGuide = useCallback(() => {
-    calibrateCamera();
-    setShowCalibrationGuide(false);
-  }, []);
-
-  const handleCameraPermissionGranted = useCallback(() => {
-    setCameraPermissionGranted(true);
-    setCameraInitError(null);
-    setUseFallbackControls(false);
-    setCameraPermissionPending(false);
-  }, []);
-
-  const handleCameraError = useCallback(
-    (error: CameraError) => {
-      setCameraPermissionGranted(false);
-      setCameraPermissionPending(false);
-      setCameraInitError(error);
-      setUseFallbackControls(true);
-      setCameraStream(null);
-      setCameraVideoReady(false);
-
-      if (telemetryEnabled) {
-        logCameraError(error);
-      }
-    },
-    [telemetryEnabled],
-  );
-
-  const handleCameraVideoReadyChange = useCallback((isReady: boolean) => {
-    setCameraVideoReady(isReady);
-  }, []);
-
-  if (showSplash) {
-    return (
-      <div className="relative min-h-screen w-screen bg-gradient-to-br from-black via-slate-950 to-cyan-950 text-cyan-100 overflow-hidden font-mono select-none">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.08),transparent_55%)]" />
-        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center space-y-8">
-          <div className="space-y-3">
-            <p className="text-xs md:text-sm uppercase tracking-[0.4em] text-cyan-500">Orbital Defense Simulator</p>
-            <h1 className="text-3xl md:text-5xl font-black tracking-[0.3em] uppercase text-cyan-300 drop-shadow-[0_0_20px_rgba(6,182,212,0.35)]">
-              Void Breach
-            </h1>
-            <p className="max-w-2xl mx-auto text-sm md:text-base text-white/70 leading-relaxed">
-              Link your neural visor and calibrate your camera feed before launching into the void. Keep your hull intact, intercept incoming threats, and survive the breach.
-            </p>
-          </div>
-          <button
-            className="inline-flex items-center justify-center px-6 py-3 rounded-md bg-cyan-500 text-black font-black tracking-[0.2em] uppercase text-sm md:text-base shadow-[0_0_25px_rgba(6,182,212,0.45)] hover:bg-cyan-400 transition"
-            onClick={handleStartExperience}
-            disabled={isCalibrating}
-          >
-            {isCalibrating ? 'Calibrating...' : 'Start & Calibrate Camera'}
-          </button>
-        </div>
-      </div>
-    );
-  }
+    setActivePhase(next.id);
+  };
 
   return (
-    <div className="relative w-screen h-screen bg-black overflow-hidden font-mono text-cyan-400 select-none">
-      {isInitializing && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black">
-          <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-8" />
-          <h1 className="text-xl md:text-2xl font-black tracking-[0.5em] uppercase animate-pulse text-center px-4">Initializing Neural Link...</h1>
-          <p className="mt-4 text-cyan-700 uppercase tracking-widest text-xs">Loading Hand Tracking Engine</p>
-        </div>
-      )}
-        <CalibrationGuide
-          open={showCalibrationGuide}
-          onClose={handleCalibrateFromGuide}
-          onConfirm={handleCalibrateFromGuide}
-          cameraReady={cameraReady}
-        />
-      {initError && !useFallbackControls && !isInitializing && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 px-4">
-          <div className="max-w-xl w-full bg-gray-900 border border-red-500/40 rounded-lg p-6 shadow-2xl text-center space-y-4">
-            <h2 className="text-2xl font-black tracking-[0.3em] uppercase text-red-400">Hand Tracking Offline</h2>
-            <p className="text-sm text-red-200/80">{initError}</p>
-            <p className="text-xs text-white/50 uppercase tracking-[0.2em]">You can retry loading the model or continue with mouse + keyboard controls.</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                className="px-4 py-2 rounded bg-red-600/80 text-white font-bold tracking-widest uppercase hover:bg-red-600 transition"
-                onClick={initializeHandTracking}
-              >
-                Retry Hand Tracking
-              </button>
-              <button
-                className="px-4 py-2 rounded border border-cyan-400 text-cyan-300 font-bold tracking-widest uppercase hover:bg-cyan-500/20 transition"
-                onClick={() => setUseFallbackControls(true)}
-              >
-                Play with Mouse/Keyboard
-              </button>
+    <div className="min-h-screen bg-slate-950 text-cyan-50">
+      <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+        <header className="space-y-3">
+          <p className="text-xs uppercase tracking-[0.45em] text-cyan-400">Spacegame rebuild shell</p>
+          <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Fresh base with legacy code removed</h1>
+          <p className="text-base text-slate-200 leading-relaxed max-w-4xl">
+            The legacy game, assets, and camera/gesture hooks have been cleared out. What remains is a stable React shell with
+            placeholder screens so we can layer the rebuild plan piece by piece without fighting old dependencies.
+          </p>
+        </header>
+
+        <div className="grid gap-6 md:grid-cols-[1.2fr,1.8fr] items-start">
+          <div className="space-y-4">
+            <div className="border border-slate-700/70 rounded-xl p-4 bg-slate-900/70 shadow-lg">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Rebuild checkpoints</h2>
+                <span className="text-[10px] uppercase tracking-[0.25em] text-cyan-200 bg-cyan-500/10 border border-cyan-500/30 rounded-full px-3 py-1">
+                  Clean slate
+                </span>
+              </div>
+              <p className="text-sm text-slate-200/80 mt-2 leading-relaxed">
+                Select a placeholder screen to see where the next slice of work will land. All legacy imports are gone so these
+                slots stay decoupled until rebuilt.
+              </p>
             </div>
+
+            <PhaseList phases={phases} activePhase={activePhase} onSelect={setActivePhase} />
           </div>
-        </div>
-      )}
-      {!isInitializing && (
-        <>
-          <GameSceneMemo
-            handResultRef={handResultRef}
-            onScoreUpdate={handleScoreUpdate}
-            onDamage={handleDamage}
-            onReset={handleReset}
-            score={score}
-            hull={hull}
-            lives={lives}
-            handTrackingEnabled={handTrackingActive}
-            cameraPermissionGranted={cameraPermissionGranted}
-            cameraReady={cameraReady}
-            cameraPermissionPending={cameraPermissionPending}
-            cameraErrorMessage={cameraInitError?.message ?? null}
-            onRetryCamera={handleRetryCamera}
-            videoStream={cameraStream}
-            videoRef={videoRef}
+
+          <PlaceholderScreen
+            phase={active}
+            onAdvance={advance}
+            onReset={() => setActivePhase('foundation')}
+            isLastPhase={activePhase === phases[phases.length - 1].id}
           />
+        </div>
 
-          {/* Top HUD: Tactical Information Display */}
-          {/* Responsive: Reduced padding on mobile, stacked elements if needed */}
-          <div className="absolute top-0 left-0 right-0 p-3 md:p-8 flex justify-between items-start pointer-events-none z-20">
-            <div className="flex flex-col gap-2">
-               <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                  <div className="bg-cyan-500/20 border border-cyan-500/40 px-3 py-1 md:px-6 md:py-2 rounded-sm backdrop-blur-md">
-                    <span className="text-[9px] md:text-xs text-cyan-600 block mb-1 uppercase tracking-widest font-bold">Orbital Score</span>
-                    <span className="text-xl md:text-4xl font-black tabular-nums leading-none">{score.toLocaleString()}</span>
-                  </div>
-                  <div className="hidden md:block bg-black/40 border border-white/10 px-4 py-2 rounded-sm backdrop-blur-md">
-                    <span className="text-[10px] text-white/40 block uppercase tracking-widest">Neural FPS</span>
-                    <span className="text-sm font-bold text-white/60 tabular-nums">{fps}</span>
-                  </div>
-               </div>
+        <section className="grid gap-3 md:grid-cols-3" aria-label="Foundation checklist">
+          {foundationChecklist.map(item => (
+            <div
+              key={item}
+              className="border border-slate-700/70 rounded-lg p-4 bg-slate-900/60 text-sm text-slate-100/80 leading-relaxed"
+            >
+              {item}
             </div>
-
-            <div className="flex flex-col items-end gap-2 md:gap-4">
-              <div className="bg-black/60 border-r-4 border-cyan-500 p-2 md:p-4 w-28 md:min-w-[300px] backdrop-blur-md shadow-2xl transition-all">
-                <div className="flex justify-between items-center mb-1 md:mb-2">
-                  <span className="text-[8px] md:text-xs font-black uppercase tracking-[0.2em] md:tracking-[0.3em]">Integrity</span>
-                  <span className="text-sm md:text-xl font-black tabular-nums">{hull}%</span>
-                </div>
-                <div className="w-full h-1.5 md:h-3 bg-cyan-950/50 relative overflow-hidden">
-                  <div 
-                    className="h-full bg-cyan-500 transition-all duration-300 shadow-[0_0_15px_#06b6d4]" 
-                    style={{ width: `${hull}%` }}
-                  />
-                  {hull < 40 && (
-                    <div className="absolute inset-0 bg-red-500/40 animate-pulse" />
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-1 md:gap-3">
-                {[...Array(3)].map((_, i) => (
-                  <div 
-                    key={i} 
-                    className={`w-2.5 h-2.5 md:w-6 md:h-6 rounded-full border md:border-2 transition-all duration-500 ${
-                      i < lives 
-                        ? 'bg-cyan-500 border-cyan-400 shadow-[0_0_15px_#06b6d4]' 
-                        : 'bg-transparent border-white/10 shadow-none'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Engagement Protocol (Controls Legend) */}
-          {/* Responsive: Hidden on small mobile screens to save space, visible on tablet/desktop */}
-          <div className="hidden md:flex absolute bottom-8 left-8 flex-col gap-3 pointer-events-none z-20 opacity-40 hover:opacity-100 transition-opacity">
-            <div className="bg-black/80 p-4 border border-cyan-500/20 rounded-md backdrop-blur-sm">
-               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-3 text-cyan-600">Engagement Protocol</h3>
-               <div className="flex flex-col gap-2 text-[10px] font-bold uppercase tracking-widest text-white/70">
-                 <div className="flex items-center gap-2">
-                   <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full" />
-                   <span>Aim: Right Hand</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                   <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full" />
-                   <span>Fire: Left Hand Pinch</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                   <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
-                   <span>Missile: Left Hand Fist</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                   <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                   <span>Threat: Void Breaches</span>
-                 </div>
-               </div>
-            </div>
-          </div>
-
-          {/* Mini Webcam Preview: Visual feedback for neural alignment */}
-          {/* Responsive: Smaller on mobile, standard on desktop. Moved higher on mobile to clear Weapon Status */}
-          <div className="relative fixed bottom-4 right-4 md:bottom-8 md:right-8 w-24 h-16 md:w-48 md:h-36 border-2 border-cyan-500/30 rounded-lg overflow-hidden shadow-2xl z-[200] bg-black transition-all pointer-events-auto">
-            <WebcamFeed
-              videoRef={videoRef}
-              onPermissionGranted={handleCameraPermissionGranted}
-              onStreamReady={setCameraStream}
-              onVideoElementAvailable={handleVideoElementAvailable}
-              onError={handleCameraError}
-              onVideoReadyChange={handleCameraVideoReadyChange}
-              accessRequestToken={cameraAccessRequestToken}
-            />
-            {!cameraReady && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-[10px] md:text-xs font-bold uppercase tracking-widest text-red-300 text-center px-2">
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <div>Requesting camera access — approve the browser prompt to link your webcam.</div>
-                    <p className="text-[9px] md:text-[10px] text-amber-100/80 normal-case tracking-normal">
-                      Use HTTPS or localhost and confirm permissions before retrying.
-                    </p>
-                    {cameraInitError && (
-                      <div className="text-[9px] md:text-[10px] text-red-200/70 normal-case">{cameraInitError.message}</div>
-                    )}
-                  </div>
-                  <button
-                    className="mt-2 px-3 py-1 text-[9px] md:text-[10px] rounded bg-cyan-600/80 text-white uppercase tracking-widest hover:bg-cyan-500 transition"
-                    onClick={requestCameraAccess}
-                  >
-                    Enable Camera
-                  </button>
-                  <button
-                    className="mt-2 px-3 py-1 text-[9px] md:text-[10px] rounded bg-red-600/80 text-white uppercase tracking-widest hover:bg-red-500 transition"
-                    onClick={handleRetryCamera}
-                  >
-                    Retry camera
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="absolute inset-0 pointer-events-none border border-cyan-500/20 mix-blend-overlay opacity-50 bg-[radial-gradient(circle,transparent_0%,rgba(0,0,0,0.4)_100%)]" />
-            <div className="absolute top-1 left-1 md:top-2 md:left-2 flex items-center gap-1.5">
-               <div className="w-1 h-1 md:w-1.5 md:h-1.5 bg-red-500 rounded-full animate-ping" />
-               <span className="hidden md:inline text-[8px] font-black text-white/50 uppercase tracking-tighter">Live Neural Uplink</span>
-            </div>
-          </div>
-        </>
-      )}
+          ))}
+        </section>
+      </div>
     </div>
   );
 };
-
-// Optimization: Memoize GameScene so it only updates when props strictly change
-const GameSceneMemo = React.memo(GameScene);
 
 export default App;

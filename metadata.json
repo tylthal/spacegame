@@ -1,7 +1,5 @@
 {
-  "requestFramePermissions": [
-    "camera"
-  ],
-  "name": "Orbital Sniper: Void Defense",
-  "description": "High-precision hand-tracked space combat simulator."
+  "requestFramePermissions": [],
+  "name": "Spacegame Rebuild Shell",
+  "description": "Legacy code removed; placeholder screens for the upcoming rebuild phases."
 }

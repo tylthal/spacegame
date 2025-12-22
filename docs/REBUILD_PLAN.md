@@ -1,6 +1,8 @@
 # Spacegame Rebuild Plan
 
-A phased plan for rebuilding the game from scratch with testing embedded throughout. Each issue is followed by a task stub of concrete steps to execute.
+A phased plan for rebuilding the game from scratch with testing embedded throughout. The roadmap assumes we first strip out
+legacy code/assets so we can layer new functionality and screens incrementally on a clean foundation. Each issue is followed by
+a task stub of concrete steps to execute.
 
 **Issue 1: Align docs with the rebuild strategy before coding** — **Status: Done**
 :::task-stub{title="Refresh foundational docs for the rebuild"}
@@ -16,13 +18,13 @@ A phased plan for rebuilding the game from scratch with testing embedded through
 - Create a minimal `GameKernel` module that wires a tick loop with dependency injection for subsystems; include a contract test that the loop ticks and calls registered systems.
 :::
 
-**Issue 3: Remove legacy and broken implementations before rebuilding** — **Status: Done**
-:::task-stub{title="Prune or quarantine historical code"}
-- Identify legacy classes/modules that conflict with the new scaffold (e.g., obsolete gesture processors, outdated rendering shells) and either delete them or move them under a clearly labeled `legacy/` folder.
-- Replace ad hoc globals with typed interfaces and dependency injection points to prevent hidden coupling.
-- Add guard tests that fail fast if legacy modules are referenced from the new code paths (e.g., import checks or dependency graph assertions).
-- Update documentation references to point to the new scaffold locations and remove mentions of deprecated paths.
-  - _Result_: Removed the unused `LiquidMetalScene`, `WebcamOverlay`, and `handTracking` stubs; added `systems/__tests__/legacyGuards.test.ts` to enforce the quarantine and keep imports pointed at the new scaffold.
+**Issue 3: Reset to a clean foundation before rebuilding** — **Status: Done**
+:::task-stub{title="Prune historical code and stand up a fresh shell"}
+- Remove or quarantine all pre-existing gameplay code, assets, and scenes that belong to the old implementation (e.g., obsolete gesture processors, legacy rendering shells, unused UI overlays) so the default branch represents a clean slate. ✅ Completed: legacy modules, assets, and MediaPipe/Three.js hooks removed.
+- Introduce a minimal, new base shell with placeholder screens (e.g., calibration, ready, and gameplay scaffolds) that only wire the new loop, refs, and testing harness—no legacy behaviors or visuals. ✅ Completed: placeholder screens now ship without legacy dependencies.
+- Replace ad hoc globals with typed interfaces and dependency injection points to prevent hidden coupling. 🔜 To do alongside the upcoming phase/loop rebuild.
+- Add guard tests that fail fast if legacy modules are referenced from the new code paths (e.g., import checks or dependency graph assertions) and document the quarantine in `docs/ARCHITECTURE.md`. ✅ Completed: guard tests assert removed modules stay absent.
+- Keep documentation references pointed at the new scaffold locations and explicitly note that legacy assets/screens are removed until reintroduced via the phased rebuild. ✅ Completed.
 :::
 
 **Issue 4: Rebuild input stack with deterministic tests**
