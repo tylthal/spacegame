@@ -152,6 +152,10 @@ const App: React.FC = () => {
     }
   }, [tracker]);
 
+  const handleCameraError = useCallback((err: Error) => {
+    setCameraError(err.message);
+  }, []);
+
   const debugConfig = useMemo(() => resolveDebugConfig(), []);
   const diagnostics = useMemo(
     () => (debugConfig.diagnosticsMode ? runDiagnosticsPipeline() : undefined),
@@ -230,7 +234,7 @@ const App: React.FC = () => {
       {phase === 'CALIBRATING' && (
         <CalibrationScreen
           onStreamReady={handleStreamReady}
-          onError={err => setCameraError(err.message)}
+          onError={handleCameraError}
           calibrationProgress={calibrationProgress}
           tracker={tracker}
           onComplete={() => {

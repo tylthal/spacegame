@@ -58,7 +58,10 @@ export class BrowserHandTracker implements HandTracker {
           const handednessStr = result.handedness[i][0].displayName;
 
           // Normalize handedness string
-          const handedness = (handednessStr === 'Left' || handednessStr === 'Right') ? handednessStr : 'Right';
+          // Swap Handedness because camera is mirrored vs MediaPipe expectation
+          const handedness = (handednessStr === 'Left' || handednessStr === 'Right')
+            ? (handednessStr === 'Left' ? 'Right' : 'Left')
+            : 'Right';
           console.log(`DEBUG: Emitting ${handedness} hand`);
 
           const frame: HandFrame = {
