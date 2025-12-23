@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { HandTracker, HandFrame } from '../input/HandTracker';
 import * as fp from 'fingerpose';
 import { PointGesture, PinchGesture } from '../input/Gestures';
@@ -37,7 +37,13 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
     const positionBufferRef = useRef<{ x: number; y: number }[]>([]);
     const finalCalibrationOffsetRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
 
-    // Simplified config - removed zone checks
+    // POST-CALIBRATION: Cursor tracking state
+    const [cursorPos, setCursorPos] = useState<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
+    const [isPinching, setIsPinching] = useState(false);
+    const lastPinchTimeRef = useRef<number>(0);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+
+    // Simplified config
     const {
         STABILITY_REQUIRED_MS,
         DETECTION_TIMEOUT_MS,
@@ -48,13 +54,32 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
         FINGERPOSE_SCORE_THRESHOLD,
     } = CALIBRATION_CONFIG;
 
+    // Handle pinch click on START GAME button
+    const handlePinchClick = useCallback(() => {
+        if (isSuccess && buttonRef.current) {
+            // Check if cursor is over the button
+            const rect = buttonRef.current.getBoundingClientRect();
+            const cursorScreenX = cursorPos.x * window.innerWidth;
+            const cursorScreenY = cursorPos.y * window.innerHeight;
+
+            if (
+                cursorScreenX >= rect.left &&
+                cursorScreenX <= rect.right &&
+                cursorScreenY >= rect.top &&
+                cursorScreenY <= rect.bottom
+            ) {
+                onComplete(finalCalibrationOffsetRef.current);
+            }
+        }
+    }, [isSuccess, cursorPos, onComplete]);
+
     useEffect(() => {
         if (!tracker) {
             console.warn("CalibrationScreen: No tracker provided");
             return;
         }
 
-        // CRITICAL: Reset all state on mount to prevent stale values from previous sessions
+        // CRITICAL: Reset all state on mount
         calibrationStartTimeRef.current = null;
         positionBufferRef.current = [];
         lastRightPointRef.current = 0;
@@ -64,18 +89,18 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
         rightWristRef.current = null;
         isSuccessRef.current = false;
         finalCalibrationOffsetRef.current = { x: 0.5, y: 0.5 };
+        lastPinchTimeRef.current = 0;
         setProgress(0);
         setIsSuccess(false);
         setRightPointDetected(false);
         setLeftPinchDetected(false);
         setFailureReason(null);
+        setCursorPos({ x: 0.5, y: 0.5 });
+        setIsPinching(false);
 
-        // Initialize Fingerpose Estimator
         const estimator = new fp.GestureEstimator([PointGesture, PinchGesture]);
 
         const handleFrame = (frame: HandFrame) => {
-            if (isSuccessRef.current) return;
-
             const now = Date.now();
             const landmarksArray = frame.landmarks.map(l => [l.x, l.y, l.z]);
 
@@ -84,20 +109,32 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                 const estimation = estimator.estimate(landmarksArray as any, 7.5);
 
                 if (frame.handedness === 'Right') {
-                    // "Gun" gesture: Index extended (pointing), others relaxed
                     const pointMatch = estimation.gestures.find(g => g.name === 'point');
                     if (pointMatch && pointMatch.score > FINGERPOSE_SCORE_THRESHOLD) {
                         lastRightPointRef.current = now;
-                        rightWristRef.current = { x: frame.landmarks[0].x, y: frame.landmarks[0].y };
-                        setRightPointDetected(true);
+                        const wristPos = { x: frame.landmarks[0].x, y: frame.landmarks[0].y };
+                        rightWristRef.current = wristPos;
+
+                        // POST-CALIBRATION: Update cursor position
+                        if (isSuccessRef.current) {
+                            // Apply calibration offset
+                            const calibratedX = wristPos.x - finalCalibrationOffsetRef.current.x + 0.5;
+                            const calibratedY = wristPos.y - finalCalibrationOffsetRef.current.y + 0.5;
+                            setCursorPos({
+                                x: Math.min(Math.max(calibratedX, 0), 1),
+                                y: Math.min(Math.max(calibratedY, 0), 1)
+                            });
+                        }
+
+                        if (!isSuccessRef.current) {
+                            setRightPointDetected(true);
+                        }
                     }
                 } else if (frame.handedness === 'Left') {
-                    // Pinch: Thumb and index close together
                     const thumbTip = frame.landmarks[4];
                     const indexTip = frame.landmarks[8];
                     const wrist = frame.landmarks[0];
 
-                    // Normalize pinch distance by hand size
                     const handSize = Math.hypot(
                         frame.landmarks[12].x - wrist.x,
                         frame.landmarks[12].y - wrist.y
@@ -105,10 +142,28 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                     const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
                     const normalizedPinch = pinchDist / Math.max(handSize, 0.01);
 
-                    if (normalizedPinch < PINCH_DISTANCE_THRESHOLD) {
+                    const isPinch = normalizedPinch < PINCH_DISTANCE_THRESHOLD;
+
+                    if (isPinch) {
                         lastLeftPinchRef.current = now;
                         leftWristRef.current = { x: wrist.x, y: wrist.y };
-                        setLeftPinchDetected(true);
+
+                        // POST-CALIBRATION: Detect pinch for clicking
+                        if (isSuccessRef.current) {
+                            // Only trigger on pinch START (not hold)
+                            if (now - lastPinchTimeRef.current > 500) {
+                                setIsPinching(true);
+                                lastPinchTimeRef.current = now;
+                            }
+                        }
+
+                        if (!isSuccessRef.current) {
+                            setLeftPinchDetected(true);
+                        }
+                    } else {
+                        if (isSuccessRef.current) {
+                            setIsPinching(false);
+                        }
                     }
                 }
             } catch (err) {
@@ -118,13 +173,12 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             }
         };
 
-        // Polling loop for staleness and progress
+        // Calibration polling loop
         const intervalId = setInterval(() => {
             if (isSuccessRef.current) return;
 
             const now = Date.now();
 
-            // Check staleness
             if (now - lastRightPointRef.current > DETECTION_TIMEOUT_MS) {
                 setRightPointDetected(false);
                 rightWristRef.current = null;
@@ -140,11 +194,6 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             let isValid = false;
             let currentReason: string | null = null;
 
-            // SIMPLIFIED VALIDATION:
-            // 1. Both hands must be detected with correct gestures
-            // 2. Hands must be separated (prevent single-hand aliasing)
-            // That's it. No zone checks.
-
             if (!rightActive && !leftActive) {
                 currentReason = "Show both hands";
             } else if (!rightActive) {
@@ -152,7 +201,6 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             } else if (!leftActive) {
                 currentReason = "Pinch with left hand";
             } else if (leftWristRef.current && rightWristRef.current) {
-                // Both gestures detected - check separation
                 const dist = Math.hypot(
                     leftWristRef.current.x - rightWristRef.current.x,
                     leftWristRef.current.y - rightWristRef.current.y
@@ -166,7 +214,6 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             }
 
             if (isValid) {
-                // Check Movement Stability
                 const currentPos = {
                     x: rightWristRef.current?.x || 0.5,
                     y: rightWristRef.current?.y || 0.5
@@ -183,7 +230,6 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                     setProgress(0);
                     positionBufferRef.current = [];
                 } else {
-                    // STABLE & VALID
                     lastValidTimeRef.current = now;
                     setFailureReason(null);
 
@@ -199,7 +245,6 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                     setProgress(p);
 
                     if (elapsed >= STABILITY_REQUIRED_MS) {
-                        // Success!
                         const sumX = positionBufferRef.current.reduce((a, b) => a + b.x, 0);
                         const sumY = positionBufferRef.current.reduce((a, b) => a + b.y, 0);
                         const len = positionBufferRef.current.length;
@@ -209,9 +254,8 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                     }
                 }
             } else {
-                // INVALID STATE
                 if (now - lastValidTimeRef.current < GRACE_PERIOD_MS) {
-                    // Grace period - don't reset yet
+                    // Grace period
                 } else {
                     calibrationStartTimeRef.current = null;
                     setProgress(0);
@@ -229,8 +273,41 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
         };
     }, [tracker]);
 
+    // Handle pinch click effect
+    useEffect(() => {
+        if (isPinching && isSuccess) {
+            handlePinchClick();
+        }
+    }, [isPinching, isSuccess, handlePinchClick]);
+
     return (
         <>
+            {/* POST-CALIBRATION: Hand Cursor */}
+            {isSuccess && (
+                <div
+                    className="fixed pointer-events-none z-[9999] transition-transform duration-75"
+                    style={{
+                        left: `${cursorPos.x * 100}%`,
+                        top: `${cursorPos.y * 100}%`,
+                        transform: 'translate(-50%, -50%)'
+                    }}
+                >
+                    {/* Outer ring */}
+                    <div className={`w-12 h-12 rounded-full border-4 transition-all duration-100 ${isPinching
+                            ? 'border-y2k-red bg-y2k-red/30 scale-75'
+                            : 'border-y2k-yellow bg-y2k-yellow/20'
+                        }`}>
+                        {/* Center dot */}
+                        <div className={`absolute top-1/2 left-1/2 w-2 h-2 rounded-full -translate-x-1/2 -translate-y-1/2 ${isPinching ? 'bg-y2k-red' : 'bg-y2k-yellow'
+                            }`} />
+                    </div>
+
+                    {/* Crosshair lines */}
+                    <div className="absolute top-1/2 left-0 w-full h-px bg-y2k-yellow/50 -translate-y-1/2" />
+                    <div className="absolute left-1/2 top-0 h-full w-px bg-y2k-yellow/50 -translate-x-1/2" />
+                </div>
+            )}
+
             {/* Main Calibration UI */}
             <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
                 <div className="w-full max-w-5xl p-8 flex flex-col items-center relative pointer-events-auto">
@@ -241,7 +318,7 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                             {isSuccess ? 'LOCKED IN' : 'CALIBRATION'}
                         </h2>
                         <p className="text-y2k-silver font-mono text-sm mt-2">
-                            {isSuccess ? 'Neural link established' : 'Hold both gestures steady for 4 seconds'}
+                            {isSuccess ? 'Aim at START GAME and pinch to begin' : 'Hold both gestures steady for 4 seconds'}
                         </p>
                     </div>
 
@@ -306,13 +383,23 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                         <div className="w-full bg-y2k-yellow p-12 flex flex-col items-center justify-center text-black space-y-6">
                             <h1 className="text-7xl font-display font-bold tracking-tighter">READY</h1>
                             <p className="font-mono text-lg">
-                                Aim calibrated. Your natural stance is now center.
+                                Aim at the button and pinch to click
                             </p>
                             <button
-                                onClick={() => onComplete(finalCalibrationOffsetRef.current)}
-                                className="mt-4 px-12 py-4 bg-black text-y2k-yellow font-display font-bold text-2xl uppercase hover:bg-white hover:text-black transition-colors"
+                                ref={buttonRef}
+                                className="mt-4 px-12 py-4 bg-black text-y2k-yellow font-display font-bold text-2xl uppercase hover:bg-white hover:text-black transition-colors cursor-none"
                             >
                                 START GAME
+                            </button>
+                            <p className="font-mono text-sm opacity-60">
+                                (or click with mouse)
+                            </p>
+                            {/* Fallback mouse click */}
+                            <button
+                                onClick={() => onComplete(finalCalibrationOffsetRef.current)}
+                                className="text-xs font-mono underline opacity-50 hover:opacity-100"
+                            >
+                                Skip (use mouse)
                             </button>
                         </div>
                     )}
