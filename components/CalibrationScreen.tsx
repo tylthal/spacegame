@@ -1,20 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { WebcamPreview } from './WebcamPreview';
 import { HandTracker, HandFrame, HandLandmark } from '../input/HandTracker';
 import * as fp from 'fingerpose';
-import { PointGesture } from '../input/Gestures';
+import { PointGesture, PinchGesture } from '../input/Gestures';
+import { CALIBRATION_CONFIG } from '../input/calibrationConfig';
 
 interface CalibrationScreenProps {
-    onStreamReady: (video: HTMLVideoElement) => void;
-    onError: (err: Error) => void;
-    calibrationProgress: number; // 0 to 1
     tracker: HandTracker | null;
-    onComplete: (offset: number) => void;
+    onComplete: (offset: { x: number; y: number }) => void;
 }
 
 export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
-    onStreamReady,
-    onError,
     tracker,
     onComplete
 }) => {
@@ -22,29 +17,38 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
     const [leftPinchDetected, setLeftPinchDetected] = useState(false);
     const [progress, setProgress] = useState(0);
     const [failureReason, setFailureReason] = useState<string | null>(null);
-    const [isSuccess, setIsSuccess] = useState(false); // Sticky success state
+
+    // Use ref for isSuccess to avoid stale closure in interval
+    const isSuccessRef = useRef(false);
+    const [isSuccess, setIsSuccess] = useState(false);
 
     // Track last detection time for stability
     const lastRightPointRef = useRef<number>(0);
     const lastLeftPinchRef = useRef<number>(0);
-    const lastValidTimeRef = useRef<number>(0); // For grace period
+    const lastValidTimeRef = useRef<number>(0);
 
-    // Store wrist positions for spatial separation check to prevent single-hand alias
+    // Store wrist positions for spatial separation check
     const leftWristRef = useRef<{ x: number, y: number } | null>(null);
     const rightWristRef = useRef<{ x: number, y: number } | null>(null);
 
     const calibrationStartTimeRef = useRef<number | null>(null);
 
-    // Constants
-    const STABILITY_REQUIRED_MS = 4000; // 4 seconds
-    const DETECTION_TIMEOUT_MS = 200; // Strict timeout
-    const GRACE_PERIOD_MS = 500; // Time allowed to be invalid before reset
-    const SPATIAL_SEPARATION_THRESHOLD = 0.2; // Min distance between wrists (normalized 0-1)
-    const MOVEMENT_THRESHOLD = 0.01; // Max allowed movement per frame for "stillness"
+    // Calibration Data Collection (now stores {x, y} objects)
+    const positionBufferRef = useRef<{ x: number; y: number }[]>([]);
+    const finalCalibrationOffsetRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
 
-    // Calibration Data Collection
-    const positionBufferRef = useRef<number[]>([]);
-    const finalCalibrationOffsetRef = useRef<number>(0.5);
+    // Destructure config for cleaner code
+    const {
+        STABILITY_REQUIRED_MS,
+        DETECTION_TIMEOUT_MS,
+        GRACE_PERIOD_MS,
+        SPATIAL_SEPARATION_THRESHOLD,
+        MOVEMENT_THRESHOLD,
+        PINCH_DISTANCE_THRESHOLD,
+        FINGERPOSE_SCORE_THRESHOLD,
+        ZONE_LEFT_MAX,
+        ZONE_RIGHT_MIN,
+    } = CALIBRATION_CONFIG;
 
     useEffect(() => {
         if (!tracker) {
@@ -52,47 +56,57 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             return;
         }
 
-        // Initialize Fingerpose Estimator for Right Hand
-        const estimator = new fp.GestureEstimator([PointGesture]);
+        // Initialize Fingerpose Estimator for BOTH hands
+        const estimator = new fp.GestureEstimator([PointGesture, PinchGesture]);
 
         const handleFrame = (frame: HandFrame) => {
+            if (isSuccessRef.current) return; // Stop processing after success
+
             const now = Date.now();
-            if (frame.handedness === 'Right') {
-                // Fingerpose expects array of arrays [x,y,z]
-                // MediaPipe gives objects {x,y,z}. We MUST map them.
-                const landmarksArray = frame.landmarks.map(l => [l.x, l.y, l.z]);
+            const landmarksArray = frame.landmarks.map(l => [l.x, l.y, l.z]);
 
-                // Estimate using a slightly relaxed threshold
-                const estimation = estimator.estimate(landmarksArray, 7.5);
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const estimation = estimator.estimate(landmarksArray as any, 7.5);
 
-                if (estimation.gestures.length > 0) {
-                    // Find the gesture with highest confidence
-                    const best = estimation.gestures.reduce((p, c) => (p.confidence > c.confidence ? p : c));
-
-                    // Console Log for Debugging
-                    // console.log(`Gesture: ${best.name} Score: ${best.score}`);
-
-                    if (best.name === 'point' && best.score > 8) {
+                if (frame.handedness === 'Right') {
+                    const pointMatch = estimation.gestures.find(g => g.name === 'point');
+                    if (pointMatch && pointMatch.score > FINGERPOSE_SCORE_THRESHOLD) {
                         lastRightPointRef.current = now;
                         rightWristRef.current = { x: frame.landmarks[0].x, y: frame.landmarks[0].y };
                         setRightPointDetected(true);
                     }
-                } else {
-                    // console.log("No gesture match");
-                }
+                } else if (frame.handedness === 'Left') {
+                    // Try fingerpose first
+                    const pinchMatch = estimation.gestures.find(g => g.name === 'pinch');
 
-            } else if (frame.handedness === 'Left') {
-                if (isPinchGesture(frame.landmarks)) {
-                    lastLeftPinchRef.current = now;
-                    leftWristRef.current = { x: frame.landmarks[0].x, y: frame.landmarks[0].y };
-                    setLeftPinchDetected(true);
+                    // Also check distance-based pinch as fallback (more reliable for actual pinching)
+                    const thumbTip = frame.landmarks[4];
+                    const indexTip = frame.landmarks[8];
+                    const wrist = frame.landmarks[0];
+                    const handSize = Math.hypot(
+                        frame.landmarks[12].x - wrist.x,
+                        frame.landmarks[12].y - wrist.y
+                    );
+                    const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+                    const normalizedPinch = pinchDist / Math.max(handSize, 0.01);
+
+                    if ((pinchMatch && pinchMatch.score > 6) || normalizedPinch < PINCH_DISTANCE_THRESHOLD) {
+                        lastLeftPinchRef.current = now;
+                        leftWristRef.current = { x: wrist.x, y: wrist.y };
+                        setLeftPinchDetected(true);
+                    }
+                }
+            } catch (err) {
+                if (import.meta.env.DEV) {
+                    console.error('Fingerpose estimation error:', err);
                 }
             }
         };
 
         // Polling loop for staleness and progress
         const intervalId = setInterval(() => {
-            if (isSuccess) return; // Stop logic if already succeeded
+            if (isSuccessRef.current) return;
 
             const now = Date.now();
 
@@ -115,7 +129,7 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             let currentReason: string | null = null;
 
             if (!rightActive && !leftActive) {
-                currentReason = "Show Both Hands"; // Friendlier
+                currentReason = "Show Both Hands";
             } else if (!rightActive) {
                 currentReason = "Right Hand Lost";
             } else if (!leftActive) {
@@ -132,28 +146,33 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                 if (dist > SPATIAL_SEPARATION_THRESHOLD) {
                     spatialValid = true;
                 } else {
-                    currentReason = "Hands Too Close"; // Friendlier
+                    currentReason = "Hands Too Close";
                 }
 
-                // 2. Zone Check (Left < 0.6, Right > 0.4)
+                // 2. Zone Check
                 if (spatialValid) {
-                    if (lx < 0.6 && rx > 0.4) {
+                    if (lx < ZONE_LEFT_MAX && rx > ZONE_RIGHT_MIN) {
                         zonesValid = true;
                     } else {
-                        if (lx >= 0.6) currentReason = "Move Left Hand Left";
-                        else if (rx <= 0.4) currentReason = "Move Right Hand Right";
+                        if (lx >= ZONE_LEFT_MAX) currentReason = "Move Left Hand Left";
+                        else if (rx <= ZONE_RIGHT_MIN) currentReason = "Move Right Hand Right";
                     }
                 }
             }
 
             if (rightActive && leftActive && spatialValid && zonesValid) {
-                // Check Movement Stability (Stationary Hold)
-                const currentRX = rightWristRef.current?.x || 0.5;
-                const prevRX = positionBufferRef.current.length > 0 ? positionBufferRef.current[positionBufferRef.current.length - 1] : currentRX;
-                const delta = Math.abs(currentRX - prevRX);
+                // Check Movement Stability
+                const currentPos = {
+                    x: rightWristRef.current?.x || 0.5,
+                    y: rightWristRef.current?.y || 0.5
+                };
+                const prevPos = positionBufferRef.current.length > 0
+                    ? positionBufferRef.current[positionBufferRef.current.length - 1]
+                    : currentPos;
+                const delta = Math.hypot(currentPos.x - prevPos.x, currentPos.y - prevPos.y);
 
                 if (delta > MOVEMENT_THRESHOLD) {
-                    currentReason = "Hold Steady"; // Too much jitter
+                    currentReason = "Hold Steady";
                     setFailureReason("Hold Steady");
 
                     // Reset if moving too much
@@ -167,27 +186,31 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
 
                     if (!calibrationStartTimeRef.current) {
                         calibrationStartTimeRef.current = now;
-                        positionBufferRef.current = []; // Start fresh buffer
+                        positionBufferRef.current = [];
                     }
 
-                    // Accumulate position for averaging
-                    positionBufferRef.current.push(currentRX);
+                    // Accumulate position for averaging (both X and Y)
+                    positionBufferRef.current.push(currentPos);
 
                     const elapsed = now - calibrationStartTimeRef.current;
                     const p = Math.min(elapsed / STABILITY_REQUIRED_MS, 1);
                     setProgress(p);
 
                     if (elapsed >= STABILITY_REQUIRED_MS) {
-                        // Success! Compute Average
-                        const sum = positionBufferRef.current.reduce((a, b) => a + b, 0);
-                        const avg = sum / positionBufferRef.current.length;
-                        finalCalibrationOffsetRef.current = avg;
+                        // Success! Compute Average for both axes
+                        const sumX = positionBufferRef.current.reduce((a, b) => a + b.x, 0);
+                        const sumY = positionBufferRef.current.reduce((a, b) => a + b.y, 0);
+                        const len = positionBufferRef.current.length;
+                        finalCalibrationOffsetRef.current = {
+                            x: sumX / len,
+                            y: sumY / len
+                        };
+                        isSuccessRef.current = true;
                         setIsSuccess(true);
                     }
                 }
             } else {
-                // INVALID STATE
-                // Check grace period
+                // INVALID STATE - check grace period
                 if (now - lastValidTimeRef.current < GRACE_PERIOD_MS) {
                     setFailureReason("Adjusting...");
                 } else {
@@ -205,25 +228,44 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             unsubscribe();
             clearInterval(intervalId);
         };
-    }, [tracker, onComplete, isSuccess]);
-
-    // Circular Progress Component
-    const radius = 80;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - progress * circumference;
+    }, [tracker]);
 
     return (
         <>
-            {/* Debug Overlay - Raw Code Style */}
+            {/* Debug Overlay */}
             <div className="fixed top-20 left-4 text-[10px] font-mono text-y2k-yellow/50 pointer-events-none z-50 whitespace-pre bg-black/80 p-2 border border-y2k-yellow/20">
                 {`DEBUG_STREAM:\nL_POS: ${leftWristRef.current ? `[${leftWristRef.current.x.toFixed(2)}, ${leftWristRef.current.y.toFixed(2)}]` : 'NULL'}\nR_POS: ${rightWristRef.current ? `[${rightWristRef.current.x.toFixed(2)}, ${rightWristRef.current.y.toFixed(2)}]` : 'NULL'}\nERR: ${failureReason || 'NONE'}`}
+            </div>
+
+            {/* Zone Indicators */}
+            <div className="fixed inset-0 z-30 pointer-events-none">
+                <div
+                    className="absolute top-0 bottom-0 w-px bg-y2k-yellow/20"
+                    style={{ left: `${ZONE_LEFT_MAX * 100}%` }}
+                />
+                <div
+                    className="absolute top-0 bottom-0 w-px bg-y2k-yellow/20"
+                    style={{ left: `${ZONE_RIGHT_MIN * 100}%` }}
+                />
+                <div
+                    className="absolute top-1/2 text-y2k-yellow/30 font-mono text-xs -translate-y-1/2"
+                    style={{ left: `${(ZONE_LEFT_MAX / 2) * 100}%`, transform: 'translateX(-50%) translateY(-50%)' }}
+                >
+                    LEFT ZONE
+                </div>
+                <div
+                    className="absolute top-1/2 text-y2k-yellow/30 font-mono text-xs -translate-y-1/2"
+                    style={{ left: `${((1 - ZONE_RIGHT_MIN) / 2 + ZONE_RIGHT_MIN) * 100}%`, transform: 'translateX(-50%) translateY(-50%)' }}
+                >
+                    RIGHT ZONE
+                </div>
             </div>
 
             {/* Main Calibration UI */}
             <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
                 <div className="w-full max-w-6xl p-4 flex flex-col items-center relative pointer-events-auto">
 
-                    {/* Header - Terminal Style */}
+                    {/* Header */}
                     <div className="w-full border-b-4 border-y2k-yellow mb-12 flex justify-between items-end pb-2">
                         <h2 className="text-6xl font-display font-bold text-y2k-yellow tracking-tighter uppercase">
                             {isSuccess ? 'SYSTEM_LOCKED' : 'HARDWARE_SYNC'}
@@ -234,7 +276,6 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                     </div>
 
                     {!isSuccess ? (
-                        /* CALIBRATION MODE */
                         <div className="flex flex-row justify-center items-stretch space-x-8 w-full">
 
                             {/* Left Hand Card */}
@@ -253,7 +294,7 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                                 </div>
                             </div>
 
-                            {/* CENTER PROGRESS - Hard Bar */}
+                            {/* CENTER PROGRESS */}
                             <div className="w-24 flex flex-col justify-end items-center bg-black/50 border border-y2k-white/10 p-2">
                                 <div className="w-full bg-y2k-white/10 h-full relative flex flex-col justify-end overflow-hidden">
                                     <div
@@ -284,12 +325,11 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
 
                         </div>
                     ) : (
-                        /* SUCCESS MODE - Crash Screen */
                         <div className="w-full bg-y2k-yellow p-12 flex flex-col items-center justify-center text-black space-y-8 animate-in zoom-in duration-200">
                             <h1 className="text-9xl font-display font-bold tracking-tighter">ACCESS GRANTED</h1>
                             <div className="h-2 w-full bg-black"></div>
                             <p className="font-mono text-xl tracking-widest">
-                                ZERO_POINT_OFFSET: {finalCalibrationOffsetRef.current.toFixed(4)}
+                                ZERO_POINT: X={finalCalibrationOffsetRef.current.x.toFixed(4)}, Y={finalCalibrationOffsetRef.current.y.toFixed(4)}
                             </p>
 
                             <button
@@ -301,7 +341,7 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                         </div>
                     )}
 
-                    {/* Status Text / Failure Reason */}
+                    {/* Status Text */}
                     {!isSuccess && (
                         <div className="mt-12 h-16 flex items-center justify-center w-full bg-black/80 border-t border-y2k-white/20">
                             {failureReason ? (
@@ -322,8 +362,3 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
         </>
     );
 };
-
-function isPinchGesture(landmarks: ReadonlyArray<HandLandmark>): boolean {
-    const d = Math.hypot(landmarks[4].x - landmarks[8].x, landmarks[4].y - landmarks[8].y);
-    return d < 0.05; // Tightened from 0.08
-}

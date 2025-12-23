@@ -51,7 +51,9 @@ export class BrowserHandTracker implements HandTracker {
       const result = this.handLandmarker.detectForVideo(this.video, startTimeMs);
 
       if (result.landmarks && result.landmarks.length > 0) {
-        console.log(`DEBUG: HandLandmarker detected ${result.landmarks.length} hands`);
+        if (import.meta.env.DEV) {
+          console.log(`DEBUG: HandLandmarker detected ${result.landmarks.length} hands`);
+        }
         // Iterate over all detected hands
         for (let i = 0; i < result.landmarks.length; i++) {
           const landmarks = result.landmarks[i];
@@ -62,7 +64,10 @@ export class BrowserHandTracker implements HandTracker {
           const handedness = (handednessStr === 'Left' || handednessStr === 'Right')
             ? (handednessStr === 'Left' ? 'Right' : 'Left')
             : 'Right';
-          console.log(`DEBUG: Emitting ${handedness} hand`);
+
+          if (import.meta.env.DEV) {
+            console.log(`DEBUG: Emitting ${handedness} hand`);
+          }
 
           const frame: HandFrame = {
             timestamp: startTimeMs,

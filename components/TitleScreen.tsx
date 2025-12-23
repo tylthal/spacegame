@@ -9,7 +9,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
         <div className="fixed inset-0 flex flex-col items-center justify-center z-50 pointer-events-none">
 
             {/* Main Title Card */}
-            <div className="relative z-10 flex flex-col items-start justify-center text-left p-12 w-full max-w-4xl">
+            <div className="relative z-10 flex flex-col items-start justify-center text-left p-12 w-full max-w-4xl pointer-events-auto">
 
                 {/* SYSTEM HEADER */}
                 <div className="flex flex-row items-center space-x-4 mb-4">

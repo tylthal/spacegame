@@ -21,9 +21,19 @@ PointGesture.addCurl(Finger.Index, FingerCurl.NoCurl, 1.0);
 // This makes the gesture extremely robust to occlusion or relaxed hand states.
 
 
-// --- Left Hand: PINCH READY (Optional) ---
-// If we want to detect the *shape* of a pinch (Index/Thumb close),
-// Fingerpose isn't distance based.
-// We'll stick to manual distance check for the "Click", but we could
-// enforce a "Pinch Pose" where Index/Thumb are not FullCurl?
-// For now, let's just export PointGesture.
+// --- Left Hand: PINCH GESTURE ---
+// Thumb and Index coming together (both half-curled or no-curl is acceptable)
+// Other fingers don't matter for the pinch detection
+
+export const PinchGesture = new GestureDescription('pinch');
+
+// For a pinch, both thumb and index should be somewhat curled (coming together)
+// We'll accept NoCurl or HalfCurl for both, but not FullCurl
+PinchGesture.addCurl(Finger.Thumb, FingerCurl.NoCurl, 1.0);
+PinchGesture.addCurl(Finger.Thumb, FingerCurl.HalfCurl, 0.8);
+
+PinchGesture.addCurl(Finger.Index, FingerCurl.NoCurl, 0.8);
+PinchGesture.addCurl(Finger.Index, FingerCurl.HalfCurl, 1.0);
+
+// Middle, Ring, Pinky: Don't care - user may have them open or closed
+

@@ -55,7 +55,8 @@ export class InputProcessor {
   private lastRawCursor?: { x: number; y: number };
   private readonly gestureConfig: GestureConfig;
   private readonly virtualPad: VirtualMousepadConfig;
-  private calibrationOffsetX = 0; // The 'zero point' offset (0.0 to 1.0)
+  private calibrationOffsetX = 0; // The 'zero point' X offset (0.0 to 1.0)
+  private calibrationOffsetY = 0; // The 'zero point' Y offset (0.0 to 1.0)
 
   constructor(
     tracker: HandTracker,
@@ -67,9 +68,10 @@ export class InputProcessor {
     this.unsubscribeTracker = tracker.subscribe(frame => this.handleFrame(frame));
   }
 
-  setCalibration(offsetX: number): void {
-    this.calibrationOffsetX = offsetX;
-    console.log(`[Input] Calibrated Zero Point: ${offsetX.toFixed(2)}`);
+  setCalibration(offset: { x: number; y: number }): void {
+    this.calibrationOffsetX = offset.x;
+    this.calibrationOffsetY = offset.y;
+    console.log(`[Input] Calibrated Zero Point: X=${offset.x.toFixed(3)}, Y=${offset.y.toFixed(3)}`);
   }
 
   dispose(): void {
@@ -193,14 +195,15 @@ export class InputProcessor {
   private toCursor(landmark: HandLandmark): { x: number; y: number } {
     // 1. Normalize to Virtual Pad (0..1)
     let relativeX = (landmark.x - this.virtualPad.origin.x) / this.virtualPad.width;
-    const relativeY = (landmark.y - this.virtualPad.origin.y) / this.virtualPad.height;
+    let relativeY = (landmark.y - this.virtualPad.origin.y) / this.virtualPad.height;
 
-    // 2. Apply Calibration Offset
-    // If calibrationOffsetX is 0.5 (center), and input is 0.5, result should be 0.5 (center).
+    // 2. Apply Calibration Offset (both axes)
+    // If calibrationOffset is 0.5 (center), and input is 0.5, result should be 0.5 (center).
     // The Game expects 0..1 range.
-    // We want the user's "natural center" (calibrationOffsetX) to map to 0.5 output.
-    // output = input - calibrationOffsetX + 0.5
+    // We want the user's "natural center" to map to 0.5 output.
+    // output = input - calibrationOffset + 0.5
     relativeX = relativeX - this.calibrationOffsetX + 0.5;
+    relativeY = relativeY - this.calibrationOffsetY + 0.5;
 
     return {
       x: Math.min(Math.max(relativeX, 0), 1),

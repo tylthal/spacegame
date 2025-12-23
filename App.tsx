@@ -212,12 +212,9 @@ const App: React.FC = () => {
 
       {phase === 'CALIBRATING' && (
         <CalibrationScreen
-          onStreamReady={handleStreamReady}
-          onError={handleCameraError}
-          calibrationProgress={calibrationProgress}
           tracker={tracker}
           onComplete={(offset) => {
-            // Apply the calibrated 'Zero Point'
+            // Apply the calibrated 'Zero Point' (now 2D)
             if (inputProcessor) {
               inputProcessor.setCalibration(offset);
             }
