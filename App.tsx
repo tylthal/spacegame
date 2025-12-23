@@ -22,7 +22,7 @@ const USE_REAL_INPUT = import.meta.env.VITE_USE_REAL_INPUT === '1' || import.met
 const App: React.FC = () => {
   // Core Systems
   const phaseManager = useMemo(() => new PhaseManager(), []);
-  const [phase, setPhase] = useState<Phase>('CALIBRATING'); // Mirror phase manager state
+  const [phase, setPhase] = useState<Phase>('TITLE'); // Mirror phase manager state
 
   const [tracker, setTracker] = useState<HandTracker | null>(null);
   const [inputProcessor, setInputProcessor] = useState<InputProcessor | null>(null);
@@ -201,33 +201,11 @@ const App: React.FC = () => {
 
       {/* FOREGROUND UI LAYERS */}
 
-      {/* PHASE: TITLE (Legacy/Simulated via manual state? No, PhaseManager starts at CALIBRATING) 
-          Wait, user wants "Title Screen". 
-          PhaseManager default is CALIBRATING.
-          We should probably have a 'TITLE' phase in PhaseManager?
-          Or we map TITLE to CALIBRATING?
-          Actually, we want: TITLE -> CALIBRATION -> READY -> PLAYING.
-          TitleScreen.tsx was "Input Ready?" button.
-          Let's make TitleScreen trigger the start of Calibration?
-          Current PhaseManager doesn't have IDLE/TITLE. 
-          Let's shim it: 
-          if Phase == 'CALIBRATING' but we haven't clicked "Start" yet...
-          Actually, let's update PhaseManager to support 'TITLE' or just wrap it.
-          
-          Simpler: We render TitleScreen *overlaying* everything until user clicks "Initialize".
-          Then we reveal Calibration.
-      */}
 
-      {/* 
-        HACK: Since PhaseManager doesn't have TITLE, allow App to manage "Pre-Game" state?
-        Or just add TITLE to PhaseManager later? 
-        The prompt said "App.tsx to manage simplified game state flow: Title Screen -> Gameplay".
-        But now we have complex Phases.
-        Let's assume "Initialize" on Title Screen -> Start PhaseManager Flow.
-      */}
-
-      {/* We need a 'manual' start. So let's keep a local 'showTitle' state. */}
-      {/* Actually let's assume 'CALIBRATING' implies we are in the flow. */}
+      {/* PHASE RENDERING SWITCH */}
+      {phase === 'TITLE' && (
+        <TitleScreen onStart={() => phaseManager.startSession()} />
+      )}
 
       {/* Override Phase Rendering */}
 
@@ -310,10 +288,24 @@ const App: React.FC = () => {
           We should keep WebcamPreview mounted ALWAYS, just hidden when not Calibrating.
       */}
 
-      {phase !== 'CALIBRATING' && USE_REAL_INPUT && (
-        <div className="fixed top-20 right-4 w-24 opacity-20 pointer-events-none z-0">
-          {/* Invisible/Small maintainer of the stream */}
+      {/* GLOBAL WEBCAM PREVIEW - ALWAYS VISIBLE */}
+      {/* Fixed Bottom Right Window */}
+      {/* Using inline styles to guarantee positioning */}
+      {USE_REAL_INPUT && (
+        <div
+          className="fixed w-64 aspect-video bg-black rounded-lg overflow-hidden border border-slate-700 shadow-2xl z-50 pointer-events-none animate-in fade-in duration-1000 slide-in-from-bottom-4"
+          style={{ position: 'fixed', bottom: '2rem', right: '2rem', width: '300px', height: '170px', zIndex: 100 }}
+        >
           <WebcamPreview onStreamReady={handleStreamReady} onError={() => { }} />
+
+          {/* Minimal Overlay */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-2 right-2 flex space-x-1">
+              <div className="w-1 h-1 bg-red-500 rounded-full animate-pulse" />
+              <span className="text-[10px] text-red-500 font-mono">LIVE</span>
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,40,60,0.2)_50%)] bg-[length:100%_4px] pointer-events-none" />
         </div>
       )}
 

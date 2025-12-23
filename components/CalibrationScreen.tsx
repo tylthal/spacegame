@@ -110,7 +110,7 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             let currentReason: string | null = null;
 
             if (!rightActive && !leftActive) {
-                currentReason = "Show Both Hands";
+                currentReason = "Show Both Hands"; // Friendlier
             } else if (!rightActive) {
                 currentReason = "Right Hand Lost";
             } else if (!leftActive) {
@@ -127,7 +127,7 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                 if (dist > SPATIAL_SEPARATION_THRESHOLD) {
                     spatialValid = true;
                 } else {
-                    currentReason = "Hands Too Close";
+                    currentReason = "Hands Too Close"; // Friendlier
                 }
 
                 // 2. Zone Check (Left < 0.6, Right > 0.4)
@@ -184,11 +184,6 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
     const radius = 80;
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - progress * circumference;
-
-    // Wrap onError to be stable for WebcamPreview
-    const handleWebcamError = React.useCallback((err: Error) => {
-        onError(new Error(err.message));
-    }, [onError]);
 
     return (
         <>
@@ -337,24 +332,6 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                     )}
 
                 </div>
-            </div>
-
-            {/* Webcam Preview - Fixed Bottom Right Window */}
-            {/* Using inline styles to guarantee positioning */}
-            <div
-                className="fixed w-64 aspect-video bg-black rounded-lg overflow-hidden border border-slate-700 shadow-2xl z-50 pointer-events-none"
-                style={{ position: 'fixed', bottom: '2rem', right: '2rem', width: '300px', height: '170px' }}
-            >
-                <WebcamPreview onStreamReady={onStreamReady} onError={handleWebcamError} />
-
-                {/* Minimal Overlay */}
-                <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-2 right-2 flex space-x-1">
-                        <div className="w-1 h-1 bg-red-500 rounded-full animate-pulse" />
-                        <span className="text-[10px] text-red-500 font-mono">LIVE</span>
-                    </div>
-                </div>
-                <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,40,60,0.2)_50%)] bg-[length:100%_4px] pointer-events-none" />
             </div>
         </>
     );

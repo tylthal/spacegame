@@ -14,17 +14,11 @@ export const PointGesture = new GestureDescription('point');
 // Index: Must be NOT curled (Straight)
 PointGesture.addCurl(Finger.Index, FingerCurl.NoCurl, 1.0);
 
-// Middle: Must be Curled
-PointGesture.addCurl(Finger.Middle, FingerCurl.FullCurl, 1.0);
-PointGesture.addCurl(Finger.Middle, FingerCurl.HalfCurl, 0.9); // Allow slightly loose curl
-
-// Ring: Must be Curled
-PointGesture.addCurl(Finger.Ring, FingerCurl.FullCurl, 1.0);
-PointGesture.addCurl(Finger.Ring, FingerCurl.HalfCurl, 0.9);
-
-// Pinky: Must be Curled
-PointGesture.addCurl(Finger.Pinky, FingerCurl.FullCurl, 1.0);
-PointGesture.addCurl(Finger.Pinky, FingerCurl.HalfCurl, 0.9);
+// OTHER FINGERS:
+// We explicitly DO NOT constrain Middle, Ring, or Pinky.
+// This allows "Open Hand", "Gun", or "Relaxed Point" to all register as 'point'.
+// The user requested: "It just needs to see at a minimum the pointer finger".
+// This makes the gesture extremely robust to occlusion or relaxed hand states.
 
 
 // --- Left Hand: PINCH READY (Optional) ---

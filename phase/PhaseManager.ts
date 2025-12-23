@@ -1,8 +1,9 @@
 import type { Gesture } from '../input/InputProcessor';
 
-export type Phase = 'CALIBRATING' | 'READY' | 'PLAYING' | 'PAUSED' | 'GAMEOVER';
+export type Phase = 'TITLE' | 'CALIBRATING' | 'READY' | 'PLAYING' | 'PAUSED' | 'GAMEOVER';
 
 type TransitionReason =
+  | 'start-calibration'
   | 'calibration-complete'
   | 'start-gesture'
   | 'help-requested'
@@ -45,7 +46,7 @@ export type PhaseEvent =
   | { type: 'guard_rejected'; from: Phase; attempted: GuardedAction; reason: string; at: number };
 
 export class PhaseManager {
-  private state: Phase = 'CALIBRATING';
+  private state: Phase = 'TITLE';
   private listeners = new Set<(event: PhaseEvent) => void>();
   private calibrationStableMs = 0;
   private lastTimestamp?: number;
@@ -68,6 +69,13 @@ export class PhaseManager {
   subscribe(listener: (event: PhaseEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  startSession(): Phase {
+    if (this.state === 'TITLE') {
+      return this.transition('CALIBRATING', 'start-calibration', Date.now());
+    }
+    return this.state;
   }
 
   ingest(sample: PhaseSample): Phase {
@@ -144,13 +152,13 @@ export class PhaseManager {
 
   reset(timestamp = 0): Phase {
     const previous = this.state;
-    this.state = 'CALIBRATING';
+    this.state = 'TITLE';
     this.calibrationStableMs = 0;
     this.lastTimestamp = timestamp;
     this.lastStableTimestamp = undefined;
     this.pauseHoldStartedAt = undefined;
     this.elapsedPlayMs = 0;
-    this.emit({ type: 'transition', from: previous, to: 'CALIBRATING', reason: 'reset', at: timestamp });
+    this.emit({ type: 'transition', from: previous, to: 'TITLE', reason: 'reset', at: timestamp });
     return this.state;
   }
 
