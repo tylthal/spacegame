@@ -126,8 +126,9 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                             const offsetY = wristPos.y - finalCalibrationOffsetRef.current.y;
 
                             // Scale by virtual pad sensitivity and center at 0.5
+                            // Note: Y is INVERTED so aiming up moves cursor up
                             const calibratedX = (offsetX / VIRTUAL_PAD_SIZE) + 0.5;
-                            const calibratedY = (offsetY / VIRTUAL_PAD_SIZE) + 0.5;
+                            const calibratedY = (-offsetY / VIRTUAL_PAD_SIZE) + 0.5;
 
                             setCursorPos({
                                 x: Math.min(Math.max(calibratedX, 0), 1),

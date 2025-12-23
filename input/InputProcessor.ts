@@ -209,8 +209,9 @@ export class InputProcessor {
     const offsetY = landmark.y - this.calibrationOffsetY;
 
     // Scale by virtual pad size (smaller pad = higher sensitivity)
+    // Note: Y is INVERTED so aiming up (lowering Y in camera) moves cursor up
     const scaledX = (offsetX / this.virtualPad.width) + 0.5;
-    const scaledY = (offsetY / this.virtualPad.height) + 0.5;
+    const scaledY = (-offsetY / this.virtualPad.height) + 0.5;
 
     return {
       x: Math.min(Math.max(scaledX, 0), 1),
