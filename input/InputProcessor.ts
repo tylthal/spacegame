@@ -29,12 +29,12 @@ export interface ProcessedHandEvent {
 const DEFAULT_VIRTUAL_PAD: VirtualMousepadConfig = {
   // VIRTUAL MOUSEPAD STRATEGY:
   // A smaller width/height = higher sensitivity
-  // With width: 0.25, moving hand 25% of camera frame covers full screen
-  // This makes aiming effortless without large arm movements
-  origin: { x: 0.375, y: 0.375 },  // Center the pad (0.5 - 0.25/2)
-  width: 0.25,    // Only 25% of camera width needed for full X range
-  height: 0.25,   // Only 25% of camera height needed for full Y range
-  stabilityTolerance: 0.02,  // Slightly increased for higher sensitivity
+  // With width: 0.4, moving hand 40% of camera frame covers full screen
+  // This provides good sensitivity without being too twitchy
+  origin: { x: 0.3, y: 0.3 },
+  width: 0.4,     // 40% of camera width = full X range
+  height: 0.4,    // 40% of camera height = full Y range
+  stabilityTolerance: 0.015,
 };
 
 const DEFAULT_GESTURE_CONFIG: GestureConfig = {
@@ -209,9 +209,9 @@ export class InputProcessor {
     const offsetY = landmark.y - this.calibrationOffsetY;
 
     // Scale by virtual pad size (smaller pad = higher sensitivity)
-    // Note: Y is INVERTED so aiming up (lowering Y in camera) moves cursor up
+    // Y-axis: MediaPipe Y=0 is top, which matches screen Y=0 at top - no inversion needed
     const scaledX = (offsetX / this.virtualPad.width) + 0.5;
-    const scaledY = (-offsetY / this.virtualPad.height) + 0.5;
+    const scaledY = (offsetY / this.virtualPad.height) + 0.5;
 
     return {
       x: Math.min(Math.max(scaledX, 0), 1),

@@ -112,23 +112,24 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                     const pointMatch = estimation.gestures.find(g => g.name === 'point');
                     if (pointMatch && pointMatch.score > FINGERPOSE_SCORE_THRESHOLD) {
                         lastRightPointRef.current = now;
-                        const wristPos = { x: frame.landmarks[0].x, y: frame.landmarks[0].y };
-                        rightWristRef.current = wristPos;
+
+                        // Use INDEX FINGERTIP (landmark 8) for aiming, not wrist
+                        const fingertipPos = { x: frame.landmarks[8].x, y: frame.landmarks[8].y };
+                        rightWristRef.current = fingertipPos; // Still using this ref for compatibility
 
                         // POST-CALIBRATION: Update cursor position with virtual mousepad
                         if (isSuccessRef.current) {
-                            // Virtual Mousepad: 25% of camera frame = full screen
-                            // This means small hand movements cover the entire screen
-                            const VIRTUAL_PAD_SIZE = 0.25;
+                            // Virtual Mousepad: 40% of camera frame = full screen
+                            const VIRTUAL_PAD_SIZE = 0.4;
 
                             // Calculate offset from calibrated center
-                            const offsetX = wristPos.x - finalCalibrationOffsetRef.current.x;
-                            const offsetY = wristPos.y - finalCalibrationOffsetRef.current.y;
+                            const offsetX = fingertipPos.x - finalCalibrationOffsetRef.current.x;
+                            const offsetY = fingertipPos.y - finalCalibrationOffsetRef.current.y;
 
                             // Scale by virtual pad sensitivity and center at 0.5
-                            // Note: Y is INVERTED so aiming up moves cursor up
+                            // Y-axis: MediaPipe Y=0 is top, screen Y=0 is top - no inversion needed
                             const calibratedX = (offsetX / VIRTUAL_PAD_SIZE) + 0.5;
-                            const calibratedY = (-offsetY / VIRTUAL_PAD_SIZE) + 0.5;
+                            const calibratedY = (offsetY / VIRTUAL_PAD_SIZE) + 0.5;
 
                             setCursorPos({
                                 x: Math.min(Math.max(calibratedX, 0), 1),
