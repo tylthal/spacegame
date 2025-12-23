@@ -13,18 +13,18 @@ This project ships with a GitHub Actions workflow at `.github/workflows/deploy.y
 2. Confirm that the **Environment** is `github-pages`; the `deploy` job in the workflow sets this environment and exposes the published URL.
 3. Ensure **Pages** permissions include **write** access for GitHub Actions (already declared in the workflow).
 
-Once configured, each push to `main` will build the project with `npm ci && npm run build`, upload the `dist/` output, and deploy it automatically to GitHub Pages.
+Once configured, each push to `main` will run `npm ci`, lint, execute the test suite, run the smoke check (which builds the site), upload the `dist/` output, and deploy it automatically to GitHub Pages.
 
-## Smoke Testing
+## CI pipeline and smoke coverage
 
-To verify the critical path without a full browser environment, run:
+The deployment workflow now includes the following guardrails:
 
-```bash
-npm run smoke
-```
+1. `npm run lint` — Type-checks the code and ensures the TypeScript build remains clean.
+2. `npm run test:ci` — Runs the Vitest suite in thread-pooled mode for determinism and speed.
+3. `npm run smoke` — Builds the Vite site, launches `npm run preview` on a loopback port, and performs a health check against the landing page content. Set `SMOKE_PREVIEW_PORT` to override the default `4173` during local or CI runs.
 
-This executes the headless diagnostics pipeline (`__tests__/diagnosticsMode.test.ts`), determining if the input, phase machine, and spawn logic can successfully transition from `READY` to `PLAYING` and simulate gameplay.
+The `smoke` script exits non-zero if the preview server fails to start or the expected landing content (`Spacegame rebuild shell`) is missing, providing a fast regression signal on the published artifact.
 
-## Large File Storage (LFS)
+## MediaPipe and asset handling
 
-Git LFS is currently **disabled** to simplify the deployment pipeline. Large assets (e.g., MediaPipe WASM/binary files) are loaded from a CDN at runtime or are small enough to be checked in directly.
+MediaPipe assets are currently stubbed out while the rebuilt input stack remains in-memory only. No large binary assets are shipped with the deploy bundle, keeping CI/GitHub Pages runs lightweight. If external MediaPipe bundles return in a future phase, prefer runtime fetches over bundling, or gate large assets behind Git LFS with appropriate CI configuration (e.g., enabling `GIT_LFS_SKIP_SMUDGE=1` for builds that do not need full asset hydration).

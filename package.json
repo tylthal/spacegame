@@ -12,8 +12,8 @@
     "test:watch": "vitest watch",
     "test:unit": "vitest run",
     "test:ci": "vitest run --pool=threads",
-    "smoke": "vitest run diagnosticsMode",
-    "ci": "npm run lint && npm run test:ci"
+    "ci": "npm run lint && npm run test:ci",
+    "smoke": "npm run build && node scripts/smoke.js"
   },
   "dependencies": {
     "react": "^19.2.3",

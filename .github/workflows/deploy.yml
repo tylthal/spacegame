@@ -31,8 +31,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:ci
+
+      - name: Smoke (build + preview health check)
+        run: npm run smoke
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
