@@ -9,7 +9,7 @@ interface CalibrationScreenProps {
     onError: (err: Error) => void;
     calibrationProgress: number; // 0 to 1
     tracker: HandTracker | null;
-    onComplete: () => void;
+    onComplete: (offset: number) => void;
 }
 
 export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
@@ -40,6 +40,11 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
     const DETECTION_TIMEOUT_MS = 200; // Strict timeout
     const GRACE_PERIOD_MS = 500; // Time allowed to be invalid before reset
     const SPATIAL_SEPARATION_THRESHOLD = 0.2; // Min distance between wrists (normalized 0-1)
+    const MOVEMENT_THRESHOLD = 0.01; // Max allowed movement per frame for "stillness"
+
+    // Calibration Data Collection
+    const positionBufferRef = useRef<number[]>([]);
+    const finalCalibrationOffsetRef = useRef<number>(0.5);
 
     useEffect(() => {
         if (!tracker) {
@@ -142,31 +147,53 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             }
 
             if (rightActive && leftActive && spatialValid && zonesValid) {
-                // VALID STATE
-                lastValidTimeRef.current = now;
-                setFailureReason(null);
+                // Check Movement Stability (Stationary Hold)
+                const currentRX = rightWristRef.current?.x || 0.5;
+                const prevRX = positionBufferRef.current.length > 0 ? positionBufferRef.current[positionBufferRef.current.length - 1] : currentRX;
+                const delta = Math.abs(currentRX - prevRX);
 
-                if (!calibrationStartTimeRef.current) {
-                    calibrationStartTimeRef.current = now;
-                }
-                const elapsed = now - calibrationStartTimeRef.current;
-                const p = Math.min(elapsed / STABILITY_REQUIRED_MS, 1);
-                setProgress(p);
+                if (delta > MOVEMENT_THRESHOLD) {
+                    currentReason = "Hold Steady"; // Too much jitter
+                    setFailureReason("Hold Steady");
 
-                if (elapsed >= STABILITY_REQUIRED_MS) {
-                    setIsSuccess(true);
+                    // Reset if moving too much
+                    calibrationStartTimeRef.current = null;
+                    setProgress(0);
+                    positionBufferRef.current = [];
+                } else {
+                    // STABLE & VALID
+                    lastValidTimeRef.current = now;
+                    setFailureReason(null);
+
+                    if (!calibrationStartTimeRef.current) {
+                        calibrationStartTimeRef.current = now;
+                        positionBufferRef.current = []; // Start fresh buffer
+                    }
+
+                    // Accumulate position for averaging
+                    positionBufferRef.current.push(currentRX);
+
+                    const elapsed = now - calibrationStartTimeRef.current;
+                    const p = Math.min(elapsed / STABILITY_REQUIRED_MS, 1);
+                    setProgress(p);
+
+                    if (elapsed >= STABILITY_REQUIRED_MS) {
+                        // Success! Compute Average
+                        const sum = positionBufferRef.current.reduce((a, b) => a + b, 0);
+                        const avg = sum / positionBufferRef.current.length;
+                        finalCalibrationOffsetRef.current = avg;
+                        setIsSuccess(true);
+                    }
                 }
             } else {
                 // INVALID STATE
                 // Check grace period
                 if (now - lastValidTimeRef.current < GRACE_PERIOD_MS) {
-                    // Within grace period: Pause progress, do not reset yet
-                    // Keep the current progress value frozen
                     setFailureReason("Adjusting...");
                 } else {
-                    // Grace period expired: Reset
                     calibrationStartTimeRef.current = null;
                     setProgress(0);
+                    positionBufferRef.current = [];
                     setFailureReason(currentReason || "Signal Dropped");
                 }
             }
@@ -187,145 +214,104 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
 
     return (
         <>
-            {/* Debug Overlay */}
-            <div className="fixed top-20 left-4 text-[10px] font-mono text-cyan-500/50 pointer-events-none z-50 whitespace-pre">
-                {`DEBUG:\nL: ${leftWristRef.current ? `(${leftWristRef.current.x.toFixed(2)}, ${leftWristRef.current.y.toFixed(2)})` : '--'}\nR: ${rightWristRef.current ? `(${rightWristRef.current.x.toFixed(2)}, ${rightWristRef.current.y.toFixed(2)})` : '--'}\nReason: ${failureReason || 'OK'}`}
+            {/* Debug Overlay - Raw Code Style */}
+            <div className="fixed top-20 left-4 text-[10px] font-mono text-y2k-yellow/50 pointer-events-none z-50 whitespace-pre bg-black/80 p-2 border border-y2k-yellow/20">
+                {`DEBUG_STREAM:\nL_POS: ${leftWristRef.current ? `[${leftWristRef.current.x.toFixed(2)}, ${leftWristRef.current.y.toFixed(2)}]` : 'NULL'}\nR_POS: ${rightWristRef.current ? `[${rightWristRef.current.x.toFixed(2)}, ${rightWristRef.current.y.toFixed(2)}]` : 'NULL'}\nERR: ${failureReason || 'NONE'}`}
             </div>
 
-            {/* Main Calibration UI - Full Screen Centered */}
-            <div
-                className="fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-xl"
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0
-                }}
-            >
-                <div className="max-w-7xl w-full p-4 space-y-8 text-center flex flex-col items-center relative">
+            {/* Main Calibration UI */}
+            <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
+                <div className="w-full max-w-6xl p-4 flex flex-col items-center relative pointer-events-auto">
 
-                    {/* Header */}
-                    <div className="space-y-3 pointer-events-none select-none">
-                        <h2 className="text-4xl font-black text-white tracking-[0.2em] uppercase drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
-                            {isSuccess ? 'SYSTEM ONLINE' : 'System Configuration'}
+                    {/* Header - Terminal Style */}
+                    <div className="w-full border-b-4 border-y2k-yellow mb-12 flex justify-between items-end pb-2">
+                        <h2 className="text-6xl font-display font-bold text-y2k-yellow tracking-tighter uppercase">
+                            {isSuccess ? 'SYSTEM_LOCKED' : 'HARDWARE_SYNC'}
                         </h2>
-                        <p className="text-cyan-400 font-mono text-sm tracking-widest uppercase opacity-80">
-                            {isSuccess ? '// READY FOR COMBAT //' : '// Establish Neural Handshake //'}
+                        <p className="text-y2k-white font-mono text-xs mb-2 animate-pulse">
+                            {isSuccess ? '>>> UPLOAD_COMPLETE' : '>>> ESTABLISHING_NEURAL_LINK...'}
                         </p>
                     </div>
 
                     {!isSuccess ? (
                         /* CALIBRATION MODE */
-                        <div className="relative w-full flex justify-center items-center py-12 animate-in fade-in duration-500">
-                            {/* Zone Divider */}
-                            <div className="absolute top-0 bottom-0 left-1/2 w-px bg-cyan-500/30 border-r border-dashed border-cyan-500/50 transform -translate-x-1/2 pointer-events-none h-full" />
+                        <div className="flex flex-row justify-center items-stretch space-x-8 w-full">
 
-                            {/* Zone Labels */}
-                            <div className="absolute top-4 left-1/4 text-cyan-900/40 text-6xl font-black uppercase tracking-widest pointer-events-none select-none">LEFT ZONE</div>
-                            <div className="absolute top-4 right-1/4 text-cyan-900/40 text-6xl font-black uppercase tracking-widest pointer-events-none select-none">RIGHT ZONE</div>
+                            {/* Left Hand Card */}
+                            <div className={`relative p-8 border-2 transition-all duration-0 w-96 flex flex-col justify-between h-96
+                                ${leftPinchDetected ? 'bg-y2k-yellow border-y2k-yellow' : 'bg-black/50 border-y2k-white/30'}`}>
 
-
-                            <div className="flex flex-row justify-center items-center space-x-12 lg:space-x-32 w-full z-10">
-                                {/* Left Hand Status Card */}
-                                <div className={`relative p-6 rounded-2xl border transition-all duration-300 w-80 h-72 flex flex-col justify-center items-center backdrop-blur-sm
-                                    ${leftPinchDetected
-                                        ? 'border-cyan-400 bg-cyan-950/30 shadow-[0_0_30px_rgba(34,211,238,0.2)]'
-                                        : 'border-slate-800 bg-slate-900/40 opacity-70'}`}>
-                                    <div className="absolute top-4 left-4 text-[10px] font-mono text-slate-500 uppercase tracking-wider">Left_Sensor</div>
-                                    <div className={`text-3xl font-bold mb-2 ${leftPinchDetected ? 'text-white' : 'text-slate-400'}`}>LEFT HAND</div>
-                                    <div className="text-xl font-mono text-cyan-300 mb-2">"PINCH"</div>
-                                    <div className="text-sm text-slate-400 mb-6">Touch Index & Thumb</div>
-                                    <div className={`px-4 py-2 rounded-full text-xs font-bold tracking-widest uppercase duration-200
-                                        ${leftPinchDetected ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
-                                        {leftPinchDetected ? 'SIGNAL LOCKED' : 'SEARCHING...'}
-                                    </div>
+                                <div>
+                                    <div className={`text-xs font-mono mb-2 ${leftPinchDetected ? 'text-black' : 'text-y2k-silver'}`}>INPUT_SOURCE_01</div>
+                                    <div className={`text-6xl font-display font-bold mb-0 ${leftPinchDetected ? 'text-black' : 'text-y2k-white'}`}>LEFT</div>
+                                    <div className={`text-4xl font-body font-bold ${leftPinchDetected ? 'text-black' : 'text-y2k-silver'}`}>PINCH</div>
                                 </div>
 
-                                {/* Central Spinner (Abstract) */}
-                                <div className="relative w-[240px] h-[240px] flex items-center justify-center flex-shrink-0">
-                                    <div className="absolute inset-0 pointer-events-none">
-                                        <svg className="w-full h-full rotate-[-90deg]" viewBox="0 0 200 200">
-                                            <circle
-                                                className="text-slate-900"
-                                                strokeWidth="12"
-                                                stroke="currentColor"
-                                                fill="transparent"
-                                                r={radius}
-                                                cx="100"
-                                                cy="100"
-                                            />
-                                            <circle
-                                                className="text-cyan-400 transition-all duration-200 ease-linear"
-                                                strokeWidth="12"
-                                                strokeDasharray={circumference}
-                                                strokeDashoffset={strokeDashoffset}
-                                                strokeLinecap="round"
-                                                stroke="currentColor"
-                                                fill="transparent"
-                                                r={radius}
-                                                cx="100"
-                                                cy="100"
-                                            />
-                                        </svg>
-                                    </div>
-                                    {/* Center Icon */}
-                                    <div className={`flex flex-col items-center justify-center transition-all duration-300`}>
-                                        <div className={`text-4xl mb-2 ${progress >= 1 ? 'text-cyan-400 scale-125' : 'text-slate-700'}`}>
-                                            {progress >= 1 ? '✓' : '⟁'}
-                                        </div>
-                                        <div className="text-xs font-mono text-cyan-500/80">
-                                            {(progress * 100).toFixed(0)}%
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Right Hand Status Card */}
-                                <div className={`relative p-6 rounded-2xl border transition-all duration-300 w-80 h-72 flex flex-col justify-center items-center backdrop-blur-sm
-                                    ${rightPointDetected
-                                        ? 'border-cyan-400 bg-cyan-950/30 shadow-[0_0_30px_rgba(34,211,238,0.2)]'
-                                        : 'border-slate-800 bg-slate-900/40 opacity-70'}`}>
-                                    <div className="absolute top-4 left-4 text-[10px] font-mono text-slate-500 uppercase tracking-wider">Right_Sensor</div>
-                                    <div className={`text-3xl font-bold mb-2 ${rightPointDetected ? 'text-white' : 'text-slate-400'}`}>RIGHT HAND</div>
-                                    <div className="text-xl font-mono text-cyan-300 mb-2">"POINT"</div>
-                                    <div className="text-sm text-slate-400 mb-6">Extend Index Finger</div>
-                                    <div className={`px-4 py-2 rounded-full text-xs font-bold tracking-widest uppercase duration-200
-                                        ${rightPointDetected ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
-                                        {rightPointDetected ? 'SIGNAL LOCKED' : 'SEARCHING...'}
-                                    </div>
+                                <div className={`text-lg font-mono px-2 py-1 border-2 text-center uppercase font-bold
+                                    ${leftPinchDetected ? 'border-black text-black' : 'border-y2k-red text-y2k-red animate-pulse'}`}>
+                                    {leftPinchDetected ? 'SIGNAL_FOUND' : 'NO_SIGNAL'}
                                 </div>
                             </div>
+
+                            {/* CENTER PROGRESS - Hard Bar */}
+                            <div className="w-24 flex flex-col justify-end items-center bg-black/50 border border-y2k-white/10 p-2">
+                                <div className="w-full bg-y2k-white/10 h-full relative flex flex-col justify-end overflow-hidden">
+                                    <div
+                                        className="w-full bg-y2k-yellow transition-all duration-75 ease-linear"
+                                        style={{ height: `${progress * 100}%` }}
+                                    />
+                                </div>
+                                <div className="mt-2 font-mono text-y2k-yellow text-xl font-bold">
+                                    {(progress * 100).toFixed(0)}%
+                                </div>
+                            </div>
+
+                            {/* Right Hand Card */}
+                            <div className={`relative p-8 border-2 transition-all duration-0 w-96 flex flex-col justify-between h-96
+                                ${rightPointDetected ? 'bg-y2k-yellow border-y2k-yellow' : 'bg-black/50 border-y2k-white/30'}`}>
+
+                                <div>
+                                    <div className={`text-xs font-mono mb-2 ${rightPointDetected ? 'text-black' : 'text-y2k-silver'}`}>INPUT_SOURCE_02</div>
+                                    <div className={`text-6xl font-display font-bold mb-0 ${rightPointDetected ? 'text-black' : 'text-y2k-white'}`}>RIGHT</div>
+                                    <div className={`text-4xl font-body font-bold ${rightPointDetected ? 'text-black' : 'text-y2k-silver'}`}>POINT</div>
+                                </div>
+
+                                <div className={`text-lg font-mono px-2 py-1 border-2 text-center uppercase font-bold
+                                    ${rightPointDetected ? 'border-black text-black' : 'border-y2k-red text-y2k-red animate-pulse'}`}>
+                                    {rightPointDetected ? 'SIGNAL_FOUND' : 'NO_SIGNAL'}
+                                </div>
+                            </div>
+
                         </div>
                     ) : (
-                        /* SUCCESS MODE */
-                        <div className="flex flex-col items-center justify-center py-16 space-y-8 animate-in zoom-in duration-500">
-                            <div className="w-32 h-32 rounded-full bg-cyan-500/20 border-4 border-cyan-400 flex items-center justify-center shadow-[0_0_50px_rgba(34,211,238,0.4)]">
-                                <span className="text-6xl text-cyan-200">✓</span>
-                            </div>
-                            <div className="space-y-2">
-                                <h3 className="text-2xl font-bold text-white tracking-widest">CALIBRATION COMPLETE</h3>
-                                <p className="text-slate-400 font-mono">Neural link established. Combat systems localized.</p>
-                            </div>
+                        /* SUCCESS MODE - Crash Screen */
+                        <div className="w-full bg-y2k-yellow p-12 flex flex-col items-center justify-center text-black space-y-8 animate-in zoom-in duration-200">
+                            <h1 className="text-9xl font-display font-bold tracking-tighter">ACCESS GRANTED</h1>
+                            <div className="h-2 w-full bg-black"></div>
+                            <p className="font-mono text-xl tracking-widest">
+                                ZERO_POINT_OFFSET: {finalCalibrationOffsetRef.current.toFixed(4)}
+                            </p>
+
                             <button
-                                onClick={onComplete}
-                                className="px-12 py-4 bg-cyan-500 text-slate-900 font-black text-xl tracking-[0.2em] rounded hover:bg-cyan-400 hover:scale-105 transition-all shadow-lg hover:shadow-cyan-500/50"
+                                onClick={() => onComplete(finalCalibrationOffsetRef.current)}
+                                className="px-16 py-6 bg-black text-y2k-yellow font-display font-bold text-4xl uppercase hover:bg-white hover:text-black transition-colors"
                             >
-                                [ ENTER VOID ]
+                                ENTER_VOID
                             </button>
                         </div>
                     )}
 
-                    {/* Status Text / Failure Reason (Only in Calibration Mode) */}
+                    {/* Status Text / Failure Reason */}
                     {!isSuccess && (
-                        <div className="h-12 flex items-center justify-center">
+                        <div className="mt-12 h-16 flex items-center justify-center w-full bg-black/80 border-t border-y2k-white/20">
                             {failureReason ? (
-                                <p className="text-amber-400 font-bold tracking-widest uppercase animate-pulse">
-                                    [ {failureReason} ]
+                                <p className="text-3xl font-body text-y2k-red font-bold tracking-widest uppercase animate-glitch">
+                                    /// ERROR: {failureReason} ///
                                 </p>
                             ) : (
-                                <p className={`text-lg font-mono tracking-widest uppercase transition-colors duration-300
-                                    ${(rightPointDetected && leftPinchDetected) ? 'text-cyan-400 animate-pulse' : 'text-slate-600'}`}>
-                                    {(rightPointDetected && leftPinchDetected) ? '/// HOLD POSITION ///' : 'AWAITING DUAL INPUT...'}
+                                <p className={`text-2xl font-body tracking-wider uppercase transition-colors duration-0
+                                    ${(rightPointDetected && leftPinchDetected) ? 'text-y2k-yellow animate-pulse' : 'text-y2k-silver'}`}>
+                                    {(rightPointDetected && leftPinchDetected) ? '>>> HOLD_STEADY_FOR_SYNC <<<' : 'WAITING_FOR_INPUT...'}
                                 </p>
                             )}
                         </div>

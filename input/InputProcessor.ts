@@ -55,6 +55,7 @@ export class InputProcessor {
   private lastRawCursor?: { x: number; y: number };
   private readonly gestureConfig: GestureConfig;
   private readonly virtualPad: VirtualMousepadConfig;
+  private calibrationOffsetX = 0; // The 'zero point' offset (0.0 to 1.0)
 
   constructor(
     tracker: HandTracker,
@@ -64,6 +65,11 @@ export class InputProcessor {
     this.virtualPad = { ...DEFAULT_VIRTUAL_PAD, ...options?.virtualPad } as VirtualMousepadConfig;
 
     this.unsubscribeTracker = tracker.subscribe(frame => this.handleFrame(frame));
+  }
+
+  setCalibration(offsetX: number): void {
+    this.calibrationOffsetX = offsetX;
+    console.log(`[Input] Calibrated Zero Point: ${offsetX.toFixed(2)}`);
   }
 
   dispose(): void {
@@ -185,8 +191,17 @@ export class InputProcessor {
   }
 
   private toCursor(landmark: HandLandmark): { x: number; y: number } {
-    const relativeX = (landmark.x - this.virtualPad.origin.x) / this.virtualPad.width;
+    // 1. Normalize to Virtual Pad (0..1)
+    let relativeX = (landmark.x - this.virtualPad.origin.x) / this.virtualPad.width;
     const relativeY = (landmark.y - this.virtualPad.origin.y) / this.virtualPad.height;
+
+    // 2. Apply Calibration Offset
+    // If calibrationOffsetX is 0.5 (center), and input is 0.5, result should be 0.5 (center).
+    // The Game expects 0..1 range.
+    // We want the user's "natural center" (calibrationOffsetX) to map to 0.5 output.
+    // output = input - calibrationOffsetX + 0.5
+    relativeX = relativeX - this.calibrationOffsetX + 0.5;
+
     return {
       x: Math.min(Math.max(relativeX, 0), 1),
       y: Math.min(Math.max(relativeY, 0), 1),

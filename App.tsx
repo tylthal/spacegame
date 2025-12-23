@@ -14,6 +14,7 @@ import { TitleScreen } from './components/TitleScreen';
 import { CalibrationScreen } from './components/CalibrationScreen';
 import { ReadyScreen } from './components/ReadyScreen';
 import { WebcamPreview } from './components/WebcamPreview';
+import { CRTOverlay } from './components/CRTOverlay';
 import { InputProcessor } from './input/InputProcessor';
 import { PhaseManager, Phase, PhaseEvent } from './phase/PhaseManager';
 
@@ -189,7 +190,7 @@ const App: React.FC = () => {
       className="fixed inset-0 bg-slate-950 text-cyan-50 overflow-hidden font-sans select-none touch-none"
       style={{ width: '100%', height: '100%', top: 0, left: 0, right: 0, bottom: 0 }}
     >
-
+      <CRTOverlay />
 
       {/* 3D BACKGROUND - ALWAYS ACTIVE */}
       {/* Note: In Title Screen, combatLoop isn't ticking, so enemies won't move unless we separate Sim vs Render.
@@ -215,28 +216,12 @@ const App: React.FC = () => {
           onError={handleCameraError}
           calibrationProgress={calibrationProgress}
           tracker={tracker}
-          onComplete={() => {
-            // Force transition to READY when calibration is done
-            // We use phaseManager.ingest to fake a stable "high confidence" event or just override locally?
-            // PhaseManager controls state. Let's force it if possible, or just setPhase manual override?
-            // "Sync Phase Manager" useEffect might fight us if we just setPhase(READY).
-            // But PhaseManager listens to inputs. 
-            // If we just want to proceed, we can force the transition in PhaseManager if it had a method.
-            // Since it doesn't, we can simulate a perfect input?
-            // Actually, we can just use `setPhase('READY')` here?
-            // But the next `phaseManager` update might revert it if it thinks we are still calibrating.
-            // Let's assume PhaseManager respects manual overrides if we don't ingest bad data.
-            // Better: update PhaseManager state.
-            // Ideally PhaseManager has a method `startSession()` or `completeCalibration()`.
-            // As a hack for MVP, we'll direct setPhase and hopefully PhaseManager catches up or we ignore it.
-            // Actually, `phaseManager` has internal state. If we don't update it, it might be weird.
-            // Let's look at PhaseManager quickly? No, I see it usage.
-            // It has `ingest`. 
-            // Let's just setPhase('READY') and `phaseManager` might be just a state machine helper.
-            // Wait, `useEffect` [phaseManager] subscribes to it.
-            // We should add a method to PhaseManager? Or just ignore for now.
-
-            // Implementation: Simple override.
+          onComplete={(offset) => {
+            // Apply the calibrated 'Zero Point'
+            if (inputProcessor) {
+              inputProcessor.setCalibration(offset);
+            }
+            // Transition to game
             setPhase('READY');
           }}
         />

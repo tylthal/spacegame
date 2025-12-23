@@ -9,38 +9,50 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
         <div className="fixed inset-0 flex flex-col items-center justify-center z-50 pointer-events-none">
 
             {/* Main Title Card */}
-            <div className="relative text-center space-y-6 pointer-events-auto p-12 bg-slate-950/50 backdrop-blur-sm rounded-3xl border border-white/5 shadow-[0_0_100px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in duration-1000">
+            <div className="relative z-10 flex flex-col items-start justify-center text-left p-12 w-full max-w-4xl">
 
-                {/* Decorative Top Line */}
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50 mb-8" />
-
-                <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-white via-cyan-100 to-cyan-500 drop-shadow-[0_0_30px_rgba(34,211,238,0.5)]">
-                    ORBITAL<br />SNIPER
-                </h1>
-
-                <div className="space-y-2">
-                    <p className="text-cyan-400 font-mono tracking-[0.3em] uppercase text-sm">
-                        // Void Defense Protocol //
-                    </p>
-                    <p className="text-slate-400 max-w-md mx-auto leading-relaxed">
-                        Hostile drone swarms detected in Sector 7. <br />
-                        Establish neural handshake to commence defensive operations.
+                {/* SYSTEM HEADER */}
+                <div className="flex flex-row items-center space-x-4 mb-4">
+                    <div className="h-4 w-4 bg-y2k-yellow animate-pulse" />
+                    <p className="text-y2k-yellow font-mono text-sm tracking-widest uppercase">
+                        // CORE_SYS_BREACH // AUTO_SEQ_99
                     </p>
                 </div>
 
-                <div className="pt-8 pb-4">
+                {/* GIANT TITLE - Overlapping/Tight */}
+                <div className="relative">
+                    <h1 className="text-9xl font-display font-bold text-y2k-white tracking-tighter leading-[0.8] select-none mix-blend-difference">
+                        ORBITAL
+                    </h1>
+                    <h1 className="text-9xl font-display font-bold text-y2k-yellow tracking-tighter leading-[0.8] select-none ml-2">
+                        SNIPER
+                    </h1>
+                </div>
+
+                {/* Subtext Grid */}
+                <div className="mt-8 border-l-4 border-y2k-yellow pl-6 space-y-2 max-w-lg bg-black/80 p-4">
+                    <p className="text-y2k-white font-body text-2xl uppercase tracking-wide">
+                        HOSTILE. DRONE. SWARM.
+                    </p>
+                    <p className="text-y2k-silver font-mono text-xs leading-relaxed">
+                        SECTOR 7 COMPROMISED. NEURAL LINK REQUIRED FOR WEAPONRY SYSTEMS.
+                        INITIATE HANDSHAKE SEQUENCE IMMEDIATELY.
+                    </p>
+                </div>
+
+                {/* BUTTON - Hard Edge, High Contrast */}
+                <div className="pt-12">
                     <button
                         onClick={onStart}
-                        className="group relative px-12 py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xl tracking-[0.2em] uppercase clip-path-polygon transition-all duration-300 hover:shadow-[0_0_50px_rgba(34,211,238,0.6)] hover:scale-105"
-                        style={{ clipPath: 'polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%)' }}
+                        className="group relative px-10 py-5 bg-transparent border-2 border-y2k-yellow hover:bg-y2k-yellow text-y2k-yellow hover:text-y2k-black transition-all duration-0 font-display font-bold text-2xl tracking-widest uppercase"
                     >
-                        <span className="relative z-10">Initialize System</span>
-                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+                        <span className="relative z-10 group-hover:animate-twitch">INITIALIZE_SYSTEM</span>
+
+                        {/* Hard Shadow/Offset */}
+                        <div className="absolute top-2 left-2 w-full h-full border-2 border-y2k-red -z-10 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform" />
                     </button>
                 </div>
 
-                {/* Decorative Bottom Line */}
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50 mt-8" />
             </div>
 
             {/* Version / Credits */}
