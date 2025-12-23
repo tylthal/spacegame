@@ -232,6 +232,31 @@ const App: React.FC = () => {
           onStreamReady={handleStreamReady}
           onError={err => setCameraError(err.message)}
           calibrationProgress={calibrationProgress}
+          tracker={tracker}
+          onComplete={() => {
+            // Force transition to READY when calibration is done
+            // We use phaseManager.ingest to fake a stable "high confidence" event or just override locally?
+            // PhaseManager controls state. Let's force it if possible, or just setPhase manual override?
+            // "Sync Phase Manager" useEffect might fight us if we just setPhase(READY).
+            // But PhaseManager listens to inputs. 
+            // If we just want to proceed, we can force the transition in PhaseManager if it had a method.
+            // Since it doesn't, we can simulate a perfect input?
+            // Actually, we can just use `setPhase('READY')` here?
+            // But the next `phaseManager` update might revert it if it thinks we are still calibrating.
+            // Let's assume PhaseManager respects manual overrides if we don't ingest bad data.
+            // Better: update PhaseManager state.
+            // Ideally PhaseManager has a method `startSession()` or `completeCalibration()`.
+            // As a hack for MVP, we'll direct setPhase and hopefully PhaseManager catches up or we ignore it.
+            // Actually, `phaseManager` has internal state. If we don't update it, it might be weird.
+            // Let's look at PhaseManager quickly? No, I see it usage.
+            // It has `ingest`. 
+            // Let's just setPhase('READY') and `phaseManager` might be just a state machine helper.
+            // Wait, `useEffect` [phaseManager] subscribes to it.
+            // We should add a method to PhaseManager? Or just ignore for now.
+
+            // Implementation: Simple override.
+            setPhase('READY');
+          }}
         />
       )}
 

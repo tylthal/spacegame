@@ -49,7 +49,7 @@ export function WebcamPreview({ onStreamReady, onError }: WebcamPreviewProps) {
 
     // Hidden video element OR visible for calibration/debugging
     return (
-        <div className="relative overflow-hidden rounded-lg bg-slate-950">
+        <div className="relative w-full h-full overflow-hidden rounded-lg bg-slate-950">
             {/* Mirror the video for natural interaction */}
             <video
                 ref={videoRef}

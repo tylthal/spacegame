@@ -9,7 +9,7 @@ export class BrowserHandTracker implements HandTracker {
   private requestAnimationFrameId: number | null = null;
   private lastVideoTime = -1;
 
-  constructor() {}
+  constructor() { }
 
   async initialize(videoElement: HTMLVideoElement): Promise<void> {
     this.video = videoElement;
@@ -25,7 +25,7 @@ export class BrowserHandTracker implements HandTracker {
         delegate: 'GPU',
       },
       runningMode: 'VIDEO',
-      numHands: 1, // We only support single-hand play for now
+      numHands: 2, // Support dual-hand calibration
     });
 
     this.startLoop();
@@ -47,26 +47,30 @@ export class BrowserHandTracker implements HandTracker {
     if (this.video.currentTime !== this.lastVideoTime) {
       this.lastVideoTime = this.video.currentTime;
       const startTimeMs = performance.now();
-      
+
       const result = this.handLandmarker.detectForVideo(this.video, startTimeMs);
 
       if (result.landmarks && result.landmarks.length > 0) {
-        // Map MediaPipe result to our internal HandFrame
-        // We only take the first hand
-        const landmarks = result.landmarks[0];
-        const handednessStr = result.handedness[0][0].displayName; 
-        
-        // Normalize handedness string if needed. MediaPipe returns "Left" or "Right" usually.
-        // Note: MP front-facing camera often flips handedness (mirrored). 
-        // We will pass it through as-is for now, consumers might need to invert if mirrored.
-        
-        const frame: HandFrame = {
-            timestamp: startTimeMs,
-            handedness: (handednessStr === 'Left' || handednessStr === 'Right') ? handednessStr : 'Right',
-            landmarks: landmarks.map(l => ({ x: l.x, y: l.y, z: l.z }))
-        };
+        console.log(`DEBUG: HandLandmarker detected ${result.landmarks.length} hands`);
+        // Iterate over all detected hands
+        for (let i = 0; i < result.landmarks.length; i++) {
+          const landmarks = result.landmarks[i];
+          const handednessStr = result.handedness[i][0].displayName;
 
-        this.emit(frame);
+          // Normalize handedness string
+          const handedness = (handednessStr === 'Left' || handednessStr === 'Right') ? handednessStr : 'Right';
+          console.log(`DEBUG: Emitting ${handedness} hand`);
+
+          const frame: HandFrame = {
+            timestamp: startTimeMs,
+            handedness: handedness,
+            landmarks: landmarks.map(l => ({ x: l.x, y: l.y, z: l.z }))
+          };
+
+          this.emit(frame);
+        }
+      } else {
+        // console.log('DEBUG: No hands detected');
       }
     }
   }
