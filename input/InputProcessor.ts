@@ -27,10 +27,14 @@ export interface ProcessedHandEvent {
 }
 
 const DEFAULT_VIRTUAL_PAD: VirtualMousepadConfig = {
-  origin: { x: 0.05, y: 0.05 },
-  width: 0.9,
-  height: 0.9,
-  stabilityTolerance: 0.01,
+  // VIRTUAL MOUSEPAD STRATEGY:
+  // A smaller width/height = higher sensitivity
+  // With width: 0.25, moving hand 25% of camera frame covers full screen
+  // This makes aiming effortless without large arm movements
+  origin: { x: 0.375, y: 0.375 },  // Center the pad (0.5 - 0.25/2)
+  width: 0.25,    // Only 25% of camera width needed for full X range
+  height: 0.25,   // Only 25% of camera height needed for full Y range
+  stabilityTolerance: 0.02,  // Slightly increased for higher sensitivity
 };
 
 const DEFAULT_GESTURE_CONFIG: GestureConfig = {
@@ -193,21 +197,24 @@ export class InputProcessor {
   }
 
   private toCursor(landmark: HandLandmark): { x: number; y: number } {
-    // 1. Normalize to Virtual Pad (0..1)
-    let relativeX = (landmark.x - this.virtualPad.origin.x) / this.virtualPad.width;
-    let relativeY = (landmark.y - this.virtualPad.origin.y) / this.virtualPad.height;
+    // VIRTUAL MOUSEPAD STRATEGY:
+    // The calibration offset is the user's natural "center" position.
+    // The virtual pad size determines sensitivity - smaller = more sensitive.
+    // 
+    // Formula: output = (input - calibratedCenter) / padSize + 0.5
+    // This centers the output at 0.5 when input equals the calibrated center.
 
-    // 2. Apply Calibration Offset (both axes)
-    // If calibrationOffset is 0.5 (center), and input is 0.5, result should be 0.5 (center).
-    // The Game expects 0..1 range.
-    // We want the user's "natural center" to map to 0.5 output.
-    // output = input - calibrationOffset + 0.5
-    relativeX = relativeX - this.calibrationOffsetX + 0.5;
-    relativeY = relativeY - this.calibrationOffsetY + 0.5;
+    // Calculate offset from calibrated center
+    const offsetX = landmark.x - this.calibrationOffsetX;
+    const offsetY = landmark.y - this.calibrationOffsetY;
+
+    // Scale by virtual pad size (smaller pad = higher sensitivity)
+    const scaledX = (offsetX / this.virtualPad.width) + 0.5;
+    const scaledY = (offsetY / this.virtualPad.height) + 0.5;
 
     return {
-      x: Math.min(Math.max(relativeX, 0), 1),
-      y: Math.min(Math.max(relativeY, 0), 1),
+      x: Math.min(Math.max(scaledX, 0), 1),
+      y: Math.min(Math.max(scaledY, 0), 1),
     };
   }
 

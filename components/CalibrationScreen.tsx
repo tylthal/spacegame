@@ -115,11 +115,20 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                         const wristPos = { x: frame.landmarks[0].x, y: frame.landmarks[0].y };
                         rightWristRef.current = wristPos;
 
-                        // POST-CALIBRATION: Update cursor position
+                        // POST-CALIBRATION: Update cursor position with virtual mousepad
                         if (isSuccessRef.current) {
-                            // Apply calibration offset
-                            const calibratedX = wristPos.x - finalCalibrationOffsetRef.current.x + 0.5;
-                            const calibratedY = wristPos.y - finalCalibrationOffsetRef.current.y + 0.5;
+                            // Virtual Mousepad: 25% of camera frame = full screen
+                            // This means small hand movements cover the entire screen
+                            const VIRTUAL_PAD_SIZE = 0.25;
+
+                            // Calculate offset from calibrated center
+                            const offsetX = wristPos.x - finalCalibrationOffsetRef.current.x;
+                            const offsetY = wristPos.y - finalCalibrationOffsetRef.current.y;
+
+                            // Scale by virtual pad sensitivity and center at 0.5
+                            const calibratedX = (offsetX / VIRTUAL_PAD_SIZE) + 0.5;
+                            const calibratedY = (offsetY / VIRTUAL_PAD_SIZE) + 0.5;
+
                             setCursorPos({
                                 x: Math.min(Math.max(calibratedX, 0), 1),
                                 y: Math.min(Math.max(calibratedY, 0), 1)
