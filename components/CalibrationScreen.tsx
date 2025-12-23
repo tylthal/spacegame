@@ -54,6 +54,22 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             return;
         }
 
+        // CRITICAL: Reset all state on mount to prevent stale values from previous sessions
+        calibrationStartTimeRef.current = null;
+        positionBufferRef.current = [];
+        lastRightPointRef.current = 0;
+        lastLeftPinchRef.current = 0;
+        lastValidTimeRef.current = 0;
+        leftWristRef.current = null;
+        rightWristRef.current = null;
+        isSuccessRef.current = false;
+        finalCalibrationOffsetRef.current = { x: 0.5, y: 0.5 };
+        setProgress(0);
+        setIsSuccess(false);
+        setRightPointDetected(false);
+        setLeftPinchDetected(false);
+        setFailureReason(null);
+
         // Initialize Fingerpose Estimator
         const estimator = new fp.GestureEstimator([PointGesture, PinchGesture]);
 
