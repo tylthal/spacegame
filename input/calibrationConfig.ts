@@ -10,16 +10,12 @@ export const CALIBRATION_CONFIG = {
     GRACE_PERIOD_MS: 500,             // Buffer before resetting progress
 
     // Spatial
-    SPATIAL_SEPARATION_THRESHOLD: 0.2, // Min distance between wrists (normalized)
-    MOVEMENT_THRESHOLD: 0.01,          // Max movement per frame for "stillness"
+    SPATIAL_SEPARATION_THRESHOLD: 0.15, // Min distance between wrists (reduced from 0.2)
+    MOVEMENT_THRESHOLD: 0.015,          // Max movement per frame (slightly increased)
 
     // Gestures
-    PINCH_DISTANCE_THRESHOLD: 0.08,    // Normalized pinch distance (thumb-index)
-    FINGERPOSE_SCORE_THRESHOLD: 8,     // Min fingerpose confidence score
-
-    // Zones (normalized screen coordinates)
-    ZONE_LEFT_MAX: 0.6,                // Left hand must be < this X
-    ZONE_RIGHT_MIN: 0.4,               // Right hand must be > this X
+    PINCH_DISTANCE_THRESHOLD: 0.12,    // Normalized pinch distance (more forgiving)
+    FINGERPOSE_SCORE_THRESHOLD: 7,     // Min fingerpose confidence (slightly reduced)
 } as const;
 
 export type CalibrationConfig = typeof CALIBRATION_CONFIG;
