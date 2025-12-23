@@ -40,6 +40,9 @@ export class CombatLoop {
   private readonly kills: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0 };
   private readonly spawns: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0 };
 
+  // Public access for renderer
+  public get activeEnemies(): ReadonlyArray<EnemyInstance> { return this.enemies; }
+
   private hull: number;
   private elapsedMs = 0;
   private sinceLastShot = 0;

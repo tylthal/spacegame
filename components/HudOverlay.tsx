@@ -47,51 +47,57 @@ const StatBadge: React.FC<{ label: string; value: string | number; hint?: string
   hint,
   role,
 }) => (
-  <div className="bg-slate-900/80 border border-cyan-500/30 rounded-lg p-3 shadow-[0_0_25px_rgba(34,211,238,0.08)]">
-    <p className="text-[10px] uppercase tracking-[0.35em] text-cyan-200/90">{label}</p>
-    <p className="text-2xl font-black text-white leading-tight" role={role} aria-label={`${label} ${value}`}>
+  <div className="bg-slate-950/40 backdrop-blur-md border border-white/10 rounded-lg p-3 shadow-lg ring-1 ring-cyan-500/20">
+    <p className="text-[10px] uppercase tracking-[0.35em] text-cyan-400/80 font-bold">{label}</p>
+    <p className="text-2xl font-black text-white leading-tight drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]" role={role} aria-label={`${label} ${value}`}>
       {value}
     </p>
-    {hint ? <p className="text-xs text-slate-300 mt-1">{hint}</p> : null}
+    {hint ? <p className="text-xs text-slate-400 mt-1 font-mono">{hint}</p> : null}
   </div>
 );
 
 const HudOverlay: React.FC<HudOverlayProps> = ({ score, hull, lives, multiplier = 1, ariaLabel = 'Player HUD' }) => {
   return (
     <section
-      className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 md:p-5 text-slate-50 space-y-4"
+      className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-between z-10"
       aria-label={ariaLabel}
     >
-      <header className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.45em] text-cyan-300">HUD Overlay</p>
-          <h3 className="text-lg font-semibold text-white">In-flight status</h3>
+      {/* Top Bar */}
+      <header className="flex items-start justify-between">
+        <div className="flex gap-4">
+          <StatBadge label="Score" value={formatNumber(score)} role="status" />
+          <StatBadge label="Multiplier" value={`x${multiplier.toFixed(1)}`} />
         </div>
-        <span className="text-[10px] uppercase tracking-[0.3em] text-slate-200 bg-slate-800 border border-slate-700 rounded-full px-3 py-1">
-          Text-safe fallback
-        </span>
-      </header>
 
-      <div className="grid gap-3 md:grid-cols-[1.4fr,1fr] items-start">
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3" role="list" aria-label="Core stats">
-            <div role="listitem">
-              <StatBadge label="Score" value={formatNumber(score)} role="status" hint="Total points" />
-            </div>
-            <div role="listitem">
-              <StatBadge label="Lives" value={lives} role="status" hint="Escape pods" />
+        <div className="flex flex-col items-end gap-2">
+          <div className="bg-slate-950/60 backdrop-blur border border-red-500/30 px-4 py-2 rounded-full">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] uppercase tracking-widest text-red-400">Hull Integrity</span>
+              <div className="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-300"
+                  style={{ width: `${clampHull(hull)}%` }}
+                />
+              </div>
+              <span className="font-mono text-red-200 text-xs">{hull}%</span>
             </div>
           </div>
-          <HullMeter value={hull} />
-        </div>
 
-        <div className="space-y-3">
-          <StatBadge label="Multiplier" value={`x${multiplier.toFixed(1)}`} hint="Damage + score" />
-          <p className="text-sm text-slate-200/80 leading-relaxed">
-            Screen-reader fallback text keeps the HUD legible without the visual overlay. Announcements for score, lives, and
-            hull use polite aria-live regions.
-          </p>
+          <div className="flex gap-1">
+            {Array.from({ length: lives }).map((_, i) => (
+              <div key={i} className="w-6 h-6 border border-cyan-500/50 bg-cyan-500/20 skew-x-[-12deg]" />
+            ))}
+          </div>
         </div>
+      </header>
+
+      {/* Bottom Area (Guidance or contextual info) */}
+      <div className="self-start bg-slate-950/50 backdrop-blur-sm border border-white/5 p-4 rounded-xl max-w-sm pointer-events-auto">
+        <p className="text-xs text-slate-300 leading-relaxed font-mono">
+          <span className="text-cyan-400 block mb-1"> SYSTEM DIAGNOSTIC </span>
+          Visual layer hydrated. Post-processing active.
+          Input monitoring engaged.
+        </p>
       </div>
 
       <p className="sr-only" role="status" aria-live="polite">

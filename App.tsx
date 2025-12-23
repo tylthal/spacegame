@@ -1,10 +1,16 @@
-import React, { useMemo, useState } from 'react';
-import PlaceholderScreen from './components/PlaceholderScreen';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PhaseList, { PhaseDescriptor, PhaseId } from './components/PhaseList';
 import HudOverlay from './components/HudOverlay';
 import DebugPanel from './components/DebugPanel';
 import { resolveDebugConfig } from './observability/DebugConfig';
 import { runDiagnosticsPipeline } from './observability/DiagnosticsHarness';
+import { BrowserHandTracker } from './infrastructure/mediapipe/BrowserHandTracker';
+import { HandTracker, InMemoryHandTracker } from './input/HandTracker';
+import { ThreeRenderer } from './infrastructure/three/ThreeRenderer';
+import { CombatLoop } from './gameplay/CombatLoop';
+import { SpawnScheduler } from './gameplay/SpawnScheduler';
+import { SeededRng } from './gameplay/Rng';
+import { RebuildShell } from './components/RebuildShell';
 
 const phases: PhaseDescriptor[] = [
   {
@@ -29,28 +35,90 @@ const phases: PhaseDescriptor[] = [
   },
 ];
 
-const foundationChecklist = [
-  'Legacy gameplay systems, assets, and MediaPipe/Three.js hooks removed.',
-  'New placeholder screens swap without relying on globals or refs.',
-  'Guard tests prevent reintroducing quarantined modules by accident.',
-];
+const USE_REAL_INPUT = import.meta.env.VITE_USE_REAL_INPUT === '1' || import.meta.env.VITE_USE_REAL_INPUT === 'true';
 
 const App: React.FC = () => {
   const [activePhase, setActivePhase] = useState<PhaseId>('foundation');
+  const [tracker, setTracker] = useState<HandTracker | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  // Game Kernel State
+  const combatLoop = useMemo(() => {
+    // Determine seed (could be from URL or fixed for consistency)
+    const seed = 12345;
+    const rng = new SeededRng(seed);
+    const scheduler = new SpawnScheduler(rng);
+    return new CombatLoop(scheduler, rng);
+  }, []);
+
+  // Tick the loop (placeholder tick)
+  useEffect(() => {
+    if (activePhase !== 'gameplay') return;
+
+    let lastTime = performance.now();
+    let frameId = 0;
+
+    const tick = (time: number) => {
+      const delta = time - lastTime;
+      lastTime = time;
+      combatLoop.tick(delta);
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [activePhase, combatLoop]);
+
+
+  // Initialize HandTracker strategy
+  useEffect(() => {
+    if (USE_REAL_INPUT) {
+      const browserTracker = new BrowserHandTracker();
+      setTracker(browserTracker);
+      return () => browserTracker.stop();
+    } else {
+      setTracker(new InMemoryHandTracker());
+    }
+  }, []);
+
+  const handleStreamReady = useCallback((video: HTMLVideoElement) => {
+    if (tracker instanceof BrowserHandTracker) {
+      tracker.initialize(video).catch(err => {
+        console.error('Failed to init MediaPipe', err);
+        setCameraError('Failed to load hand tracking. Check console.');
+      });
+    }
+  }, [tracker]);
+
   const debugConfig = useMemo(() => resolveDebugConfig(), []);
   const diagnostics = useMemo(
     () => (debugConfig.diagnosticsMode ? runDiagnosticsPipeline() : undefined),
     [debugConfig.diagnosticsMode],
   );
 
-  const active = useMemo(() => phases.find(phase => phase.id === activePhase) ?? phases[0], [activePhase]);
-
-  const hudPreview = {
-    score: 48250,
-    hull: 86,
+  // HUD STATE mapped from CombatLoop for gameplay? 
+  // For now we use the static preview props OR map them if possible.
+  // Let's create a live hud state if we are in gameplay.
+  const [hudState, setHudState] = useState({
+    score: 0,
+    hull: 100,
     lives: 3,
-    multiplier: 2.4,
-  };
+    multiplier: 1.0
+  });
+
+  // Sync HUD with loop (simple poller for React state)
+  useEffect(() => {
+    if (activePhase !== 'gameplay') return;
+    const interval = setInterval(() => {
+      const summary = combatLoop.summary();
+      setHudState({
+        score: summary.kills.drone * 100 + summary.kills.scout * 200 + summary.kills.bomber * 500, // naive score
+        hull: summary.hull,
+        lives: 3, // Logic not in CombatLoop yet
+        multiplier: 1.0 // Logic not in loop yet
+      });
+    }, 100); // 10fps UI update
+    return () => clearInterval(interval);
+  }, [activePhase, combatLoop]);
 
   const advance = () => {
     const index = phases.findIndex(phase => phase.id === activePhase);
@@ -63,72 +131,44 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-cyan-50">
-      <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
-        <header className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.45em] text-cyan-400">Spacegame rebuild shell</p>
-          <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Fresh base with legacy code removed</h1>
-          <p className="text-base text-slate-200 leading-relaxed max-w-4xl">
-            The legacy game, assets, and camera/gesture hooks have been cleared out. What remains is a stable React shell with
-            placeholder screens so we can layer the rebuild plan piece by piece without fighting old dependencies.
-          </p>
-        </header>
+    <div className="min-h-screen bg-slate-950 text-cyan-50 relative overflow-hidden">
 
-        <section className="grid gap-4 md:grid-cols-[1.4fr,1fr]" aria-label="HUD preview and guidance">
-          <HudOverlay {...hudPreview} />
-          <div className="border border-slate-700/70 rounded-xl p-4 bg-slate-900/60 shadow-lg space-y-2">
-            <h2 className="text-lg font-semibold text-white">HUD and menu rebuild slice</h2>
-            <p className="text-sm text-slate-200/80 leading-relaxed">
-              The new HUD overlay stands alone from the gameplay loop and exposes text-first fallbacks for accessibility. Menu
-              targets will reuse the same injection points when the ready screen is wired to the rebuilt phase manager.
-            </p>
-            <ul className="list-disc list-inside text-sm text-slate-100/80 space-y-1">
-              <li>Score, hull, and lives surface via aria-live regions.</li>
-              <li>Menu targets live at the `MENU_Z` plane for ray-hit testing.</li>
-              <li>Components stay dependency-injection friendly for future kernels.</li>
-            </ul>
-          </div>
-        </section>
+      {activePhase === 'gameplay' ? (
+        <>
+          {/* GAMEPLAY VIEW */}
+          <ThreeRenderer combatLoop={combatLoop} />
+          <HudOverlay {...hudState} />
 
-        <div className="grid gap-6 md:grid-cols-[1.2fr,1.8fr] items-start">
-          <div className="space-y-4">
-            <div className="border border-slate-700/70 rounded-xl p-4 bg-slate-900/70 shadow-lg">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">Rebuild checkpoints</h2>
-                <span className="text-[10px] uppercase tracking-[0.25em] text-cyan-200 bg-cyan-500/10 border border-cyan-500/30 rounded-full px-3 py-1">
-                  Clean slate
-                </span>
-              </div>
-              <p className="text-sm text-slate-200/80 mt-2 leading-relaxed">
-                Select a placeholder screen to see where the next slice of work will land. All legacy imports are gone so these
-                slots stay decoupled until rebuilt.
-              </p>
-            </div>
-
-            <PhaseList phases={phases} activePhase={activePhase} onSelect={setActivePhase} />
-          </div>
-
-          <PlaceholderScreen
-            phase={active}
-            onAdvance={advance}
-            onReset={() => setActivePhase('foundation')}
-            isLastPhase={activePhase === phases[phases.length - 1].id}
-          />
-        </div>
-
-        {debugConfig.debugPanels && <DebugPanel config={debugConfig} diagnostics={diagnostics} />}
-
-        <section className="grid gap-3 md:grid-cols-3" aria-label="Foundation checklist">
-          {foundationChecklist.map(item => (
-            <div
-              key={item}
-              className="border border-slate-700/70 rounded-lg p-4 bg-slate-900/60 text-sm text-slate-100/80 leading-relaxed"
+          {/* Temp Exit Button */}
+          <div className="absolute top-4 left-4 z-50">
+            <button
+              onClick={() => setActivePhase('foundation')}
+              className="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white border border-red-500/50 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition"
             >
-              {item}
-            </div>
-          ))}
-        </section>
-      </div>
+              Exit Sim
+            </button>
+          </div>
+
+          {/* Debug Panel Overlay during Gameplay */}
+          <div className="absolute bottom-4 right-4 z-50">
+            {debugConfig.debugPanels && <DebugPanel config={debugConfig} diagnostics={diagnostics} />}
+          </div>
+        </>
+      ) : (
+        /* REBUILD SHELL VIEW */
+        <RebuildShell
+          phases={phases}
+          activePhase={activePhase}
+          onPhaseSelect={setActivePhase}
+          onAdvance={advance}
+          onReset={() => setActivePhase('foundation')}
+          tracker={tracker}
+          cameraError={cameraError}
+          onStreamReady={handleStreamReady}
+          debugConfig={debugConfig}
+          diagnostics={diagnostics}
+        />
+      )}
     </div>
   );
 };
