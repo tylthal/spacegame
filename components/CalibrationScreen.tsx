@@ -151,7 +151,8 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                         // POST-CALIBRATION: Detect pinch for clicking
                         if (isSuccessRef.current) {
                             // Only trigger on pinch START (not hold)
-                            if (now - lastPinchTimeRef.current > 500) {
+                            // Requires: 1 second since last pinch AND pinch was released
+                            if (now - lastPinchTimeRef.current > 1000) {
                                 setIsPinching(true);
                                 lastPinchTimeRef.current = now;
                             }
@@ -161,6 +162,7 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                             setLeftPinchDetected(true);
                         }
                     } else {
+                        // Not pinching - reset state
                         if (isSuccessRef.current) {
                             setIsPinching(false);
                         }
@@ -249,6 +251,11 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                         const sumY = positionBufferRef.current.reduce((a, b) => a + b.y, 0);
                         const len = positionBufferRef.current.length;
                         finalCalibrationOffsetRef.current = { x: sumX / len, y: sumY / len };
+
+                        // CRITICAL: Set lastPinchTimeRef to now to prevent the held pinch
+                        // from immediately triggering a click on the START GAME button
+                        lastPinchTimeRef.current = Date.now();
+
                         isSuccessRef.current = true;
                         setIsSuccess(true);
                     }
@@ -294,8 +301,8 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                 >
                     {/* Outer ring */}
                     <div className={`w-12 h-12 rounded-full border-4 transition-all duration-100 ${isPinching
-                            ? 'border-y2k-red bg-y2k-red/30 scale-75'
-                            : 'border-y2k-yellow bg-y2k-yellow/20'
+                        ? 'border-y2k-red bg-y2k-red/30 scale-75'
+                        : 'border-y2k-yellow bg-y2k-yellow/20'
                         }`}>
                         {/* Center dot */}
                         <div className={`absolute top-1/2 left-1/2 w-2 h-2 rounded-full -translate-x-1/2 -translate-y-1/2 ${isPinching ? 'bg-y2k-red' : 'bg-y2k-yellow'
