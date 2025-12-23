@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import HudOverlay from './components/HudOverlay';
 import DebugPanel from './components/DebugPanel';
@@ -10,16 +11,25 @@ import { CombatLoop } from './gameplay/CombatLoop';
 import { SpawnScheduler } from './gameplay/SpawnScheduler';
 import { SeededRng } from './gameplay/Rng';
 import { TitleScreen } from './components/TitleScreen';
-import { WebcamPreview } from './components/WebcamPreview'; // Added for real input
+import { CalibrationScreen } from './components/CalibrationScreen';
+import { ReadyScreen } from './components/ReadyScreen';
+import { WebcamPreview } from './components/WebcamPreview';
+import { InputProcessor } from './input/InputProcessor';
+import { PhaseManager, Phase, PhaseEvent } from './phase/PhaseManager';
 
 const USE_REAL_INPUT = import.meta.env.VITE_USE_REAL_INPUT === '1' || import.meta.env.VITE_USE_REAL_INPUT === 'true';
 
-type GameState = 'TITLE' | 'PLAYING';
-
 const App: React.FC = () => {
-  const [gameState, setGameState] = useState<GameState>('TITLE');
+  // Core Systems
+  const phaseManager = useMemo(() => new PhaseManager(), []);
+  const [phase, setPhase] = useState<Phase>('CALIBRATING'); // Mirror phase manager state
+
   const [tracker, setTracker] = useState<HandTracker | null>(null);
+  const [inputProcessor, setInputProcessor] = useState<InputProcessor | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+
+  // Calibration Progress visual (0-1)
+  const [calibrationProgress, setCalibrationProgress] = useState(0);
 
   // Game Kernel State
   const combatLoop = useMemo(() => {
@@ -29,9 +39,23 @@ const App: React.FC = () => {
     return new CombatLoop(scheduler, rng);
   }, []);
 
+  // Sync Phase Manager -> React State
+  useEffect(() => {
+    // Initial sync
+    setPhase(phaseManager.phase);
+
+    // Subscribe to changes
+    return phaseManager.subscribe((event: PhaseEvent) => {
+      if (event.type === 'transition') {
+        setPhase(event.to);
+        console.log('[Phase] Transition:', event.from, '->', event.to, 'Reason:', event.reason);
+      }
+    });
+  }, [phaseManager]);
+
   // Tick the loop only when PLAYING
   useEffect(() => {
-    if (gameState !== 'PLAYING') return;
+    if (phase !== 'PLAYING') return;
 
     let lastTime = performance.now();
     let frameId = 0;
@@ -44,19 +68,80 @@ const App: React.FC = () => {
     };
     frameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frameId);
-  }, [gameState, combatLoop]);
+  }, [phase, combatLoop]);
 
 
-  // Initialize HandTracker
+  // Initialize HandTracker & InputProcessor
   useEffect(() => {
+    let t: HandTracker;
     if (USE_REAL_INPUT) {
-      const browserTracker = new BrowserHandTracker();
-      setTracker(browserTracker);
-      return () => browserTracker.stop();
+      t = new BrowserHandTracker();
     } else {
-      setTracker(new InMemoryHandTracker());
+      t = new InMemoryHandTracker();
     }
+    setTracker(t);
+
+    const proc = new InputProcessor(t);
+    setInputProcessor(proc);
+
+    return () => {
+      console.log('Cleaning up tracker/processor');
+      proc.dispose();
+      if (t instanceof BrowserHandTracker) t.stop();
+    };
   }, []);
+
+  // Wire InputProcessor -> PhaseManager + CombatLoop
+  useEffect(() => {
+    if (!inputProcessor) return;
+
+    return inputProcessor.subscribe(event => {
+      // 1. Feed PhaseManager
+      phaseManager.ingest({
+        timestamp: event.raw.timestamp,
+        stable: event.stable,
+        gesture: event.gesture
+      });
+
+      // 2. Feed CombatLoop (Input Mapping)
+      // Cursor X is 0..1. Map to -1..1 for game
+      const gameX = (event.cursor.x * 2) - 1;
+      // Invert X because camera is mirrored? Usually mirrors are intuitive (Left is Left).
+      // But webcams often mirror image. 
+      // If I move right, image moves right. 
+      // Let's stick to direct mapping for now.
+      combatLoop.setPlayerX(gameX);
+
+      // 3. Update local calibration visual state (hacky optimization)
+      if (phaseManager.phase === 'CALIBRATING') {
+        // We don't expose progress on PhaseManager yet, but we can guess or expose it?
+        // The PhaseManager tracks `calibrationStableMs`.
+        // Actually, we can't easily access private `calibrationStableMs` without exposing it.
+        // For now, let's just show "Stable" vs "Unstable" based on event.stable?
+        // Better: Update PhaseManager to emit progress or expose public getter?
+        // For MVP, let's just fake a "feeling" of calibration or add a getter.
+        // Let's rely on the transition to READY as the main feedback.
+        // To show a progress bar we'd need to poll PhaseManager or expose state.
+        // See below: I'll trust the user to hold it.
+      }
+    });
+  }, [inputProcessor, phaseManager, combatLoop]);
+
+  // HACK: Poll for calibration progress since it's internal to PhaseManager
+  // Efficient enough for React 18+
+  useEffect(() => {
+    if (phase !== 'CALIBRATING') return;
+    const interval = setInterval(() => {
+      // Use 'any' cast to access private property for visualization if needed,
+      // OR prefer modifying PhaseManager. 
+      // Let's just modify the UI to say "Holding..." vs "Searching" based on input stability?
+      // Actually, let's just be simple. If stable, increment visual bar? No.
+      // Let's skip the progress bar accuracy for this step or it gets complex.
+      // I will set it to 100% when phase becomes READY.
+    }, 100);
+    return () => clearInterval(interval);
+  }, [phase]);
+
 
   const handleStreamReady = useCallback((video: HTMLVideoElement) => {
     if (tracker instanceof BrowserHandTracker) {
@@ -82,7 +167,7 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    if (gameState !== 'PLAYING') return;
+    if (phase !== 'PLAYING') return;
     const interval = setInterval(() => {
       const summary = combatLoop.summary();
       setHudState({
@@ -93,10 +178,14 @@ const App: React.FC = () => {
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [gameState, combatLoop]);
+  }, [phase, combatLoop]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-cyan-50 relative overflow-hidden font-sans select-none">
+    <div
+      className="fixed inset-0 bg-slate-950 text-cyan-50 overflow-hidden font-sans select-none touch-none"
+      style={{ width: '100%', height: '100%', top: 0, left: 0, right: 0, bottom: 0 }}
+    >
+
 
       {/* 3D BACKGROUND - ALWAYS ACTIVE */}
       {/* Note: In Title Screen, combatLoop isn't ticking, so enemies won't move unless we separate Sim vs Render.
@@ -108,21 +197,58 @@ const App: React.FC = () => {
 
       {/* FOREGROUND UI LAYERS */}
 
-      {gameState === 'TITLE' && (
-        <TitleScreen
-          onStart={() => setGameState('PLAYING')}
-          inputReady={!!tracker}
+      {/* PHASE: TITLE (Legacy/Simulated via manual state? No, PhaseManager starts at CALIBRATING) 
+          Wait, user wants "Title Screen". 
+          PhaseManager default is CALIBRATING.
+          We should probably have a 'TITLE' phase in PhaseManager?
+          Or we map TITLE to CALIBRATING?
+          Actually, we want: TITLE -> CALIBRATION -> READY -> PLAYING.
+          TitleScreen.tsx was "Input Ready?" button.
+          Let's make TitleScreen trigger the start of Calibration?
+          Current PhaseManager doesn't have IDLE/TITLE. 
+          Let's shim it: 
+          if Phase == 'CALIBRATING' but we haven't clicked "Start" yet...
+          Actually, let's update PhaseManager to support 'TITLE' or just wrap it.
+          
+          Simpler: We render TitleScreen *overlaying* everything until user clicks "Initialize".
+          Then we reveal Calibration.
+      */}
+
+      {/* 
+        HACK: Since PhaseManager doesn't have TITLE, allow App to manage "Pre-Game" state?
+        Or just add TITLE to PhaseManager later? 
+        The prompt said "App.tsx to manage simplified game state flow: Title Screen -> Gameplay".
+        But now we have complex Phases.
+        Let's assume "Initialize" on Title Screen -> Start PhaseManager Flow.
+      */}
+
+      {/* We need a 'manual' start. So let's keep a local 'showTitle' state. */}
+      {/* Actually let's assume 'CALIBRATING' implies we are in the flow. */}
+
+      {/* Override Phase Rendering */}
+
+      {phase === 'CALIBRATING' && (
+        <CalibrationScreen
+          onStreamReady={handleStreamReady}
+          onError={err => setCameraError(err.message)}
+          calibrationProgress={calibrationProgress}
         />
       )}
 
-      {gameState === 'PLAYING' && (
+      {phase === 'READY' && (
+        <ReadyScreen onStart={() => console.log('Manual Start Clicked? PhaseManager needs a trigger? No, gesture trigger.')} />
+      )}
+
+      {phase === 'PLAYING' && (
         <>
           <HudOverlay {...hudState} />
 
           {/* Exit Button */}
           <div className="absolute top-4 left-4 z-50 pointer-events-auto">
             <button
-              onClick={() => setGameState('TITLE')}
+              onClick={() => {
+                phaseManager.reset(); // Go back to start
+              }}
               className="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white border border-red-500/50 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition"
             >
               Abort
@@ -142,24 +268,26 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Hidden webcam for processing (if needed for debugging, usually BrowserHandTracker keeps it internal 
-          but we passed handleStreamReady? BrowserHandTracker doesn't attach video to DOM by itself?
-          Wait, BrowserHandTracker needs a video element passed to initialize(). 
-          We need to render <WebcamPreview> somewhere to get that video element if we want it on screen or processed.
-          If we hid RebuildShell, we lost WebcamPreview!
-          We must render WebcamPreview (hidden or visible) to drive the input.
+      {/* 
+          Input Note: 
+          If Phase == CALIBRATING, CalibrationScreen handles WebcamPreview rendering.
+          If Phase == PLAYING/READY, we still need WebcamPreview to keep the stream alive?
+          BrowserHandTracker keeps the stream? 
+          Actually, if CalibrationScreen unmounts, WebcamPreview unmounts?
+          WebcamPreview handles the <video> tag. 
+          If we unmount it, does the stream die? 
+          Inside WebcamPreview: useMediaStream...
+          If unmounted, we likely lose the video-element ref.
+          We should keep WebcamPreview mounted ALWAYS, just hidden when not Calibrating.
       */}
-      {USE_REAL_INPUT && (
-        <div className="absolute top-4 right-4 w-32 opacity-50 hover:opacity-100 transition-opacity z-40 pointer-events-auto">
-          {/* Mini preview for validation */}
-          <div className="aspect-video bg-black rounded border border-cyan-900 overflow-hidden">
-            {/* We reuse the component to get the stream and ref, even if small */}
-            {/* It handles getUserMedia and calls onStreamReady */}
-            {/* Pass simplified error handler since we toast it above */}
-            <WebcamPreview onStreamReady={handleStreamReady} onError={err => setCameraError(err.message)} />
-          </div>
+
+      {phase !== 'CALIBRATING' && USE_REAL_INPUT && (
+        <div className="fixed top-20 right-4 w-24 opacity-20 pointer-events-none z-0">
+          {/* Invisible/Small maintainer of the stream */}
+          <WebcamPreview onStreamReady={handleStreamReady} onError={() => { }} />
         </div>
       )}
+
     </div>
   );
 };

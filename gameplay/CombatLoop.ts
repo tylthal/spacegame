@@ -43,6 +43,10 @@ export class CombatLoop {
   // Public access for renderer
   public get activeEnemies(): ReadonlyArray<EnemyInstance> { return this.enemies; }
 
+  // Player state
+  private _playerX = 0;
+  public get playerX(): number { return this._playerX; }
+
   private hull: number;
   private elapsedMs = 0;
   private sinceLastShot = 0;
@@ -54,6 +58,14 @@ export class CombatLoop {
     private readonly options: CombatOptions = DEFAULT_COMBAT_OPTIONS,
   ) {
     this.hull = options.hull;
+  }
+
+  // Update player position (called by InputProcessor/App)
+  public setPlayerX(x: number) {
+    // Clamp to valid range [-1, 1] approx (or whatever the game width is)
+    // GameScene maps X [-0.9, 0.9] -> [-5, 5]
+    // Let's keep normalized [-1, 1] here
+    this._playerX = Math.max(-1, Math.min(1, x));
   }
 
   tick(deltaMs: number): CombatTickResult {
@@ -115,19 +127,39 @@ export class CombatLoop {
     const destroyed: EnemyInstance[] = [];
     while (this.sinceLastShot >= this.options.fireIntervalMs) {
       this.sinceLastShot -= this.options.fireIntervalMs;
-      if (this.enemies.length === 0) continue;
 
-      const targetIndex = this.enemies.reduce((bestIndex, enemy, index, list) => {
-        if (bestIndex === -1) return index;
-        return list[index].position.y > list[bestIndex].position.y ? index : bestIndex;
-      }, -1);
+      // Fire from current player position
+      const shotStart = { x: this._playerX, y: this.options.baseY }; // Player is at baseY effectively (or -4 in scene, which is 0-1 logic inverted)
+      // Actually CombatLoop logic: Enemies start at y=0, Base is at y=1.
+      // So Player is at y=1 (defending the base).
+      // Shots go from y=1 to y=-1 (upwards in screen space if 0 is top? No.)
+      // Wait, let's check advanceEnemies.
+      // y += velocity * delta. Velocity is positive. So enemies move 0 -> 1.
+      // So Player (base) is at +1.
+      // Shots should go "out" from base. 1 -> 0 -> -1.
 
-      const target = this.enemies[targetIndex];
-      const shotStart = { x: target.position.x, y: this.options.baseY };
-      const shotEnd = { x: target.position.x, y: -1 };
+      const shotEnd = { x: this._playerX, y: -1 };
 
-      if (segmentHitsCircle(shotStart, shotEnd, target.position, this.options.enemyRadius[target.kind])) {
-        const [hit] = this.enemies.splice(targetIndex, 1);
+      // Simple collision check against all enemies
+      // Optimize: spatial partition if needed, but for <50 enemies loop is fine.
+
+      let hitEnemyIndex = -1;
+      let closestDist = Infinity;
+
+      for (let i = 0; i < this.enemies.length; i++) {
+        const enemy = this.enemies[i];
+        if (segmentHitsCircle(shotStart, shotEnd, enemy.position, this.options.enemyRadius[enemy.kind])) {
+          // Find closest hit (highest Y is closest to player at 1)
+          const dist = 1 - enemy.position.y;
+          if (dist < closestDist) {
+            closestDist = dist;
+            hitEnemyIndex = i;
+          }
+        }
+      }
+
+      if (hitEnemyIndex !== -1) {
+        const [hit] = this.enemies.splice(hitEnemyIndex, 1);
         destroyed.push(hit);
         this.kills[hit.kind] += 1;
       }

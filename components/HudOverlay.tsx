@@ -59,21 +59,35 @@ const StatBadge: React.FC<{ label: string; value: string | number; hint?: string
 const HudOverlay: React.FC<HudOverlayProps> = ({ score, hull, lives, multiplier = 1, ariaLabel = 'Player HUD' }) => {
   return (
     <section
-      className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-between z-10"
+      className="absolute inset-0 pointer-events-none p-4 md:p-6 flex flex-col justify-between z-10"
       aria-label={ariaLabel}
     >
-      {/* Top Bar */}
-      <header className="flex items-start justify-between">
-        <div className="flex gap-4">
+      {/* Top Bar - Responsive Layout */}
+      <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+
+        {/* Mobile: Compact Header Row */}
+        <div className="flex items-center justify-between w-full md:w-auto md:justify-start md:gap-4">
           <StatBadge label="Score" value={formatNumber(score)} role="status" />
-          <StatBadge label="Multiplier" value={`x${multiplier.toFixed(1)}`} />
+
+          {/* Mobile-only Multiplier (shown next to score on small screens if space permits, or we keep standard layout) */}
+          <div className="md:hidden">
+            <StatBadge label="Mult" value={`x${multiplier.toFixed(1)}`} />
+          </div>
+
+          {/* Desktop Multiplier */}
+          <div className="hidden md:block">
+            <StatBadge label="Multiplier" value={`x${multiplier.toFixed(1)}`} />
+          </div>
         </div>
 
-        <div className="flex flex-col items-end gap-2">
-          <div className="bg-slate-950/60 backdrop-blur border border-red-500/30 px-4 py-2 rounded-full">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] uppercase tracking-widest text-red-400">Hull Integrity</span>
-              <div className="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
+        {/* Right Side / Bottom-on-mobile Status */}
+        <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-start w-full md:w-auto gap-2 md:gap-2">
+
+          {/* Hull Bar */}
+          <div className="bg-slate-950/60 backdrop-blur border border-red-500/30 px-3 py-1.5 md:px-4 md:py-2 rounded-full flex-1 md:flex-none">
+            <div className="flex items-center gap-2 md:gap-3">
+              <span className="text-[10px] uppercase tracking-widest text-red-400 whitespace-nowrap">Hull Integrity</span>
+              <div className="w-full md:w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-300"
                   style={{ width: `${clampHull(hull)}%` }}
@@ -83,16 +97,17 @@ const HudOverlay: React.FC<HudOverlayProps> = ({ score, hull, lives, multiplier 
             </div>
           </div>
 
+          {/* Lives */}
           <div className="flex gap-1">
             {Array.from({ length: lives }).map((_, i) => (
-              <div key={i} className="w-6 h-6 border border-cyan-500/50 bg-cyan-500/20 skew-x-[-12deg]" />
+              <div key={i} className="w-5 h-5 md:w-6 md:h-6 border border-cyan-500/50 bg-cyan-500/20 skew-x-[-12deg]" />
             ))}
           </div>
         </div>
       </header>
 
       {/* Bottom Area (Guidance or contextual info) */}
-      <div className="self-start bg-slate-950/50 backdrop-blur-sm border border-white/5 p-4 rounded-xl max-w-sm pointer-events-auto">
+      <div className="hidden md:block self-start bg-slate-950/50 backdrop-blur-sm border border-white/5 p-4 rounded-xl max-w-sm pointer-events-auto">
         <p className="text-xs text-slate-300 leading-relaxed font-mono">
           <span className="text-cyan-400 block mb-1"> SYSTEM DIAGNOSTIC </span>
           Visual layer hydrated. Post-processing active.

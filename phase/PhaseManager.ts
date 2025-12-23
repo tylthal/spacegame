@@ -53,11 +53,17 @@ export class PhaseManager {
   private pauseHoldStartedAt?: number;
   private elapsedPlayMs = 0;
 
-  constructor(private readonly guards: PhaseGuards = DEFAULT_PHASE_GUARDS) {}
+  constructor(private readonly guards: PhaseGuards = DEFAULT_PHASE_GUARDS) { }
 
   get phase(): Phase {
     return this.state;
   }
+
+  get calibrationProgress(): number {
+    return Math.min(1, this.calibrationStableMs / this.guards.requiredCalibrationStableMs);
+  }
+
+
 
   subscribe(listener: (event: PhaseEvent) => void): () => void {
     this.listeners.add(listener);

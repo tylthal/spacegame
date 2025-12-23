@@ -22,8 +22,8 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, inputReady })
                     <p className="text-cyan-400 tracking-[0.5em] text-xs uppercase font-bold animate-pulse">
                         System Online
                     </p>
-                    <h1 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-200 drop-shadow-[0_0_25px_rgba(34,211,238,0.5)] tracking-tighter">
-                        ORBITAL<br />SNIPER
+                    <h1 className="text-4xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-200 drop-shadow-[0_0_25px_rgba(34,211,238,0.5)] tracking-tighter">
+                        ORBITAL<br className="md:hidden" /> SNIPER
                     </h1>
                     <p className="text-slate-400 tracking-[0.8em] text-sm uppercase font-light">
                         Void Defense Protocol
