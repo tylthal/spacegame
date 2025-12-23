@@ -14,3 +14,17 @@ This project ships with a GitHub Actions workflow at `.github/workflows/deploy.y
 3. Ensure **Pages** permissions include **write** access for GitHub Actions (already declared in the workflow).
 
 Once configured, each push to `main` will build the project with `npm ci && npm run build`, upload the `dist/` output, and deploy it automatically to GitHub Pages.
+
+## Smoke Testing
+
+To verify the critical path without a full browser environment, run:
+
+```bash
+npm run smoke
+```
+
+This executes the headless diagnostics pipeline (`__tests__/diagnosticsMode.test.ts`), determining if the input, phase machine, and spawn logic can successfully transition from `READY` to `PLAYING` and simulate gameplay.
+
+## Large File Storage (LFS)
+
+Git LFS is currently **disabled** to simplify the deployment pipeline. Large assets (e.g., MediaPipe WASM/binary files) are loaded from a CDN at runtime or are small enough to be checked in directly.

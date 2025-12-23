@@ -69,7 +69,7 @@ a task stub of concrete steps to execute.
 - Document troubleshooting steps in `docs/DEVELOPER_GUIDE.md` and `docs/USER_GUIDE.md` (tracking loss, gesture misfires). ✅ Completed: guides updated with flags and troubleshooting notes.
 :::
 
-**Issue 10: Build, deploy, and regression safety**
+**Issue 10: Build, deploy, and regression safety — Status: Done**
 :::task-stub{title="CI and deployment verification"}
 - Validate `npm run build` and ensure assets (MediaPipe) are stubbed or fetched in a CI-friendly manner.
 - Add a `npm run smoke` script that starts the app in headless mode (if feasible) or stubs rendering, then runs a basic health check.
