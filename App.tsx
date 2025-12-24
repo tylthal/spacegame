@@ -11,13 +11,13 @@ import { SpawnScheduler } from './gameplay/SpawnScheduler';
 import { SeededRng } from './gameplay/Rng';
 import { TitleScreen } from './components/TitleScreen';
 import { CalibrationScreen } from './components/CalibrationScreen';
-import { ReadyScreen } from './components/ReadyScreen';
 import { WebcamPreview } from './components/WebcamPreview';
 import { CRTOverlay } from './components/CRTOverlay';
 import { InputProcessor } from './input/InputProcessor';
 import { PhaseManager, Phase, PhaseEvent } from './phase/PhaseManager';
 import { GameHUD } from './components/GameHUD';
 import { GameOverScreen } from './components/GameOverScreen';
+import { HandCursor } from './components/HandCursor';
 
 const USE_REAL_INPUT = import.meta.env.VITE_USE_REAL_INPUT === '1' || import.meta.env.VITE_USE_REAL_INPUT === 'true';
 
@@ -29,6 +29,10 @@ const App: React.FC = () => {
   const [tracker, setTracker] = useState<HandTracker | null>(null);
   const [inputProcessor, setInputProcessor] = useState<InputProcessor | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+
+  // Cursor state for gameplay display
+  const [cursorPos, setCursorPos] = useState({ x: 0.5, y: 0.5 });
+  const [isPinching, setIsPinching] = useState(false);
 
   // Calibration Progress visual (0-1)
   const [calibrationProgress, setCalibrationProgress] = useState(0);
@@ -111,8 +115,12 @@ const App: React.FC = () => {
       combatLoop.setPlayerX(gameX);
 
       // 3. Firing: pinch gesture triggers shooting
-      const isPinching = event.gesture === 'pinch';
-      combatLoop.setFiring(isPinching);
+      const pinching = event.gesture === 'pinch';
+      combatLoop.setFiring(pinching);
+
+      // 4. Update cursor display state (for gameplay cursor)
+      setCursorPos(event.cursor);
+      setIsPinching(pinching);
     });
   }, [inputProcessor, phaseManager, combatLoop]);
 
@@ -216,6 +224,12 @@ const App: React.FC = () => {
         <>
           {/* Game HUD */}
           <GameHUD {...hudState} />
+
+          {/* Gameplay Cursor */}
+          <HandCursor
+            position={cursorPos}
+            isPinching={isPinching}
+          />
 
           {/* Game Over Screen */}
           {isGameOver && (
