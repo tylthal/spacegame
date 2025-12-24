@@ -197,18 +197,23 @@ function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kin
         const { x: vx, y: vy, z: vz } = enemy.velocity;
         velocityVec.current.set(vx, vy, vz);
 
-        // Calculate point BEHIND (opposite velocity) for lookAt
-        // This makes nose point forward due to how meshes are structured
+        // Calculate point AHEAD in velocity direction
+        // lookAt makes -Z point at target
+        // Mesh has engine at -Z, nose at +Z
+        // So looking ahead makes engine point forward... 
+        // We actually want to look ahead to make -Z (engine) face the target,
+        // meaning +Z (nose) faces away from target... no wait.
+        // Let's just try ahead and see what happens
         targetPos.current.set(
-            x - vx * 10,
-            y - vy * 10,
-            z - vz * 10
+            x + vx * 10,
+            y + vy * 10,
+            z + vz * 10
         );
 
         // Reset rotation before applying new one
         group.current.rotation.set(0, 0, 0);
 
-        // Look at the point behind - this makes nose point forward
+        // Look at the point ahead
         group.current.lookAt(targetPos.current);
     });
 
