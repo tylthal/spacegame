@@ -22,6 +22,36 @@ function AssetMesh({ id, ...props }: { id: AssetId } & any) {
 
 // Render individual bullets
 // Render individual bullets - Plasma Bolt style
+// Helper: Lane Projection Logic (Star Fox / Guitar Hero style)
+// Logic X (-1..1), Y (0..1) -> Scene X, Y, Z
+// Y maps to Depth (Z): 0 -> -50 (Far), 1 -> 0 (Near)
+// X maps to Width (X): Scales with depth to create "Lane" effect
+function projectToLane(logicX: number, logicY: number): Vector3 {
+    // 1. Z-Depth: Logic Y (1..0) -> Z (0..-50)
+    // Wait, Logic Y=0 (Start) -> Far (-50)
+    // Logic Y=1 (Base) -> Near (0)
+    // CombatLoop Y is 0 (Top) -> 1 (Base)
+    const zFar = -50;
+    const zNear = 0;
+    // Logic Y=0 should be FAR (-50)
+    // Logic Y=1 should be NEAR (0)
+    // Formula: -50 + (logicY * 50)
+    const sceneZ = zFar + (logicY * (zNear - zFar));
+
+    // 2. X-Width: Perspective scaling
+    // At Near (Z=0), Width is ~10 (-5 to 5)
+    // At Far (Z=-50), Width should be wider (e.g. 50)
+    // Scale factor = 1 + (dist / 15)
+    const dist = zNear - sceneZ;
+    const scale = 1 + (dist / 15); // Tune this for "Lane" feel
+    const baseX = 5; // Base half-width
+    const sceneX = logicX * baseX * scale;
+
+    const sceneY = 0; // Flat plane for now
+
+    return new Vector3(sceneX, sceneY, sceneZ);
+}
+
 // Render all bullets using a single draw call via InstancedMesh
 function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
     const meshRef = useRef<InstancedMesh>(null);
@@ -39,11 +69,11 @@ function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
         for (let i = 0; i < bullets.length; i++) {
             const bullet = bullets[i];
 
-            // Map logic coords to scene coords
-            const sceneX = bullet.position.x * 5;
-            const sceneY = 5 - (bullet.position.y * 10);
+            // Logic Y for bullets goes from >1 (Base) to Target (<0) (Distance)
+            const pos = projectToLane(bullet.position.x, bullet.position.y);
 
-            dummy.current.position.set(sceneX, sceneY, 0);
+            dummy.current.position.copy(pos);
+            dummy.current.lookAt(pos.x, pos.y, pos.z - 10); // Look forward/down range
             dummy.current.updateMatrix();
 
             meshRef.current.setMatrixAt(i, dummy.current.matrix);
@@ -109,8 +139,14 @@ function EnemyRenderer({ enemy }: { enemy: { id: number, kind: string, position:
 
     useFrame((state, delta) => {
         if (!group.current) return;
-        group.current.position.set(enemy.position.x * 5, 5 - (enemy.position.y * 10), 0);
-        group.current.rotation.z = -enemy.velocity.x * 200;
+
+        const pos = projectToLane(enemy.position.x, enemy.position.y);
+        group.current.position.copy(pos);
+
+        // Tilt sprite/mesh towards camera slightly
+        group.current.rotation.x = 0;
+        group.current.rotation.y = 0;
+        group.current.rotation.z = -enemy.velocity.x * 200; // Bank turn
     });
 
     return (

@@ -29,8 +29,10 @@ function AdaptiveCamera() {
         // VFOV = 2 * atan( tan(HFOV/2) / aspect )
         // We can just adjust Z position based on 1/aspect.
 
-        const baseZ = 10;
-        const baseY = 5;
+        // Star Fox / Tunnel Perspective
+        // Camera is lower (Y=3) and closer (Z=5) relative to base, looking DEEP (-20)
+        const baseZ = 5;
+        const baseY = 3;
 
         if (aspect < 1.0) {
             // Portrait: Pull back proportional to how narrow it is
@@ -41,7 +43,8 @@ function AdaptiveCamera() {
             camera.position.set(0, baseY, baseZ);
         }
 
-        camera.lookAt(0, 0, 0);
+        // Look down the tunnel (Z=-20), slightly up from floor
+        camera.lookAt(0, 0, -20);
         camera.updateProjectionMatrix();
 
     }, [camera, size]);
@@ -53,7 +56,7 @@ export function ThreeRenderer({ combatLoop }: ThreeRendererProps) {
     return (
         <div className="absolute inset-0 z-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
             <Canvas
-                camera={{ position: [0, 5, 10], fov: 60 }}
+                camera={{ position: [0, 3, 5], fov: 60 }}
                 dpr={[1, 2]}
             >
                 <color attach="background" args={['#000000']} />
