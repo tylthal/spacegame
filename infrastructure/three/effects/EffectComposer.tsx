@@ -1,6 +1,5 @@
 
-import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
-import { BlendFunction } from 'postprocessing';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 
 export function GameEffects() {
     return (
@@ -10,10 +9,6 @@ export function GameEffects() {
                 mipmapBlur
                 intensity={1.5}
                 radius={0.7}
-            />
-            <ChromaticAberration
-                blendFunction={BlendFunction.NORMAL} // use blendFunction to blend with previous pass
-                offset={[0.002, 0.002]}
             />
             <Vignette
                 eskil={false}
