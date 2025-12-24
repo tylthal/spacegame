@@ -10,6 +10,13 @@ export interface EnemyInstance {
   velocity: Vector2;
 }
 
+export interface Bullet {
+  id: number;
+  position: Vector2;
+  velocity: Vector2;
+  active: boolean;
+}
+
 export interface CombatOptions {
   hull: number;
   fireIntervalMs: number;
@@ -17,13 +24,7 @@ export interface CombatOptions {
   enemySpeedPerMs: Record<EnemyKind, number>;
   enemyDamage: Record<EnemyKind, number>;
   baseY: number;
-}
-
-export interface CombatTickResult {
-  timestamp: number;
-  spawned: EnemyInstance[];
-  destroyed: EnemyInstance[];
-  hull: number;
+  bulletSpeed: number;
 }
 
 const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
@@ -33,15 +34,25 @@ const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   enemySpeedPerMs: { drone: 0.0006, scout: 0.00075, bomber: 0.0005 },
   enemyDamage: { drone: 5, scout: 8, bomber: 15 },
   baseY: 1,
+  bulletSpeed: 0.005, // Fast projectile speed
 };
+
+export interface CombatTickResult {
+  timestamp: number;
+  spawned: EnemyInstance[];
+  destroyed: EnemyInstance[];
+  hull: number;
+}
 
 export class CombatLoop {
   private readonly enemies: EnemyInstance[] = [];
+  private readonly bullets: Bullet[] = [];
   private readonly kills: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0 };
   private readonly spawns: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0 };
 
   // Public access for renderer
   public get activeEnemies(): ReadonlyArray<EnemyInstance> { return this.enemies; }
+  public get activeBullets(): ReadonlyArray<Bullet> { return this.bullets; }
 
   // Player state
   private _playerX = 0;
@@ -70,6 +81,7 @@ export class CombatLoop {
   private hull: number;
   private elapsedMs = 0;
   private enemyId = 0;
+  private bulletId = 0;
 
   constructor(
     private readonly scheduler: SpawnScheduler,
@@ -99,6 +111,8 @@ export class CombatLoop {
     spawned.forEach(enemy => this.enemies.push(enemy));
 
     this.advanceEnemies(deltaMs);
+    const bulletCollisions = this.advanceBullets(deltaMs);
+    const destroyed = [...bulletCollisions];
 
     // Heat management
     if (this._isFiring && !this._isOverheated) {
@@ -116,7 +130,7 @@ export class CombatLoop {
     }
 
     // Fire shots (auto-fire while holding, limited by overheat)
-    const destroyed = this.fireShots();
+    this.spawnBullets();
 
     this.applyHullDamage();
 
@@ -164,12 +178,46 @@ export class CombatLoop {
     }
   }
 
-  private fireShots(): EnemyInstance[] {
+  private advanceBullets(deltaMs: number): EnemyInstance[] {
     const destroyed: EnemyInstance[] = [];
 
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
+      const bullet = this.bullets[i];
+
+      // Move bullet
+      bullet.position.x += bullet.velocity.x * deltaMs;
+      bullet.position.y += bullet.velocity.y * deltaMs;
+
+      // Check for collisions
+      let hit = false;
+      for (let j = this.enemies.length - 1; j >= 0; j--) {
+        const enemy = this.enemies[j];
+        const dist = Math.hypot(bullet.position.x - enemy.position.x, bullet.position.y - enemy.position.y);
+
+        // Simple point-circle collision for bullets
+        if (dist < this.options.enemyRadius[enemy.kind]) {
+          // Hit!
+          destroyed.push(enemy);
+          this.enemies.splice(j, 1);
+          this.kills[enemy.kind] += 1;
+          hit = true;
+          break; // Bullet destroys only one enemy
+        }
+      }
+
+      // Check bounds (off screen top)
+      if (hit || bullet.position.y < -1.5) {
+        this.bullets.splice(i, 1);
+      }
+    }
+
+    return destroyed;
+  }
+
+  private spawnBullets(): void {
     // Only fire if pinching and not overheated
     if (!this._isFiring || this._isOverheated) {
-      return destroyed;
+      return;
     }
 
     // Auto-fire while holding (limited by fire rate)
@@ -186,35 +234,38 @@ export class CombatLoop {
       }
 
       // Fire from base (y=1) toward cursor aim (y=-1)
-      const shotStart = { x: 0, y: this.options.baseY };
-      const shotEnd = { x: this._playerX, y: -1 };
+      const startX = 0;
+      const startY = this.options.baseY;
+      const targetX = this._playerX;
+      const targetY = -1;
 
-      // Find first enemy hit along the shot line
-      let hitEnemyIndex = -1;
-      let closestDist = Infinity;
+      const dx = targetX - startX;
+      const dy = targetY - startY;
+      const validDist = Math.hypot(dx, dy);
 
-      for (let i = 0; i < this.enemies.length; i++) {
-        const enemy = this.enemies[i];
-        if (segmentHitsCircle(shotStart, shotEnd, enemy.position, this.options.enemyRadius[enemy.kind])) {
-          const dist = this.options.baseY - enemy.position.y;
-          if (dist < closestDist) {
-            closestDist = dist;
-            hitEnemyIndex = i;
-          }
-        }
-      }
+      // Normalize and scale by speed
+      const speed = this.options.bulletSpeed;
+      const velocity = {
+        x: (dx / validDist) * speed,
+        y: (dy / validDist) * speed,
+      };
 
-      if (hitEnemyIndex !== -1) {
-        const [hit] = this.enemies.splice(hitEnemyIndex, 1);
-        destroyed.push(hit);
-        this.kills[hit.kind] += 1;
-      }
+      this.bulletId++;
+      this.bullets.push({
+        id: this.bulletId,
+        position: { x: startX, y: startY },
+        velocity: velocity,
+        active: true,
+      });
 
       // Stop firing more this frame if overheated
       if (this._isOverheated) break;
     }
+  }
 
-    return destroyed;
+  // Legacy method placeholder
+  private fireShots(): EnemyInstance[] {
+    return [];
   }
 
   private applyHullDamage(): void {
