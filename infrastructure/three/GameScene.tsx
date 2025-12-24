@@ -15,6 +15,7 @@ function AssetMesh({ id, ...props }: { id: AssetId } & any) {
             {geometryType === 'box' && <boxGeometry args={args as any} />}
             {geometryType === 'sphere' && <sphereGeometry args={args as any} />}
             {geometryType === 'tetrahedron' && <tetrahedronGeometry args={args as any} />}
+            {geometryType === 'octahedron' && <octahedronGeometry args={args as any} />}
             <meshStandardMaterial {...materialParams} />
         </mesh>
     );
@@ -174,15 +175,33 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
 // Sub-component to handle per-enemy updates efficiently
 function EnemyRenderer({ enemy }: { enemy: { id: number, kind: string, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number } } }) {
     const group = useRef<Group>(null);
+    const velocityVec = useRef(new Vector3());
+    const targetPos = useRef(new Vector3());
 
-    useFrame((state, delta) => {
+    useFrame(() => {
         if (!group.current) return;
 
         const { x, y, z } = enemy.position;
         group.current.position.set(x, y, z);
 
-        // Look at the center (0,0,0) which is where the player is
-        group.current.lookAt(0, 0, 0);
+        // VELOCITY-BASED ROTATION
+        // Point the needle in the direction of travel
+        const { x: vx, y: vy, z: vz } = enemy.velocity;
+        velocityVec.current.set(vx, vy, vz);
+
+        // Calculate a target point ahead in the velocity direction
+        targetPos.current.set(
+            x + vx * 10,
+            y + vy * 10,
+            z + vz * 10
+        );
+
+        // Look at the point ahead (needle points where it's going)
+        group.current.lookAt(targetPos.current);
+
+        // Rotate 90 degrees so the elongated Z-axis points forward
+        // (octahedron's natural orientation has the pointy ends on Y)
+        group.current.rotateX(Math.PI / 2);
     });
 
     return (
