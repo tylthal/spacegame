@@ -56,7 +56,9 @@ export class CombatLoop {
 
   // Player state
   private _playerX = 0;
+  private _playerY = 0;
   public get playerX(): number { return this._playerX; }
+  public get playerY(): number { return this._playerY; }
 
   // Firing state (controlled by pinch gesture)
   private _isFiring = false;
@@ -92,9 +94,11 @@ export class CombatLoop {
   }
 
   // Update player position (called by InputProcessor/App)
-  public setPlayerX(x: number) {
-    // Clamp to valid range [-1, 1]
+  public setPlayerPosition(x: number, y: number) {
+    // Clamp to valid range [-1, 1] for X
     this._playerX = Math.max(-1, Math.min(1, x));
+    // Y is roughly 0 (top) to 1 (base).
+    this._playerY = Math.max(-1, Math.min(2, y)); // Allow some overflow?
   }
 
   // Set firing state (true = pinching/firing)
@@ -233,13 +237,16 @@ export class CombatLoop {
         this._isOverheated = true;
       }
 
-      // Fire from below the base (y=1.2) toward cursor aim (y=-1)
+      // Fire from below the base (y=1.2) toward cursor aim (x, y)
       const startX = 0;
-      const startY = 1.2; // Start off-screen (Logic coords: 1 is base, >1 is below)
+      const startY = 1.2; // Start off-screen
       const targetX = this._playerX;
-      const targetY = -1;
+      const targetY = this._playerY; // Use actua logic Y coordinate
 
       const dx = targetX - startX;
+      // Note: Logic Y is 0 (top) to 1 (base).
+      // We fire from 1.2 UP towards targetY (e.g. 0.5 or 0).
+      // So dy should be negative.
       const dy = targetY - startY;
       const validDist = Math.hypot(dx, dy);
 

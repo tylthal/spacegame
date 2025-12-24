@@ -21,13 +21,13 @@ function AssetMesh({ id, ...props }: { id: AssetId } & any) {
 }
 
 // Render individual bullets
+// Render individual bullets - Plasma Bolt style
 function BulletRenderer({ bullet }: { bullet: { position: { x: number, y: number } } }) {
     const mesh = useRef<Mesh>(null);
 
     useFrame(() => {
         if (!mesh.current) return;
         // Map logic coords (x: -1..1, y: 1..-1) to scene coords (x: -5..5, y: -5..15)
-        // Matches EnemyRenderer logic: sceneY = 5 - (logicY * 10)
         const sceneX = bullet.position.x * 5;
         const sceneY = 5 - (bullet.position.y * 10);
 
@@ -36,8 +36,14 @@ function BulletRenderer({ bullet }: { bullet: { position: { x: number, y: number
 
     return (
         <mesh ref={mesh}>
-            <boxGeometry args={[0.2, 0.4, 0.2]} />
-            <meshBasicMaterial color="#FFFF00" />
+            <capsuleGeometry args={[0.08, 0.4, 4, 8]} />
+            <meshStandardMaterial
+                color="#FFFF00"
+                emissive="#FFFF00"
+                emissiveIntensity={2}
+                roughness={0.2}
+                metalness={0.8}
+            />
         </mesh>
     );
 }

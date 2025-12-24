@@ -119,7 +119,11 @@ const App: React.FC = () => {
       // 2. Feed CombatLoop (Input Mapping)
       // Cursor X is 0..1. Map to -1..1 for game
       const gameX = (event.cursor.x * 2) - 1;
-      combatLoop.setPlayerX(gameX);
+      // Cursor Y is 0..1. Map to 0..1 for game (match logic)
+      // Actually, logic is 0=Top, 1=Base. Input Y is 0=Top, 1=Bottom.
+      // So no mapping needed, just clamp.
+      const gameY = event.cursor.y;
+      combatLoop.setPlayerPosition(gameX, gameY);
 
       // 3. Firing: pinch gesture triggers shooting
       const pinching = event.gesture === 'pinch';

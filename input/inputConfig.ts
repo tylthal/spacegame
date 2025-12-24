@@ -13,8 +13,8 @@ export const INPUT_CONFIG = {
      * Note: Y is typically more constrained, so we use higher value for more reach
      */
     virtualPad: {
-        width: 0.35,    // 35% of camera width = full screen X range (more sensitive)
-        height: 0.5,    // 50% of camera height = full screen Y range (easier to reach edges)
+        width: 0.6,     // Increased to 60% to prevent "sticky edges" where hand moves past pad
+        height: 0.7,    // Increased to 70% to match physical range better
         stabilityTolerance: 0.015,
         deadZone: 0.00, // Disabled: dead zone causes sporadic jumping/sticky behavior
     },
