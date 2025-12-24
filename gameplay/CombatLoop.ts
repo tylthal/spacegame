@@ -213,13 +213,22 @@ export class CombatLoop {
     const y = r * Math.sin(pitch);
     const z = -r * Math.cos(yaw) * Math.cos(pitch);
 
-    // Velocity: Target is (0,0,0)
-    // Direction = Target - Pos = -Pos
-    const dist = Math.hypot(x, y, z);
+    // Velocity: Target is area below/behind player
+    // Base Target: (0, -5, 2)
+    // Add variance to make paths distinct
+    const targetX = (this.rng.next() - 0.5) * 15; // +/- 7.5 width variance
+    const targetY = -8 + (this.rng.next() - 0.5) * 4; // -10 to -6 height
+    const targetZ = 10 + (this.rng.next() - 0.5) * 10; // 5 to 15 depth (fly past player)
+
+    const dx = targetX - x;
+    const dy = targetY - y;
+    const dz = targetZ - z;
+
+    const dist = Math.hypot(dx, dy, dz);
     const speed = this.options.enemySpeedPerMs[kind];
-    const vx = (-x / dist) * speed;
-    const vy = (-y / dist) * speed;
-    const vz = (-z / dist) * speed;
+    const vx = (dx / dist) * speed;
+    const vy = (dy / dist) * speed;
+    const vz = (dz / dist) * speed;
 
     return {
       id: this.enemyId,
