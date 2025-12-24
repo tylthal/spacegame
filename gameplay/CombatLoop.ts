@@ -17,13 +17,19 @@ export interface Bullet {
   active: boolean;
 }
 
+/**
+ * Combat configuration options.
+ * The player defends a space station from incoming enemy drones.
+ * "hull" represents the station's hull integrity - enemies that reach
+ * or fly past the player deal damage to the station.
+ */
 export interface CombatOptions {
-  hull: number;
+  hull: number; // Space station hull integrity (0-100)
   fireIntervalMs: number;
   enemyRadius: Record<EnemyKind, number>;
   enemySpeedPerMs: Record<EnemyKind, number>;
-  enemyDamage: Record<EnemyKind, number>;
-  spawnRadius: number; // Radius of the spawn shell
+  enemyDamage: Record<EnemyKind, number>; // Damage dealt to station when enemy gets through
+  spawnRadius: number; // Distance at which enemies spawn
   bulletSpeed: number;
   maxEnemies: number; // Maximum enemies on screen at once
 }
@@ -160,7 +166,7 @@ export class CombatLoop {
     }
 
     this.spawnBullets();
-    this.applyHullDamage();
+    this.applyStationDamage();
 
     return {
       timestamp: this.elapsedMs,
@@ -373,11 +379,16 @@ export class CombatLoop {
     }
   }
 
-  private applyHullDamage(): void {
+  /**
+   * Check for enemies that reached/passed the player and apply station damage.
+   * The player is positioned in front of a space station - any enemy that
+   * gets past the player's defensive position damages the station.
+   */
+  private applyStationDamage(): void {
     for (let i = this.enemies.length - 1; i >= 0; i -= 1) {
       const enemy = this.enemies[i];
 
-      // Check 1: Enemy reached the player (within 2 meter radius of origin)
+      // Check 1: Enemy collided with the player position (within 2 meter radius)
       const distSq = enemy.position.x ** 2 + enemy.position.y ** 2 + enemy.position.z ** 2;
       if (distSq < 2 * 2) {
         this.hull = Math.max(0, this.hull - this.options.enemyDamage[enemy.kind]);
@@ -385,8 +396,8 @@ export class CombatLoop {
         continue;
       }
 
-      // Check 2: Enemy flew past the player (behind camera, Z > 20)
-      // These enemies "got through" the player's defenses
+      // Check 2: Enemy flew past the player and reached the station (Z > 20)
+      // These enemies bypassed defenses and hit the station directly
       if (enemy.position.z > 20) {
         this.hull = Math.max(0, this.hull - this.options.enemyDamage[enemy.kind]);
         this.enemies.splice(i, 1);

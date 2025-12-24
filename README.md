@@ -1,31 +1,50 @@
-# Spacegame rebuild shell
+# Orbital Sniper: Void Defense
 
-The repository has been reset to a minimal, testable shell. Legacy gameplay code, assets, and MediaPipe/Three.js wiring have
-been removed so the rebuild can proceed in small, well-tested steps.
+A gesture-controlled space shooter where you defend a space station from waves of incoming enemy drones using hand tracking.
+
+## Game Concept
+
+You are the last line of defense for a space station under attack. Enemy drones approach from deep space - use your hand to aim and pinch to fire. Any enemy that gets past you damages the station's hull. Survive as long as possible while protecting the station.
+
+## Controls
+
+- **Right Hand (Point)**: Aim your weapon - point at enemies to target them
+- **Left Hand (Pinch)**: Fire your weapon - pinch thumb and index finger together to shoot
+- **Both Hands**: Required for calibration before gameplay begins
 
 ## Quickstart
 
 1. Install dependencies: `npm install`
 2. Start the dev server: `npm run dev`
-3. Visit the Vite URL (defaults to `http://localhost:5173`) to see the placeholder screens that will host the rebuilt features.
+3. Visit the Vite URL (defaults to `http://localhost:5173`)
+4. Click "INITIALIZE_SYSTEM" to begin calibration
+5. Follow the on-screen instructions to calibrate hand tracking
+6. Defend the station!
 
 ## Tests
 
-- `npm run test`: run the Vitest suite.
-- `npm run lint`: type-check the project.
+- `npm run test`: run the Vitest suite
+- `npm run lint`: type-check the project
 
-## What is in the repo now
+## Architecture
 
-- A React shell with placeholder screens for the upcoming calibration, ready/menu, and gameplay flows.
-- A11y-first HUD overlay component (score, hull, lives) previewed in the shell with Testing Library coverage.
-- MENU_Z menu target math and hit-detection helpers with deterministic unit tests.
-- Guard tests that fail if legacy modules or assets are reintroduced.
-- Documentation updated to describe the clean foundation and phased rebuild plan.
+- **CombatLoop**: Core gameplay logic - enemy spawning, bullet physics, station damage
+- **InputProcessor**: Hand tracking and gesture recognition
+- **PhaseManager**: Game state management (Title → Calibration → Playing → GameOver)
+- **ThreeRenderer**: 3D rendering with React Three Fiber
+- **GameHUD**: Real-time display of score, station hull, heat, and kills
 
-## What is intentionally missing
+## Configuration
 
-- MediaPipe camera/gesture handling.
-- Three.js rendering, scene composition, and gameplay visuals beyond HUD/menu placeholders.
-- Legacy assets; new art/UI will return alongside the rebuilt systems.
+Key gameplay settings in `CombatLoop.ts`:
+- `hull: 100` - Starting station hull integrity
+- `maxEnemies: 6` - Maximum enemies on screen
+- `fireIntervalMs: 125` - Rate of fire (8 shots/second)
+- `enemyDamage` - Damage dealt to station when enemies get through
 
-Each missing piece will return gradually as the rebuild plan is implemented with tests and clear module boundaries.
+## Development
+
+See `docs/` for detailed documentation:
+- `ARCHITECTURE.md` - System design and layering
+- `TECHNICAL_REFERENCE.md` - API and configuration details
+- `DEVELOPER_GUIDE.md` - Contributing guidelines
