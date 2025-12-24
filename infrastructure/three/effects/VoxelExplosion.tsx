@@ -1,6 +1,6 @@
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { InstancedMesh, Object3D, Color, MathUtils } from 'three';
+import { InstancedMesh, Object3D, Color } from 'three';
 
 interface Debris {
     x: number;
@@ -16,8 +16,7 @@ interface Debris {
     rotSpeedY: number;
     rotSpeedZ: number;
     scale: number;
-    life: number;
-    maxLife: number;
+    lifeMultiplier: number; // 0.5-1.5 for varied fade timing
 }
 
 export interface Explosion {
@@ -34,42 +33,46 @@ interface VoxelExplosionProps {
     onComplete: (id: number) => void;
 }
 
-const DEBRIS_COUNT = 12;
-const EXPLOSION_DURATION = 800; // ms
+const DEBRIS_COUNT = 50; // More particles
+const EXPLOSION_DURATION = 700; // ms
 
 /**
- * Single explosion instance with voxel debris
+ * Bright particle explosion with concentrated center and lingering debris
  */
 export function VoxelExplosion({ explosion, onComplete }: VoxelExplosionProps) {
     const meshRef = useRef<InstancedMesh>(null);
     const dummy = useRef(new Object3D());
-    const startTimeRef = useRef<number | null>(null);
+    const elapsedRef = useRef(0);
 
-    // Create debris particles on mount
+    // Create debris particles - many small particles, concentrated center
     const debris = useMemo<Debris[]>(() => {
         const particles: Debris[] = [];
         for (let i = 0; i < DEBRIS_COUNT; i++) {
-            // Random direction with upward bias
+            // Random spherical direction
             const theta = Math.random() * Math.PI * 2;
-            const phi = Math.random() * Math.PI * 0.8; // Mostly outward
-            const speed = 0.02 + Math.random() * 0.04;
+            const phi = Math.acos(2 * Math.random() - 1);
+
+            // Speed varies - some fast, some slow (creates depth)
+            const speedBase = 0.008 + Math.random() * 0.025;
+            // Center particles start slower
+            const isCenterParticle = i < DEBRIS_COUNT * 0.4;
+            const speed = isCenterParticle ? speedBase * 0.5 : speedBase;
 
             particles.push({
                 x: explosion.x,
                 y: explosion.y,
                 z: explosion.z,
                 vx: Math.sin(phi) * Math.cos(theta) * speed,
-                vy: Math.sin(phi) * Math.sin(theta) * speed + 0.01, // Slight upward
+                vy: Math.sin(phi) * Math.sin(theta) * speed,
                 vz: Math.cos(phi) * speed,
                 rotX: Math.random() * Math.PI * 2,
                 rotY: Math.random() * Math.PI * 2,
                 rotZ: Math.random() * Math.PI * 2,
-                rotSpeedX: (Math.random() - 0.5) * 0.3,
-                rotSpeedY: (Math.random() - 0.5) * 0.3,
-                rotSpeedZ: (Math.random() - 0.5) * 0.3,
-                scale: 0.3 + Math.random() * 0.5,
-                life: EXPLOSION_DURATION,
-                maxLife: EXPLOSION_DURATION,
+                rotSpeedX: (Math.random() - 0.5) * 0.2,
+                rotSpeedY: (Math.random() - 0.5) * 0.2,
+                rotSpeedZ: (Math.random() - 0.5) * 0.2,
+                scale: 0.08 + Math.random() * 0.12, // Small particles
+                lifeMultiplier: 0.6 + Math.random() * 0.8, // Varied fade timing
             });
         }
         return particles;
@@ -78,16 +81,12 @@ export function VoxelExplosion({ explosion, onComplete }: VoxelExplosionProps) {
     useFrame((_, delta) => {
         if (!meshRef.current) return;
 
-        // Initialize start time
-        if (startTimeRef.current === null) {
-            startTimeRef.current = Date.now();
-        }
+        elapsedRef.current += delta * 1000;
+        const elapsed = elapsedRef.current;
+        const maxProgress = Math.min(elapsed / EXPLOSION_DURATION, 1);
 
-        const elapsed = Date.now() - startTimeRef.current;
-        const progress = Math.min(elapsed / EXPLOSION_DURATION, 1);
-
-        // Check if explosion is complete
-        if (progress >= 1) {
+        // Check if explosion is complete (all particles faded)
+        if (maxProgress >= 1) {
             onComplete(explosion.id);
             return;
         }
@@ -104,17 +103,18 @@ export function VoxelExplosion({ explosion, onComplete }: VoxelExplosionProps) {
             d.z += d.vz * deltaMs;
 
             // Slow down over time (drag)
-            d.vx *= 0.98;
-            d.vy *= 0.98;
-            d.vz *= 0.98;
+            d.vx *= 0.97;
+            d.vy *= 0.97;
+            d.vz *= 0.97;
 
             // Update rotation
             d.rotX += d.rotSpeedX;
             d.rotY += d.rotSpeedY;
             d.rotZ += d.rotSpeedZ;
 
-            // Calculate fade based on progress
-            const fadeScale = 1 - progress;
+            // Individual fade timing - some particles linger longer
+            const particleProgress = Math.min(elapsed / (EXPLOSION_DURATION * d.lifeMultiplier), 1);
+            const fadeScale = Math.max(0, 1 - particleProgress * particleProgress);
 
             // Set instance transform
             dummy.current.position.set(d.x, d.y, d.z);
@@ -131,13 +131,13 @@ export function VoxelExplosion({ explosion, onComplete }: VoxelExplosionProps) {
 
     return (
         <instancedMesh ref={meshRef} args={[undefined, undefined, DEBRIS_COUNT]}>
-            <boxGeometry args={[0.4, 0.4, 0.4]} />
+            <sphereGeometry args={[0.12, 6, 4]} />
             <meshStandardMaterial
                 color={explosionColor}
                 emissive={explosionColor}
-                emissiveIntensity={3}
-                roughness={0.3}
-                metalness={0.7}
+                emissiveIntensity={5}
+                roughness={0.2}
+                metalness={0.4}
             />
         </instancedMesh>
     );
@@ -149,3 +149,4 @@ export const EXPLOSION_COLORS: Record<string, string> = {
     scout: '#FF8800',  // Orange
     bomber: '#AA00FF', // Purple
 };
+
