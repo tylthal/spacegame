@@ -17,9 +17,11 @@ function clamp(value: number, min: number, max: number): number {
  * - Calibration support (user's natural position = screen center)
  * - Configurable sensitivity via virtual pad size
  * - Axis inversion for webcam mirror correction
+ * - Dead zone to prevent jitter when holding still
  */
 export class CursorMapper {
     private calibrationOffset = { x: 0.5, y: 0.5 };
+    private lastCursor = { x: 0.5, y: 0.5 };
     private readonly config = INPUT_CONFIG;
 
     /**
@@ -37,10 +39,18 @@ export class CursorMapper {
     }
 
     /**
+     * Reset last cursor position (call when cursor becomes invisible)
+     */
+    resetLastPosition(): void {
+        this.lastCursor = { x: 0.5, y: 0.5 };
+    }
+
+    /**
      * Transform raw hand position to screen coordinates (0-1).
      * 
      * The calibrated position maps to screen center (0.5, 0.5).
      * The virtual pad size determines sensitivity - smaller = more sensitive.
+     * Includes dead zone to prevent jitter when holding still.
      * 
      * @param pos - Raw MediaPipe position (0 = left/top, 1 = right/bottom)
      * @returns Screen position (0-1), calibrated and scaled
@@ -48,6 +58,7 @@ export class CursorMapper {
     toCursor(pos: { x: number; y: number }): { x: number; y: number } {
         const { width, height } = this.config.virtualPad;
         const { invertX, invertY } = this.config.axes;
+        const deadZone = this.config.virtualPad.deadZone ?? 0.01;
 
         // Calculate offset from calibrated center
         const offsetX = pos.x - this.calibrationOffset.x;
@@ -60,10 +71,24 @@ export class CursorMapper {
         const scaledX = (xMultiplier * offsetX / width) + 0.5;
         const scaledY = (yMultiplier * offsetY / height) + 0.5;
 
-        return {
+        const newCursor = {
             x: clamp(scaledX, 0, 1),
             y: clamp(scaledY, 0, 1),
         };
+
+        // Apply dead zone - ignore small movements to reduce jitter
+        const deltaX = Math.abs(newCursor.x - this.lastCursor.x);
+        const deltaY = Math.abs(newCursor.y - this.lastCursor.y);
+        const totalDelta = Math.hypot(deltaX, deltaY);
+
+        if (totalDelta < deadZone) {
+            // Movement too small, keep last position
+            return { ...this.lastCursor };
+        }
+
+        // Update last cursor and return new position
+        this.lastCursor = newCursor;
+        return newCursor;
     }
 
     /**
@@ -75,6 +100,7 @@ export class CursorMapper {
         padSize: number
     ): { x: number; y: number } {
         const { invertX, invertY } = this.config.axes;
+        const deadZone = this.config.virtualPad.deadZone ?? 0.01;
 
         const offsetX = pos.x - this.calibrationOffset.x;
         const offsetY = pos.y - this.calibrationOffset.y;
@@ -85,10 +111,23 @@ export class CursorMapper {
         const scaledX = (xMultiplier * offsetX / padSize) + 0.5;
         const scaledY = (yMultiplier * offsetY / padSize) + 0.5;
 
-        return {
+        const newCursor = {
             x: clamp(scaledX, 0, 1),
             y: clamp(scaledY, 0, 1),
         };
+
+        // Apply dead zone
+        const totalDelta = Math.hypot(
+            Math.abs(newCursor.x - this.lastCursor.x),
+            Math.abs(newCursor.y - this.lastCursor.y)
+        );
+
+        if (totalDelta < deadZone) {
+            return { ...this.lastCursor };
+        }
+
+        this.lastCursor = newCursor;
+        return newCursor;
     }
 }
 
