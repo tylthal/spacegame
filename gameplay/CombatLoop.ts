@@ -96,23 +96,14 @@ export class CombatLoop {
   }
 
   // Set Aim from Input (0..1 range)
-  // x: 0 (Left) -> 1 (Right) => Maps to Yaw Cone (-30 to 30 deg)
-  // y: 0 (Top) -> 1 (Bottom) => Maps to Pitch Cone (15 to -15 deg)
+  // Using linear screen projection instead of spherical coordinates
+  // x: 0 (Left) -> 1 (Right)
+  // y: 0 (Top) -> 1 (Bottom)
   public setPlayerPosition(x: number, y: number) {
-    // Forward Cone Scaling (Matched to Camera FOV)
-    const MAX_YAW = 45 * (Math.PI / 180);   // 45 degrees (Horizontal - 90 FOV total)
-    const MAX_PITCH = 30 * (Math.PI / 180); // 30 degrees (Vertical - 60 FOV total)
-
-    // Map X (0..1) to Yaw (-30 to +30 deg)
-    // x=0 (Left) -> -30 deg (Left/Negative Yaw)
-    // x=1 (Right) -> +30 deg (Right/Positive Yaw)
-    this._yaw = (x - 0.5) * 2 * MAX_YAW;
-
-    // Map Y (top..bottom) to Pitch
-    // Top (0) -> Up (+Pitch)
-    // Bottom (1) -> Down (-Pitch)
-    const clampedY = Math.max(0, Math.min(1, y));
-    this._pitch = (0.5 - clampedY) * 2 * MAX_PITCH;
+    // Store as normalized device coordinates (-1 to 1)
+    // This will be used directly for linear projection in spawnBullets
+    this._yaw = (x - 0.5) * 2;   // -1 (left) to 1 (right)
+    this._pitch = (0.5 - y) * 2; // -1 (bottom) to 1 (top)
   }
 
   public reset(): void {
@@ -310,19 +301,29 @@ export class CombatLoop {
 
       const speed = this.options.bulletSpeed;
 
-      // SIMPLIFIED: Fire directly from origin in aim direction
-      // Aim Vector (Spherical to Cartesian)
-      // Forward is -Z, Y is up
-      const aimDirY = Math.sin(this._pitch);
-      const aimH = Math.cos(this._pitch);
-      const aimDirX = aimH * Math.sin(this._yaw);
-      const aimDirZ = -aimH * Math.cos(this._yaw);
+      // LINEAR SCREEN PROJECTION
+      // Camera FOV: 60° vertical, ~90° horizontal (16:9 aspect)
+      // Project cursor position to a point on a virtual screen plane at distance D
 
-      // Normalize (should already be unit vector, but safety)
-      const mag = Math.hypot(aimDirX, aimDirY, aimDirZ);
-      const vx = (aimDirX / mag) * speed;
-      const vy = (aimDirY / mag) * speed;
-      const vz = (aimDirZ / mag) * speed;
+      const D = 100; // Virtual screen distance
+      const VERTICAL_FOV = 60 * (Math.PI / 180); // 60 degrees
+      const ASPECT_RATIO = 16 / 9;
+
+      // Calculate half-extents of the virtual screen at distance D
+      const halfHeight = D * Math.tan(VERTICAL_FOV / 2);
+      const halfWidth = halfHeight * ASPECT_RATIO;
+
+      // _yaw is now NDC X: -1 (left) to 1 (right)
+      // _pitch is now NDC Y: -1 (bottom) to 1 (top)
+      const targetX = this._yaw * halfWidth;
+      const targetY = this._pitch * halfHeight;
+      const targetZ = -D; // Forward is -Z
+
+      // Calculate velocity direction from origin to target
+      const dist = Math.hypot(targetX, targetY, targetZ);
+      const vx = (targetX / dist) * speed;
+      const vy = (targetY / dist) * speed;
+      const vz = (targetZ / dist) * speed;
 
       // Spawn at origin
       this.bulletId++;
