@@ -52,8 +52,8 @@ const App: React.FC = () => {
   const [isPaused, setIsPaused] = useState(false);
   const palmHoldStartRef = useRef<number | null>(null);
   const palmConsecutiveFramesRef = useRef(0); // Track consecutive palm frames
-  const PAUSE_HOLD_MS = 1200; // Hold RIGHT palm for 1.2 seconds (very intentional)
-  const PAUSE_MIN_FRAMES = 10; // Require at least 10 consecutive palm frames
+  const PAUSE_HOLD_MS = 600; // Hold BOTH palms for 0.6 seconds
+  const PAUSE_MIN_FRAMES = 5; // Require at least 5 consecutive palm frames
 
   // Sync Phase Manager -> React State
   useEffect(() => {
