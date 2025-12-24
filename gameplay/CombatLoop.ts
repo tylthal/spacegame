@@ -376,13 +376,21 @@ export class CombatLoop {
   private applyHullDamage(): void {
     for (let i = this.enemies.length - 1; i >= 0; i -= 1) {
       const enemy = this.enemies[i];
-      // Check distance to center (Player at 0,0,0)
-      const distSq = enemy.position.x ** 2 + enemy.position.y ** 2 + enemy.position.z ** 2;
 
-      // If too close, damage and destroy
-      if (distSq < 2 * 2) { // 2 meter radius
+      // Check 1: Enemy reached the player (within 2 meter radius of origin)
+      const distSq = enemy.position.x ** 2 + enemy.position.y ** 2 + enemy.position.z ** 2;
+      if (distSq < 2 * 2) {
         this.hull = Math.max(0, this.hull - this.options.enemyDamage[enemy.kind]);
         this.enemies.splice(i, 1);
+        continue;
+      }
+
+      // Check 2: Enemy flew past the player (behind camera, Z > 20)
+      // These enemies "got through" the player's defenses
+      if (enemy.position.z > 20) {
+        this.hull = Math.max(0, this.hull - this.options.enemyDamage[enemy.kind]);
+        this.enemies.splice(i, 1);
+        continue;
       }
     }
   }
