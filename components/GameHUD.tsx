@@ -5,6 +5,8 @@ export interface GameHUDProps {
     hull: number;
     kills: number;
     elapsedMs: number;
+    heat: number;
+    isOverheated: boolean;
 }
 
 const formatTime = (ms: number): string => {
@@ -17,17 +19,20 @@ const formatTime = (ms: number): string => {
 /**
  * GameHUD - Y2K themed heads-up display for gameplay
  * 
- * Shows hull integrity, score, and survival time in the Y2K glitch aesthetic.
+ * Shows hull integrity, score, heat, and survival time in the Y2K glitch aesthetic.
  */
 export const GameHUD: React.FC<GameHUDProps> = ({
     score,
     hull,
     kills,
     elapsedMs,
+    heat,
+    isOverheated,
 }) => {
     const hullPercent = Math.max(0, Math.min(100, hull));
     const isDanger = hullPercent <= 25;
     const isWarning = hullPercent <= 50 && hullPercent > 25;
+    const heatPercent = Math.max(0, Math.min(100, heat));
 
     return (
         <div className="fixed inset-0 pointer-events-none z-40">
@@ -97,12 +102,33 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 </div>
             </div>
 
-            {/* Bottom: Targeting Reticle Info */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-                <div className="bg-black/60 border border-y2k-yellow/50 px-4 py-2 text-center">
-                    <div className="font-mono text-xs text-y2k-yellow/80 uppercase tracking-widest">
-                        Auto-Fire Active • Point to Aim
+            {/* Bottom: Heat Gauge */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-80">
+                <div className="bg-black/80 border-2 border-y2k-yellow/50 p-3">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className={`text-xs font-mono uppercase tracking-wider ${isOverheated ? 'text-y2k-red animate-pulse' : 'text-y2k-yellow/70'
+                            }`}>
+                            {isOverheated ? '⚠ OVERHEAT - COOLING DOWN' : 'Weapon Heat'}
+                        </span>
+                        <span className={`font-mono text-sm ${isOverheated ? 'text-y2k-red' : heatPercent > 70 ? 'text-y2k-yellow' : 'text-y2k-white/70'
+                            }`}>
+                            {Math.round(heatPercent)}%
+                        </span>
                     </div>
+                    <div className="h-3 bg-black border border-y2k-white/30">
+                        <div
+                            className={`h-full transition-all duration-100 ${isOverheated ? 'bg-y2k-red animate-pulse' :
+                                    heatPercent > 70 ? 'bg-y2k-yellow' :
+                                        'bg-y2k-cyan'
+                                }`}
+                            style={{ width: `${heatPercent}%` }}
+                        />
+                    </div>
+                    {!isOverheated && (
+                        <div className="text-xs font-mono text-y2k-white/50 mt-1 text-center uppercase tracking-widest">
+                            Pinch to Fire • Release to Cool
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -110,3 +136,4 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 };
 
 export default GameHUD;
+

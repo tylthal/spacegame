@@ -142,6 +142,8 @@ const App: React.FC = () => {
     hull: 100,
     kills: 0,
     elapsedMs: 0,
+    heat: 0,
+    isOverheated: false,
   });
   const [isGameOver, setIsGameOver] = useState(false);
 
@@ -159,6 +161,8 @@ const App: React.FC = () => {
         hull: summary.hull,
         kills: totalKills,
         elapsedMs: summary.elapsedMs,
+        heat: summary.heat,
+        isOverheated: summary.isOverheated,
       });
 
       // Check for game over

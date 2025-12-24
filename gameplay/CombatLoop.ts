@@ -49,8 +49,23 @@ export class CombatLoop {
 
   // Firing state (controlled by pinch gesture)
   private _isFiring = false;
-  private _wasFiring = false;
-  public get isFiring(): boolean { return this._isFiring; }
+  public get isFiring(): boolean { return this._isFiring && !this._isOverheated; }
+
+  // Heat system
+  private _heat = 0;           // Current heat (0-100)
+  private _isOverheated = false;
+  private sinceLastShot = 0;
+
+  // Heat settings
+  private readonly maxHeat = 100;
+  private readonly heatPerShot = 15;           // Heat gained per shot
+  private readonly heatCooldownPerMs = 0.05;   // Heat lost per ms when not firing
+  private readonly overheatCooldownPerMs = 0.03; // Slower cooldown when overheated
+  private readonly overheatThreshold = 100;    // Heat level that triggers overheat
+  private readonly overheatRecoveryThreshold = 30; // Must cool to this to recover
+
+  public get heat(): number { return this._heat; }
+  public get isOverheated(): boolean { return this._isOverheated; }
 
   private hull: number;
   private elapsedMs = 0;
@@ -85,9 +100,23 @@ export class CombatLoop {
 
     this.advanceEnemies(deltaMs);
 
-    // Fire only on pinch START (edge trigger)
+    // Heat management
+    if (this._isFiring && !this._isOverheated) {
+      // While firing: accumulate shot timer and try to fire
+      this.sinceLastShot += deltaMs;
+    } else {
+      // Not firing: cool down
+      const cooldownRate = this._isOverheated ? this.overheatCooldownPerMs : this.heatCooldownPerMs;
+      this._heat = Math.max(0, this._heat - cooldownRate * deltaMs);
+
+      // Recover from overheat when cooled enough
+      if (this._isOverheated && this._heat <= this.overheatRecoveryThreshold) {
+        this._isOverheated = false;
+      }
+    }
+
+    // Fire shots (auto-fire while holding, limited by overheat)
     const destroyed = this.fireShots();
-    this._wasFiring = this._isFiring;
 
     this.applyHullDamage();
 
@@ -99,13 +128,15 @@ export class CombatLoop {
     };
   }
 
-  summary(): { hull: number; kills: Record<EnemyKind, number>; spawns: Record<EnemyKind, number>; active: number; elapsedMs: number } {
+  summary(): { hull: number; kills: Record<EnemyKind, number>; spawns: Record<EnemyKind, number>; active: number; elapsedMs: number; heat: number; isOverheated: boolean } {
     return {
       hull: this.hull,
       kills: { ...this.kills },
       spawns: { ...this.spawns },
       active: this.enemies.length,
       elapsedMs: this.elapsedMs,
+      heat: this._heat,
+      isOverheated: this._isOverheated,
     };
   }
 
@@ -136,36 +167,51 @@ export class CombatLoop {
   private fireShots(): EnemyInstance[] {
     const destroyed: EnemyInstance[] = [];
 
-    // Only fire on pinch START (rising edge - was not firing, now firing)
-    if (!this._isFiring || this._wasFiring) {
+    // Only fire if pinching and not overheated
+    if (!this._isFiring || this._isOverheated) {
       return destroyed;
     }
 
-    // Fire from base (y=1) toward cursor aim (y=-1)
-    // Shot goes from bottom center (0, 1) toward the cursor X position
-    const shotStart = { x: 0, y: this.options.baseY }; // Origin: bottom center
-    const shotEnd = { x: this._playerX, y: -1 };       // Target: cursor position extended
+    // Auto-fire while holding (limited by fire rate)
+    while (this.sinceLastShot >= this.options.fireIntervalMs) {
+      this.sinceLastShot -= this.options.fireIntervalMs;
 
-    // Simple collision check against all enemies
-    let hitEnemyIndex = -1;
-    let closestDist = Infinity;
+      // Add heat for this shot
+      this._heat += this.heatPerShot;
 
-    for (let i = 0; i < this.enemies.length; i++) {
-      const enemy = this.enemies[i];
-      if (segmentHitsCircle(shotStart, shotEnd, enemy.position, this.options.enemyRadius[enemy.kind])) {
-        // Find closest hit to the base (highest Y value)
-        const dist = this.options.baseY - enemy.position.y;
-        if (dist < closestDist) {
-          closestDist = dist;
-          hitEnemyIndex = i;
+      // Check for overheat
+      if (this._heat >= this.overheatThreshold) {
+        this._heat = this.maxHeat;
+        this._isOverheated = true;
+      }
+
+      // Fire from base (y=1) toward cursor aim (y=-1)
+      const shotStart = { x: 0, y: this.options.baseY };
+      const shotEnd = { x: this._playerX, y: -1 };
+
+      // Find first enemy hit along the shot line
+      let hitEnemyIndex = -1;
+      let closestDist = Infinity;
+
+      for (let i = 0; i < this.enemies.length; i++) {
+        const enemy = this.enemies[i];
+        if (segmentHitsCircle(shotStart, shotEnd, enemy.position, this.options.enemyRadius[enemy.kind])) {
+          const dist = this.options.baseY - enemy.position.y;
+          if (dist < closestDist) {
+            closestDist = dist;
+            hitEnemyIndex = i;
+          }
         }
       }
-    }
 
-    if (hitEnemyIndex !== -1) {
-      const [hit] = this.enemies.splice(hitEnemyIndex, 1);
-      destroyed.push(hit);
-      this.kills[hit.kind] += 1;
+      if (hitEnemyIndex !== -1) {
+        const [hit] = this.enemies.splice(hitEnemyIndex, 1);
+        destroyed.push(hit);
+        this.kills[hit.kind] += 1;
+      }
+
+      // Stop firing more this frame if overheated
+      if (this._isOverheated) break;
     }
 
     return destroyed;
