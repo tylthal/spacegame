@@ -3,7 +3,8 @@ import { OneEuroConfig, OneEuroFilter } from './OneEuroFilter';
 import { INPUT_CONFIG } from './inputConfig';
 import { CursorMapper } from './CursorMapper';
 
-type Gesture = 'pinch' | 'fist' | 'palm';
+// Gestures: pinch (shooting), fist (gripping), palm (stop/pause), point (default/aiming)
+type Gesture = 'pinch' | 'fist' | 'palm' | 'point';
 
 export interface VirtualMousepadConfig {
   origin: { x: number; y: number };
@@ -252,7 +253,7 @@ export class InputProcessor {
     const pinkyTip = landmarks[20];
 
     if (!wrist || !thumbTip || !indexTip || !middleTip || !ringTip || !pinkyTip) {
-      return 'palm';
+      return 'point'; // Default to point, not palm
     }
 
     const boundingDiagonal = this.boundingDiagonal(landmarks);
@@ -285,7 +286,21 @@ export class InputProcessor {
       return 'fist';
     }
 
-    return 'palm';
+    // EXPLICIT PALM DETECTION:
+    // Palm requires ALL fingers to be extended (far from wrist)
+    // and fingers spread apart (not bunched together)
+    const palmExtensionThreshold = 0.55; // Fingers must be > 55% of diagonal from wrist
+    const allFingersExtended = curlDistances.every(d => d >= palmExtensionThreshold);
+
+    // Check that thumb is also extended away from index (spread hand)
+    const thumbSpread = this.normalizedDistance(thumbTip, indexTip, boundingDiagonal) >= 0.15;
+
+    if (allFingersExtended && thumbSpread) {
+      return 'palm';
+    }
+
+    // Default to 'point' (normal aiming gesture)
+    return 'point';
   }
 
   private boundingDiagonal(landmarks: HandLandmark[]): number {
