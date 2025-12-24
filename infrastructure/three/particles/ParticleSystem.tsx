@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { Points, BufferGeometry, Float32BufferAttribute, PointsMaterial } from 'three';
 
 // Warp Speed Starfield
-export function Starfield({ count = 2000 }) {
+export function Starfield({ count = 1000 }) {
     const points = useRef<Points>(null);
 
     const particlesPosition = useMemo(() => {

@@ -5,10 +5,9 @@ export function GameEffects() {
     return (
         <EffectComposer>
             <Bloom
-                luminanceThreshold={0.2}
-                mipmapBlur
-                intensity={1.5}
-                radius={0.7}
+                luminanceThreshold={0.3}
+                intensity={0.8}
+                radius={0.5}
             />
             <Vignette
                 eskil={false}
