@@ -388,8 +388,7 @@ export class CombatLoop {
       const speed = this.options.bulletSpeed;
 
       // ===== TARGETING SYSTEM =====
-      // Bullets spawn at muzzle but travel toward crosshair target
-      // CRITICAL: Account for camera position offset!
+      // Muzzle at bottom of screen (camera-local), target at crosshair (world space)
 
       // Camera properties (must match Three.js camera in ThreeRenderer.tsx)
       const VERTICAL_FOV = 60 * (Math.PI / 180); // 60 degrees
@@ -397,28 +396,29 @@ export class CombatLoop {
         ? window.innerWidth / window.innerHeight
         : 16 / 9;
 
-      // Camera is NOT at origin - it's offset! (from ThreeRenderer.tsx)
+      // Camera position (from ThreeRenderer.tsx: camera={{ position: [0, 3, 5] }})
       const CAMERA_Y = 3;
       const CAMERA_Z = 5;
 
-      // 1. MUZZLE: Fixed at visual BOTTOM-CENTER of screen, relative to camera
-      const MUZZLE_DISTANCE = 5; // Distance in front of camera
+      // 1. MUZZLE: Fixed at visual BOTTOM-CENTER of screen
+      // This is in front of the camera, at the bottom edge of what's visible
+      const MUZZLE_DISTANCE = 5;
       const muzzleHalfHeight = MUZZLE_DISTANCE * Math.tan(VERTICAL_FOV / 2);
       const MUZZLE_X = 0;
-      const MUZZLE_Y = CAMERA_Y - muzzleHalfHeight; // Offset by camera Y
+      const MUZZLE_Y = CAMERA_Y - muzzleHalfHeight; // Bottom of screen at this distance
       const MUZZLE_Z = CAMERA_Z - MUZZLE_DISTANCE;   // In front of camera
 
-      // 2. TARGET: Flat plane projection at fixed Z, relative to camera
+      // 2. TARGET: Where crosshair is pointing in world space (far away)
       const TARGET_DISTANCE = 100;
-      const halfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);
-      const halfWidth = halfHeight * ASPECT_RATIO;
+      const targetHalfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);
+      const targetHalfWidth = targetHalfHeight * ASPECT_RATIO;
 
-      // Convert cursor (0..1) to world coordinates on flat plane (relative to camera)
-      const targetX = (this._cursorX - 0.5) * 2 * halfWidth;
-      const targetY = CAMERA_Y + (0.5 - this._cursorY) * 2 * halfHeight; // Offset by camera Y
-      const targetZ = CAMERA_Z - TARGET_DISTANCE; // In front of camera
+      // Convert cursor (0..1) to world position at target distance
+      const targetX = (this._cursorX - 0.5) * 2 * targetHalfWidth;
+      const targetY = CAMERA_Y + (0.5 - this._cursorY) * 2 * targetHalfHeight;
+      const targetZ = CAMERA_Z - TARGET_DISTANCE;
 
-      // 3. BULLET DIRECTION: From MUZZLE to target point
+      // 3. BULLET DIRECTION: From MUZZLE to target
       const dx = targetX - MUZZLE_X;
       const dy = targetY - MUZZLE_Y;
       const dz = targetZ - MUZZLE_Z;
@@ -427,7 +427,7 @@ export class CombatLoop {
       const vy = (dy / dist) * speed;
       const vz = (dz / dist) * speed;
 
-      // 4. SPAWN: At muzzle with calculated velocity
+      // 4. SPAWN: At muzzle position
       this.bulletId++;
       let bullet = this.bulletPool.pop();
       if (!bullet) {
