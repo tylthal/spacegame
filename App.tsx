@@ -125,9 +125,8 @@ const App: React.FC = () => {
       // - event.cursor is ALWAYS the 'Aim Hand' (Rightmost)
       // - event.gesture is ALWAYS the 'Fire Hand' (Leftmost)
 
-      const gameX = (event.cursor.x * 2) - 1;
-      const gameY = event.cursor.y;
-      combatLoop.setPlayerPosition(gameX, gameY);
+      // Pass RAW 0-1 cursor values - CombatLoop handles the transformation
+      combatLoop.setPlayerPosition(event.cursor.x, event.cursor.y);
 
       // 3. Firing
       const pinching = event.gesture === 'pinch';
