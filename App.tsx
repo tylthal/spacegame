@@ -1,4 +1,3 @@
-
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DebugPanel from './components/DebugPanel';
 import { resolveDebugConfig } from './observability/DebugConfig';
@@ -17,6 +16,7 @@ import { InputProcessor } from './input/InputProcessor';
 import { PhaseManager, Phase, PhaseEvent } from './phase/PhaseManager';
 import { GameHUD } from './components/GameHUD';
 import { GameOverScreen } from './components/GameOverScreen';
+import { PauseScreen } from './components/PauseScreen';
 import { HandCursor } from './components/HandCursor';
 import { CursorLayer } from './components/CursorLayer';
 
@@ -48,6 +48,11 @@ const App: React.FC = () => {
   const [isGameOver, setIsGameOver] = useState(false);
   const frozenTimeRef = useRef<number | null>(null);
 
+  // Pause state
+  const [isPaused, setIsPaused] = useState(false);
+  const palmHoldStartRef = useRef<number | null>(null);
+  const PAUSE_HOLD_MS = 500; // Hold palm for 500ms to toggle pause
+
   // Sync Phase Manager -> React State
   useEffect(() => {
     // Initial sync
@@ -67,9 +72,9 @@ const App: React.FC = () => {
     });
   }, [phaseManager]);
 
-  // Tick the loop only when PLAYING and not game over
+  // Tick the loop only when PLAYING and not game over and not paused
   useEffect(() => {
-    if (phase !== 'PLAYING' || isGameOver) return;
+    if (phase !== 'PLAYING' || isGameOver || isPaused) return;
 
     let lastTime: number | null = null;
     let frameId = 0;
@@ -89,7 +94,34 @@ const App: React.FC = () => {
     };
     frameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frameId);
-  }, [phase, combatLoop, isGameOver]);
+  }, [phase, combatLoop, isGameOver, isPaused]);
+
+  // Pause gesture detection - right hand palm held for 500ms
+  useEffect(() => {
+    if (!inputProcessor || phase !== 'PLAYING' || isGameOver) return;
+
+    return inputProcessor.subscribe(event => {
+      const rightHand = event.hands.right;
+      if (!rightHand) {
+        palmHoldStartRef.current = null;
+        return;
+      }
+
+      if (rightHand.gesture === 'palm') {
+        if (!palmHoldStartRef.current) {
+          palmHoldStartRef.current = Date.now();
+        } else {
+          const heldMs = Date.now() - palmHoldStartRef.current;
+          if (heldMs >= PAUSE_HOLD_MS) {
+            setIsPaused(prev => !prev);
+            palmHoldStartRef.current = null; // Reset after toggle
+          }
+        }
+      } else {
+        palmHoldStartRef.current = null;
+      }
+    });
+  }, [inputProcessor, phase, isGameOver]);
 
 
   // Initialize HandTracker & InputProcessor
@@ -263,6 +295,22 @@ const App: React.FC = () => {
                 // Go back to title screen
                 phaseManager.reset();
                 setIsGameOver(false);
+              }}
+            />
+          )}
+
+          {/* Pause Screen - show when paused but not game over */}
+          {isPaused && !isGameOver && (
+            <PauseScreen
+              inputProcessor={inputProcessor}
+              onResume={() => {
+                setIsPaused(false);
+                palmHoldStartRef.current = null;
+              }}
+              onExit={() => {
+                // Go back to title screen
+                phaseManager.reset();
+                setIsPaused(false);
               }}
             />
           )}
