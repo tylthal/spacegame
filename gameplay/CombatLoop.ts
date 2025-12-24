@@ -41,7 +41,7 @@ const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   enemySpeedPerMs: { drone: 0.02, scout: 0.015, bomber: 0.01 }, // Faster to cover distance
   enemyDamage: { drone: 5, scout: 8, bomber: 15 },
   spawnRadius: 250, // Increased from 150 - enemies spawn farther away
-  bulletSpeed: 0.08, // Slowed from 0.2 - visible travel time, requires leading targets
+  bulletSpeed: 0.18, // Faster bullets = less lead required when aiming
   maxEnemies: 6, // Limit enemies on screen
 };
 
