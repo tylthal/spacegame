@@ -99,9 +99,9 @@ export class CombatLoop {
   // x: 0 (Left) -> 1 (Right) => Maps to Yaw Cone (-30 to 30 deg)
   // y: 0 (Top) -> 1 (Bottom) => Maps to Pitch Cone (15 to -15 deg)
   public setPlayerPosition(x: number, y: number) {
-    // Forward Cone Scaling
-    const MAX_YAW = Math.PI / 6;   // 30 degrees
-    const MAX_PITCH = Math.PI / 12; // 15 degrees
+    // Forward Cone Scaling (Matched to Camera FOV)
+    const MAX_YAW = 50 * (Math.PI / 180);   // 50 degrees (Horizontal)
+    const MAX_PITCH = 30 * (Math.PI / 180); // 30 degrees (Vertical)
 
     // Map X (0..1) to Yaw (-30 to +30 deg)
     // x=0 (Left) -> -30 deg (Left/Negative Yaw)
