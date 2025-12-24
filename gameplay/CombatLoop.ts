@@ -88,7 +88,7 @@ export class CombatLoop {
   // Missile state (fist gesture)
   private _isFiringMissile = false;
   private missileCooldownMs = 0;
-  private readonly missileCooldownDuration = 1500; // 1.5 seconds between missiles
+  private readonly missileCooldownDuration = 5000; // 5 seconds between missiles
   private readonly missileSpeed = 0.08; // Slower than bullets (0.18)
   private readonly missileProximityRadius = 8; // Detonation proximity
   private readonly missileBlastRadius = 15; // Area damage radius
