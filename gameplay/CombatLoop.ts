@@ -319,25 +319,34 @@ export class CombatLoop {
       const targetY = this._pitch * halfHeight;
       const targetZ = -D; // Forward is -Z
 
-      // Calculate velocity direction from origin to target
-      const dist = Math.hypot(targetX, targetY, targetZ);
-      const vx = (targetX / dist) * speed;
-      const vy = (targetY / dist) * speed;
-      const vz = (targetZ / dist) * speed;
+      // MUZZLE POSITION: Fixed at bottom center of screen
+      const muzzleX = 0;
+      const muzzleY = -3; // Below camera
+      const muzzleZ = 0;
 
-      // Spawn at origin
+      // Calculate velocity direction from MUZZLE through TARGET
+      const dx = targetX - muzzleX;
+      const dy = targetY - muzzleY;
+      const dz = targetZ - muzzleZ;
+      const dist = Math.hypot(dx, dy, dz);
+
+      const vx = (dx / dist) * speed;
+      const vy = (dy / dist) * speed;
+      const vz = (dz / dist) * speed;
+
+      // Spawn at muzzle position
       this.bulletId++;
       let bullet = this.bulletPool.pop();
       if (!bullet) {
         bullet = {
           id: this.bulletId,
-          position: { x: 0, y: 0, z: 0 },
+          position: { x: muzzleX, y: muzzleY, z: muzzleZ },
           velocity: { x: vx, y: vy, z: vz },
           active: true,
         };
       } else {
         bullet.id = this.bulletId;
-        bullet.position.x = 0; bullet.position.y = 0; bullet.position.z = 0;
+        bullet.position.x = muzzleX; bullet.position.y = muzzleY; bullet.position.z = muzzleZ;
         bullet.velocity.x = vx; bullet.velocity.y = vy; bullet.velocity.z = vz;
         bullet.active = true;
       }
