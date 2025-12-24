@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Group, Mesh, Vector3 } from 'three';
+import { Group, Mesh, Vector3, Object3D, InstancedMesh } from 'three';
 import { CombatLoop } from '../../gameplay/CombatLoop';
 import { useSpaceshipAsset, AssetId } from './assets/AssetLoader';
 import { GameEffects } from './effects/EffectComposer';
@@ -22,20 +22,38 @@ function AssetMesh({ id, ...props }: { id: AssetId } & any) {
 
 // Render individual bullets
 // Render individual bullets - Plasma Bolt style
-function BulletRenderer({ bullet }: { bullet: { position: { x: number, y: number } } }) {
-    const mesh = useRef<Mesh>(null);
+// Render all bullets using a single draw call via InstancedMesh
+function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
+    const meshRef = useRef<InstancedMesh>(null);
+    const dummy = useRef(new Object3D());
 
     useFrame(() => {
-        if (!mesh.current) return;
-        // Map logic coords (x: -1..1, y: 1..-1) to scene coords (x: -5..5, y: -5..15)
-        const sceneX = bullet.position.x * 5;
-        const sceneY = 5 - (bullet.position.y * 10);
+        if (!meshRef.current) return;
 
-        mesh.current.position.set(sceneX, sceneY, 0);
+        const bullets = combatLoop.activeBullets;
+
+        // Update instance count to match active bullets
+        // Note: count must be <= args max count. Default 1000 is plenty.
+        meshRef.current.count = bullets.length;
+
+        for (let i = 0; i < bullets.length; i++) {
+            const bullet = bullets[i];
+
+            // Map logic coords to scene coords
+            const sceneX = bullet.position.x * 5;
+            const sceneY = 5 - (bullet.position.y * 10);
+
+            dummy.current.position.set(sceneX, sceneY, 0);
+            dummy.current.updateMatrix();
+
+            meshRef.current.setMatrixAt(i, dummy.current.matrix);
+        }
+
+        meshRef.current.instanceMatrix.needsUpdate = true;
     });
 
     return (
-        <mesh ref={mesh}>
+        <instancedMesh ref={meshRef} args={[undefined, undefined, 1000]}>
             <capsuleGeometry args={[0.08, 0.4, 4, 8]} />
             <meshStandardMaterial
                 color="#FFFF00"
@@ -44,45 +62,21 @@ function BulletRenderer({ bullet }: { bullet: { position: { x: number, y: number
                 roughness={0.2}
                 metalness={0.8}
             />
-        </mesh>
+        </instancedMesh>
     );
 }
 
 export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
-    // Force re-render on every frame to animating bullets/enemies
-    // In React-Three-Fiber, standard practice is refs for imperative updates.
-    // But adding/removing bullets requires state or forced update.
-    // Since CombatLoop manages the array, we just need to ensure we re-render usage.
-    // The `useFrame` in GameScene doesn't trigger React render.
-    // However, `combatLoop.activeBullets` is a standard array.
-    // Changes to its length won't trigger React.
-    // We need a mechanism to force re-render or use a pool.
-    // For now, let's use a dummy state to force 60fps React render for the lists?
-    // Or better: Use <InstanceMesh> for bullets?
-    // Given the low count (10-20 bullets), a simple tick that forces update is fine.
-
-    // Actually, `activeEnemies` implementation is:
-    // {combatLoop?.activeEnemies.map(...)}
-    // If `activeEnemies` changes (splice/push), React won't know!
-    // We need `useFrame` to force update, or use `useState` to generic version.
-    // Existing code didn't handle enemy spawning updates reactively?
-    // Ah, `useSpaceshipAsset` hooks? No.
-    // The existing `GameScene` relies on `combatLoop` prop.
-    // If `combatLoop` instance is constant, React doesn't re-render.
-    // THIS IS A BUG. New enemies won't appear!
-    // I need to fix this.
-
-    // I will add a `useFrame` that uses `useState` to force render if counts change.
-    // Optimization: Only force re-render when the number of entities changes
-    // This reduces React reconciliation overhead significantly vs 60fps forced updates.
-    // Ideally we'd use InstancedMesh (Phase 2), but this is a good Phase 1 fix.
+    // Optimization: Only force re-render when the number of enemies changes
+    // Bullets are now handled by the InstancedBulletRenderer efficiently inside useFrame
     const [version, setVersion] = useState(0);
     const lastEntityCount = useRef(0);
 
     useFrame(() => {
         if (!combatLoop) return;
 
-        const count = combatLoop.activeBullets.length + combatLoop.activeEnemies.length;
+        // Only track enemies for React updates now
+        const count = combatLoop.activeEnemies.length;
         if (count !== lastEntityCount.current) {
             lastEntityCount.current = count;
             setVersion(v => v + 1);
@@ -94,12 +88,8 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
             <GameEffects />
             <Starfield />
 
-            {/* Bullets */}
-            <group>
-                {combatLoop?.activeBullets.map(bullet => (
-                    <BulletRenderer key={bullet.id} bullet={bullet} />
-                ))}
-            </group>
+            {/* Bullets - Instanced for High Performance */}
+            {combatLoop && <InstancedBulletRenderer combatLoop={combatLoop} />}
 
             {/* Enemies */}
             <group>
@@ -110,6 +100,8 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
         </group>
     );
 }
+
+
 
 // Sub-component to handle per-enemy updates efficiently
 function EnemyRenderer({ enemy }: { enemy: { id: number, kind: string, position: { x: number, y: number }, velocity: { x: number } } }) {
