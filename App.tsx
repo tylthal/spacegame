@@ -206,14 +206,10 @@ const App: React.FC = () => {
             if (inputProcessor) {
               inputProcessor.setCalibration(offset);
             }
-            // Transition to game
-            setPhase('READY');
+            // Go directly to gameplay
+            setPhase('PLAYING');
           }}
         />
-      )}
-
-      {phase === 'READY' && (
-        <ReadyScreen onStart={() => console.log('Manual Start Clicked? PhaseManager needs a trigger? No, gesture trigger.')} />
       )}
 
       {phase === 'PLAYING' && (
