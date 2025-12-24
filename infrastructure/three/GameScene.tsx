@@ -180,7 +180,7 @@ const HITBOX_RADIUS: Record<string, number> = {
 };
 
 // Sub-component to handle per-enemy updates efficiently
-function EnemyRenderer({ enemy, showHitbox = true }: { enemy: { id: number, kind: string, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number } }, showHitbox?: boolean }) {
+function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kind: string, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number } }, showHitbox?: boolean }) {
     const group = useRef<Group>(null);
     const velocityVec = useRef(new Vector3());
     const targetPos = useRef(new Vector3());
