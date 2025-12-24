@@ -16,7 +16,7 @@ export const INPUT_CONFIG = {
         width: 0.35,    // 35% of camera width = full screen X range (more sensitive)
         height: 0.5,    // 50% of camera height = full screen Y range (easier to reach edges)
         stabilityTolerance: 0.015,
-        deadZone: 0.012, // Ignore movements smaller than 1.2% of screen - reduces jitter
+        deadZone: 0.00, // Disabled: dead zone causes sporadic jumping/sticky behavior
     },
 
     /**

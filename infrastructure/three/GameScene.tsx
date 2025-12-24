@@ -43,11 +43,37 @@ function BulletRenderer({ bullet }: { bullet: { position: { x: number, y: number
 }
 
 export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
-    const [isFiring, setIsFiring] = useState(false);
+    // Force re-render on every frame to animating bullets/enemies
+    // In React-Three-Fiber, standard practice is refs for imperative updates.
+    // But adding/removing bullets requires state or forced update.
+    // Since CombatLoop manages the array, we just need to ensure we re-render usage.
+    // The `useFrame` in GameScene doesn't trigger React render.
+    // However, `combatLoop.activeBullets` is a standard array.
+    // Changes to its length won't trigger React.
+    // We need a mechanism to force re-render or use a pool.
+    // For now, let's use a dummy state to force 60fps React render for the lists?
+    // Or better: Use <InstanceMesh> for bullets?
+    // Given the low count (10-20 bullets), a simple tick that forces update is fine.
 
+    // Actually, `activeEnemies` implementation is:
+    // {combatLoop?.activeEnemies.map(...)}
+    // If `activeEnemies` changes (splice/push), React won't know!
+    // We need `useFrame` to force update, or use `useState` to generic version.
+    // Existing code didn't handle enemy spawning updates reactively?
+    // Ah, `useSpaceshipAsset` hooks? No.
+    // The existing `GameScene` relies on `combatLoop` prop.
+    // If `combatLoop` instance is constant, React doesn't re-render.
+    // THIS IS A BUG. New enemies won't appear!
+    // I need to fix this.
+
+    // I will add a `useFrame` that uses `useState` to force render if counts change.
+    const [tick, setTick] = useState(0);
     useFrame(() => {
         if (!combatLoop) return;
-        setIsFiring(combatLoop.isFiring);
+        // Cheap check: if enemy/bullet count changed, or just 30fps update?
+        // Let's force update every few frames or just rely on React's speed?
+        // For "Arcade", let's force render.
+        setTick(t => (t + 1) % 60);
     });
 
     return (
@@ -62,12 +88,7 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
                 ))}
             </group>
 
-            {/* Muzzle flash at bottom center when firing - moved offscreen to match new launch point */}
-            {isFiring && (
-                <pointLight position={[0, -6, 0]} color="#FFFF00" intensity={3} distance={5} />
-            )}
-
-            {/* Enemies: Declarative approach */}
+            {/* Enemies */}
             <group>
                 {combatLoop?.activeEnemies.map(enemy => (
                     <EnemyRenderer key={enemy.id} enemy={enemy as any} />
