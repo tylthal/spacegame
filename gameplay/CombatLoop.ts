@@ -104,8 +104,9 @@ export class CombatLoop {
     const MAX_PITCH = Math.PI / 12; // 15 degrees
 
     // Map X (0..1) to Yaw (-30 to +30 deg)
-    // 0 -> +30 (Left), 1 -> -30 (Right)
-    this._yaw = (0.5 - x) * 2 * MAX_YAW;
+    // x=0 (Left) -> -30 deg (Left/Negative Yaw)
+    // x=1 (Right) -> +30 deg (Right/Positive Yaw)
+    this._yaw = (x - 0.5) * 2 * MAX_YAW;
 
     // Map Y (top..bottom) to Pitch
     // Top (0) -> Up (+Pitch)
@@ -313,34 +314,49 @@ export class CombatLoop {
 
       const speed = this.options.bulletSpeed;
 
-      // x = sin(yaw) * cos(pitch)
-      // y = sin(pitch)
-      // z = -cos(yaw) * cos(pitch)
+      // 1. Calculate Aim Point (Where the player is looking)
+      // Eye Position: (0,0,0)
+      // Aim Vector (Spherical to Cartesian)
+      const aimDirY = Math.sin(this._pitch);
+      const aimH = Math.cos(this._pitch);
+      const aimDirX = aimH * Math.sin(this._yaw);
+      const aimDirZ = -aimH * Math.cos(this._yaw); // Forward is -Z
 
-      const dirY = Math.sin(this._pitch);
-      const h = Math.cos(this._pitch); // horizontal proj
-      const dirX = h * Math.sin(this._yaw);
-      const dirZ = -h * Math.cos(this._yaw); // -Z is forward
+      // Convergence Distance (where bullets cross the crosshair)
+      const CONVERGENCE_DIST = 50;
+      const targetX = aimDirX * CONVERGENCE_DIST;
+      const targetY = aimDirY * CONVERGENCE_DIST;
+      const targetZ = aimDirZ * CONVERGENCE_DIST;
 
-      // Normalize just in case
-      const mag = Math.hypot(dirX, dirY, dirZ);
+      // 2. Muzzle Position (Fixed hardpoint below camera)
+      // Offset: 0 X, -2 Y (Below), 1 Z (Slightly forward/back?) 
+      // Camera is at 0,0,0. Let's put muzzle bit forward and down.
+      const muzzleX = 0;
+      const muzzleY = -2.0;
+      const muzzleZ = 0.5;
 
-      const vx = (dirX / mag) * speed;
-      const vy = (dirY / mag) * speed;
-      const vz = (dirZ / mag) * speed;
+      // 3. Bullet Velocity Vector (Muzzle -> Target)
+      const dx = targetX - muzzleX;
+      const dy = targetY - muzzleY;
+      const dz = targetZ - muzzleZ;
+      const dist = Math.hypot(dx, dy, dz);
+
+      const vx = (dx / dist) * speed;
+      const vy = (dy / dist) * speed;
+      const vz = (dz / dist) * speed;
 
       this.bulletId++;
       let bullet = this.bulletPool.pop();
       if (!bullet) {
         bullet = {
           id: this.bulletId,
-          position: { x: 0, y: 0, z: 0 },
+          position: { x: muzzleX, y: muzzleY, z: muzzleZ },
           velocity: { x: vx, y: vy, z: vz },
           active: true,
         };
       } else {
         bullet.id = this.bulletId;
-        bullet.position.x = 0; bullet.position.y = 0; bullet.position.z = 0;
+        bullet.position.x = muzzleX; bullet.position.y = muzzleY; bullet.position.z = muzzleZ;
         bullet.velocity.x = vx; bullet.velocity.y = vy; bullet.velocity.z = vz;
         bullet.active = true;
       }
