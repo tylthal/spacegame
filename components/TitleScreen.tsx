@@ -25,7 +25,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
                         ORBITAL
                     </h1>
                     <h1 className="text-9xl font-display font-bold text-y2k-yellow tracking-tighter leading-[0.8] select-none ml-2">
-                        SNIPER
+                        DEFENSE
                     </h1>
                 </div>
 

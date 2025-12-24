@@ -20,9 +20,9 @@ describe('App shell', () => {
   it('renders the title screen initially', () => {
     render(<App />);
 
-    // App should start on Title screen - check for "ORBITAL SNIPER" title
+    // App should start on Title screen - check for "ORBITAL DEFENSE" title
     expect(screen.getAllByText(/ORBITAL/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/SNIPER/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/DEFENSE/i).length).toBeGreaterThan(0);
   });
 
   it('has an initialize button', () => {

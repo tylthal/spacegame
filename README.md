@@ -1,4 +1,4 @@
-# Orbital Sniper: Void Defense
+# Orbital Defense
 
 A gesture-controlled space shooter where you defend a space station from waves of incoming enemy drones using hand tracking.
 
