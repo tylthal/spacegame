@@ -179,16 +179,17 @@ export class CombatLoop {
     this.spawns[kind] += 1;
 
     // Spawn in Forward Cone (Sector)
-    // Random Yaw/Pitch within Spawn Cone (slightly wider than aim cone)
+    // Random Yaw/Pitch within Spawn Cone
     const SPAWN_YAW = Math.PI / 3; // 60 degrees total width (+/- 30)
-    const SPAWN_PITCH = Math.PI / 6; // 30 degrees total height
+    const SPAWN_PITCH = Math.PI / 4; // 45 degrees height range
 
-    // Random -0.5 .. 0.5
+    // Yaw: Random across full width (-0.5 to 0.5)
     const u = this.rng.next() - 0.5;
-    const v = this.rng.next() - 0.5;
+    // Pitch: Biased upward (0.1 to 0.9 -> mostly positive pitch = upper screen)
+    const v = this.rng.next() * 0.8 + 0.1; // Range: 0.1 to 0.9 (top-biased)
 
     const yaw = u * SPAWN_YAW;
-    const pitch = v * SPAWN_PITCH;
+    const pitch = v * SPAWN_PITCH; // Now mostly positive = above center
 
     const r = this.options.spawnRadius;
 
