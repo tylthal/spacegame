@@ -100,6 +100,9 @@ function InstancedMissileRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
                 z + missile.velocity.z
             );
 
+            // Cone geometry points up (+Y), rotate to point forward (-Z after lookAt)
+            dummy.current.rotateX(Math.PI / 2);
+
             dummy.current.updateMatrix();
             meshRef.current.setMatrixAt(i, dummy.current.matrix);
         }
