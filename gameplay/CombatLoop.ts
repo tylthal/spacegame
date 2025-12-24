@@ -54,7 +54,7 @@ export class CombatLoop {
   // Heat system
   private _heat = 0;           // Current heat (0-100)
   private _isOverheated = false;
-  private sinceLastShot = 0;
+  private sinceLastShot = 450; // Start ready to fire immediately
 
   // Heat settings
   private readonly maxHeat = 100;
