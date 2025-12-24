@@ -45,6 +45,8 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
 
     // Track if restart has been triggered to prevent repeated calls
     const triggeredRef = useRef(false);
+    const onRestartRef = useRef(onRestart);
+    onRestartRef.current = onRestart;
 
     // Check if cursor is over the button and handle pinch-click
     useEffect(() => {
@@ -66,14 +68,14 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
         // Trigger restart on pinch while hovering (only once)
         if (isOver && isPinching && !triggeredRef.current) {
             triggeredRef.current = true;
-            onRestart();
+            onRestartRef.current();
         }
 
         // Reset trigger when not pinching
         if (!isPinching) {
             triggeredRef.current = false;
         }
-    }, [cursorPos, isPinching, onRestart]);
+    }, [cursorPos, isPinching]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">

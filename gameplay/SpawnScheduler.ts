@@ -36,6 +36,12 @@ export class SpawnScheduler {
     this.nextSpawnAt = this.tiers[0].startMs + this.tiers[0].intervalMs;
   }
 
+  /** Reset scheduler to initial state for game restart */
+  reset(): void {
+    this.elapsedMs = 0;
+    this.nextSpawnAt = this.tiers[0].startMs + this.tiers[0].intervalMs;
+  }
+
   step(deltaMs: number): SpawnEvent[] {
     if (deltaMs < 0) throw new Error('deltaMs must be non-negative');
     this.elapsedMs += deltaMs;
