@@ -158,9 +158,6 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
             <GameEffects />
             <Starfield />
 
-            {/* DEBUG: Aim line from muzzle to target */}
-            {combatLoop && <DebugAimLine combatLoop={combatLoop} />}
-
             {/* Bullets - Instanced for High Performance */}
             {combatLoop && <InstancedBulletRenderer combatLoop={combatLoop} />}
 
