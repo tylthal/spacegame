@@ -52,7 +52,7 @@ export class BrowserHandTracker implements HandTracker {
 
       if (result.landmarks && result.landmarks.length > 0) {
         if (import.meta.env.DEV) {
-          console.log(`DEBUG: HandLandmarker detected ${result.landmarks.length} hands`);
+          // console.log(`DEBUG: HandLandmarker detected ${result.landmarks.length} hands`);
         }
         // Iterate over all detected hands
         for (let i = 0; i < result.landmarks.length; i++) {
@@ -66,7 +66,7 @@ export class BrowserHandTracker implements HandTracker {
             : 'Right';
 
           if (import.meta.env.DEV) {
-            console.log(`DEBUG: Emitting ${handedness} hand`);
+            // console.log(`DEBUG: Emitting ${handedness} hand`);
           }
 
           const frame: HandFrame = {

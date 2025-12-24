@@ -72,7 +72,6 @@ export class InputProcessor {
 
   setCalibration(offset: { x: number; y: number }): void {
     this.cursorMapper.setCalibration(offset);
-    console.log(`[Input] Calibrated Zero Point: X=${offset.x.toFixed(3)}, Y=${offset.y.toFixed(3)}`);
   }
 
   dispose(): void {
