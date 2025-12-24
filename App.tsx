@@ -63,11 +63,18 @@ const App: React.FC = () => {
   useEffect(() => {
     if (phase !== 'PLAYING') return;
 
-    let lastTime = performance.now();
+    let lastTime: number | null = null;
     let frameId = 0;
 
     const tick = (time: number) => {
-      const delta = time - lastTime;
+      // Skip first frame to establish baseline
+      if (lastTime === null) {
+        lastTime = time;
+        frameId = requestAnimationFrame(tick);
+        return;
+      }
+
+      const delta = Math.max(0, time - lastTime); // Clamp to non-negative
       lastTime = time;
       combatLoop.tick(delta);
       frameId = requestAnimationFrame(tick);
@@ -117,6 +124,11 @@ const App: React.FC = () => {
       // 3. Firing: pinch gesture triggers shooting
       const pinching = event.gesture === 'pinch';
       combatLoop.setFiring(pinching);
+
+      // DEBUG: Log when pinch state changes
+      if (pinching) {
+        console.log('[DEBUG] Pinching! isFiring:', combatLoop.isFiring, 'isOverheated:', combatLoop.isOverheated, 'heat:', combatLoop.heat);
+      }
 
       // 4. Update cursor display state (for gameplay cursor)
       setCursorPos(event.cursor);

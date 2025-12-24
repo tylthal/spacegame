@@ -167,6 +167,11 @@ export class CombatLoop {
   private fireShots(): EnemyInstance[] {
     const destroyed: EnemyInstance[] = [];
 
+    // DEBUG: Log firing state
+    if (this._isFiring) {
+      console.log('[CombatLoop] fireShots: _isFiring=', this._isFiring, '_isOverheated=', this._isOverheated, 'sinceLastShot=', this.sinceLastShot, 'fireInterval=', this.options.fireIntervalMs);
+    }
+
     // Only fire if pinching and not overheated
     if (!this._isFiring || this._isOverheated) {
       return destroyed;
