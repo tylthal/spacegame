@@ -125,11 +125,6 @@ const App: React.FC = () => {
       const pinching = event.gesture === 'pinch';
       combatLoop.setFiring(pinching);
 
-      // DEBUG: Log when pinch state changes
-      if (pinching) {
-        console.log('[DEBUG] Pinching! isFiring:', combatLoop.isFiring, 'isOverheated:', combatLoop.isOverheated, 'heat:', combatLoop.heat);
-      }
-
       // 4. Update cursor display state (for gameplay cursor)
       setCursorPos(event.cursor);
       setIsPinching(pinching);
