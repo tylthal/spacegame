@@ -95,6 +95,13 @@ export class CombatLoop {
   private missileId = 0;
   private readonly missilePool: Missile[] = [];
 
+  // Public missile state for UI
+  public get missileReady(): boolean { return this.missileCooldownMs <= 0; }
+  public get missileCooldownProgress(): number {
+    if (this.missileCooldownMs <= 0) return 1;
+    return 1 - (this.missileCooldownMs / this.missileCooldownDuration);
+  }
+
   // Heat system
   private _heat = 0;
   private _isOverheated = false;
@@ -220,6 +227,8 @@ export class CombatLoop {
       elapsedMs: this.elapsedMs,
       heat: this._heat,
       isOverheated: this._isOverheated,
+      missileReady: this.missileReady,
+      missileCooldownProgress: this.missileCooldownProgress,
     };
   }
 

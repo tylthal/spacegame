@@ -182,20 +182,7 @@ const App: React.FC = () => {
       combatLoop.setFiring(pinching);
 
       // 4. Missiles - left hand fist gesture
-      const leftHand = event.hands.left;
-      const rightHand = event.hands.right;
-      const leftHandFist = leftHand?.gesture === 'fist';
-
-      // DEBUG: Log gesture detection
-      if (leftHand || rightHand) {
-        console.log('Gestures:', {
-          leftGesture: leftHand?.gesture || 'none',
-          rightGesture: rightHand?.gesture || 'none',
-          leftFist: leftHandFist,
-          eventGesture: event.gesture
-        });
-      }
-
+      const leftHandFist = event.hands.left?.gesture === 'fist';
       combatLoop.setFiringMissile(leftHandFist || false);
     });
   }, [inputProcessor, phaseManager, combatLoop]);

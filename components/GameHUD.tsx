@@ -7,6 +7,8 @@ export interface GameHUDProps {
     elapsedMs: number;
     heat: number;
     isOverheated: boolean;
+    missileReady: boolean;
+    missileCooldownProgress: number;
 }
 
 const formatTime = (ms: number): string => {
@@ -29,6 +31,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     elapsedMs,
     heat,
     isOverheated,
+    missileReady,
+    missileCooldownProgress,
 }) => {
     const hullPercent = Math.max(0, Math.min(100, hull));
     const isDanger = hullPercent <= 25;
@@ -123,8 +127,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
                     {/* Kills - with flash animation */}
                     <div className={`bg-black/80 border-2 p-3 text-center transition-all duration-100 ${isKillFlashing
-                            ? 'border-y2k-yellow bg-y2k-cyan/20 scale-110'
-                            : 'border-y2k-cyan'
+                        ? 'border-y2k-yellow bg-y2k-cyan/20 scale-110'
+                        : 'border-y2k-cyan'
                         }`}>
                         <div className="text-xs font-mono text-y2k-cyan/70 uppercase tracking-wider">
                             Kills
@@ -178,6 +182,26 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                             Pinch to Fire • Release to Cool
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* Left side: Missile Status */}
+            <div className="absolute bottom-4 left-4">
+                <div className={`bg-black/80 border-2 p-2 px-3 ${missileReady ? 'border-y2k-cyan' : 'border-y2k-white/30'}`}>
+                    <div className={`text-xs font-mono uppercase tracking-wider ${missileReady ? 'text-y2k-cyan' : 'text-y2k-white/50'}`}>
+                        🚀 {missileReady ? 'MISSILE READY' : 'LOADING...'}
+                    </div>
+                    {!missileReady && (
+                        <div className="h-1 bg-black border border-y2k-white/20 mt-1 overflow-hidden">
+                            <div
+                                className="h-full bg-y2k-cyan transition-all duration-100"
+                                style={{ width: `${missileCooldownProgress * 100}%` }}
+                            />
+                        </div>
+                    )}
+                    <div className="text-[10px] font-mono text-y2k-white/40 mt-1 uppercase">
+                        Fist to Fire
+                    </div>
                 </div>
             </div>
         </div>
