@@ -269,21 +269,23 @@ export class InputProcessor {
         .map(tip => this.normalizedDistance(tip, rawLandmarks[0], rawDiagonal))
         .reduce((sum, distance) => sum + distance, 0) / 4;
 
-      if (rawPinch <= this.gestureConfig.pinchThreshold) {
-        return 'pinch';
-      }
-
+      // Check FIST before PINCH - fist naturally closes thumb+index but all fingers are curled
       if (rawCurl <= this.gestureConfig.fistThreshold) {
         return 'fist';
       }
+
+      if (rawPinch <= this.gestureConfig.pinchThreshold) {
+        return 'pinch';
+      }
+    }
+
+    // Check FIST before PINCH - fist naturally closes thumb+index but all fingers are curled
+    if (averageCurl <= this.gestureConfig.fistThreshold) {
+      return 'fist';
     }
 
     if (pinchDistance <= this.gestureConfig.pinchThreshold) {
       return 'pinch';
-    }
-
-    if (averageCurl <= this.gestureConfig.fistThreshold) {
-      return 'fist';
     }
 
     // EXPLICIT PALM DETECTION:
