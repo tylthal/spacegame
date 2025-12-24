@@ -6,10 +6,20 @@ import React from 'react';
  * Multi-part enemy designs with metallic materials and detailed geometry.
  * Each enemy type has a unique silhouette for easy identification.
  * 
- * MESH CONVENTION:
- * - Nose/Front at +Z (intuitive for artists)
- * - Engine/Back at -Z
- * - The EnemyMesh wrapper handles Three.js lookAt convention internally
+ * ========================================
+ * MESH ORIENTATION CONVENTION
+ * ========================================
+ * 
+ * When creating new enemy meshes, follow this convention:
+ * - NOSE / FRONT: Position at +Z
+ * - ENGINE / BACK: Position at -Z
+ * 
+ * The GameScene's EnemyRenderer uses lookAt(ahead) to orient enemies.
+ * Due to Three.js camera conventions, this correctly makes enemies
+ * fly nose-first. See GameScene.tsx for detailed explanation.
+ * 
+ * DO NOT add wrapper rotations here - the math in GameScene handles it.
+ * ========================================
  */
 
 // Shared metallic material presets with emissive glow for space visibility
@@ -315,9 +325,9 @@ function BomberMesh() {
  * 
  * MESH CONVENTION: 
  * - Nose at +Z (front), Engine at -Z (back)
- * - GameScene uses lookAt(behind) to orient enemies correctly
+ * - GameScene uses lookAt(ahead) to orient enemies correctly
  * 
- * When creating new enemy types, use +Z for front, -Z for back.
+ * When adding new enemy types, place nose at +Z and engine at -Z.
  */
 export function EnemyMesh({ kind }: { kind: string }) {
     switch (kind) {

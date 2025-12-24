@@ -119,3 +119,32 @@ The rebuild will continue layering modules behind tests. Remaining work focuses 
   - Fires a cadence-based vertical shot (default 450ms) using `segmentHitsCircle` to cull targets.
   - Advances enemies toward the base (`baseY=1`), deducting hull (`drone=5`, `scout=8`, `bomber=15`) when they breach.
   - Exposes summary stats for hull, spawns, kills, and elapsed time to keep integration tests deterministic.
+
+## 3D Rendering (Three.js / React Three Fiber)
+
+### Enemy Orientation System
+
+Enemy meshes need to face the direction they're flying. This is handled by:
+
+1. **Mesh Convention** (in `EnemyMeshes.tsx`):
+   - NOSE / FRONT: Positioned at +Z
+   - ENGINE / BACK: Positioned at -Z
+   - This is intuitive for artists creating new enemy types
+
+2. **Runtime Orientation** (in `GameScene.tsx`):
+   - Each enemy's velocity vector determines flight direction
+   - `lookAt(position + velocity)` orients the enemy to face ahead
+   - Due to Three.js conventions, this makes the nose lead and engine trail
+
+**Important**: This was empirically tested. The math seems counterintuitive (lookAt makes -Z face the target, so engine should lead), but the combination of world coordinates and camera setup makes it work correctly. **Do not change without visual testing.**
+
+### Enemy Visual Design
+
+Each enemy type has distinct visual characteristics for quick identification:
+
+- **Drone**: Compact body, red nose cone, cyan engine glow, swept wings
+- **Scout**: Angular body, copper sensor dish, twin orange engines
+- **Bomber**: Heavy armored body, gold plating, purple triple engines
+
+Materials use emissive properties for visibility in dark space environments.
+

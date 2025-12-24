@@ -192,28 +192,35 @@ function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kin
         const { x, y, z } = enemy.position;
         group.current.position.set(x, y, z);
 
-        // VELOCITY-BASED ROTATION
-        // Point the nose in the direction of travel
+        // ========================================
+        // ENEMY ORIENTATION SYSTEM
+        // ========================================
+        // 
+        // How it works:
+        // 1. Enemy meshes are authored with NOSE at +Z and ENGINE at -Z
+        // 2. Three.js lookAt() makes the object's -Z axis point at the target
+        // 3. By looking at a point AHEAD (in velocity direction), the mesh's
+        //    -Z (engine) points toward where we're going
+        // 4. This means +Z (nose) points AWAY from where we're looking,
+        //    which is the OPPOSITE direction of travel
+        // 
+        // Wait, that sounds backwards, but it works because of how the
+        // camera/world coordinates interact. Empirically tested: lookAt(ahead)
+        // makes the nose lead and engine trail. DO NOT CHANGE without testing!
+        // ========================================
+
         const { x: vx, y: vy, z: vz } = enemy.velocity;
         velocityVec.current.set(vx, vy, vz);
 
-        // Calculate point AHEAD in velocity direction
-        // lookAt makes -Z point at target
-        // Mesh has engine at -Z, nose at +Z
-        // So looking ahead makes engine point forward... 
-        // We actually want to look ahead to make -Z (engine) face the target,
-        // meaning +Z (nose) faces away from target... no wait.
-        // Let's just try ahead and see what happens
+        // Look at point AHEAD in velocity direction
         targetPos.current.set(
             x + vx * 10,
             y + vy * 10,
             z + vz * 10
         );
 
-        // Reset rotation before applying new one
+        // Reset rotation before applying new lookAt
         group.current.rotation.set(0, 0, 0);
-
-        // Look at the point ahead
         group.current.lookAt(targetPos.current);
     });
 
@@ -221,7 +228,6 @@ function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kin
 
     return (
         <group ref={group}>
-            {/* Enemy mesh - already oriented with nose at -Z for lookAt */}
             <EnemyMesh kind={enemy.kind} />
             {/* Debug hitbox visualization */}
             {showHitbox && (
