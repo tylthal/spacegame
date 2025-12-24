@@ -71,6 +71,58 @@ function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
     );
 }
 
+// Debug: Draw line from muzzle to crosshair target
+function DebugAimLine({ combatLoop }: { combatLoop: CombatLoop }) {
+    const lineRef = useRef<any>(null);
+    const pointsRef = useRef([new Vector3(), new Vector3()]);
+
+    useFrame(() => {
+        if (!lineRef.current) return;
+
+        // Constants matching CombatLoop
+        const MUZZLE_Y = -5;
+        const TARGET_DISTANCE = 100;
+        const VERTICAL_FOV = 60 * (Math.PI / 180);
+        const ASPECT_RATIO = 16 / 9;
+
+        const halfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);
+        const halfWidth = halfHeight * ASPECT_RATIO;
+
+        // Get cursor from combatLoop
+        const cursorX = combatLoop.cursorX;
+        const cursorY = combatLoop.cursorY;
+
+        // Calculate target (same as CombatLoop)
+        const targetX = (cursorX - 0.5) * 2 * halfWidth;
+        const targetY = (0.5 - cursorY) * 2 * halfHeight;
+        const targetZ = -TARGET_DISTANCE;
+
+        // Muzzle position
+        const muzzle = new Vector3(0, MUZZLE_Y, 0);
+
+        // Target position
+        const target = new Vector3(targetX, targetY, targetZ);
+
+        // Extend line past target to make it more visible
+        const direction = target.clone().sub(muzzle).normalize();
+        const extendedTarget = muzzle.clone().add(direction.multiplyScalar(200));
+
+        // Update line geometry
+        pointsRef.current[0].copy(muzzle);
+        pointsRef.current[1].copy(extendedTarget);
+
+        lineRef.current.geometry.setFromPoints(pointsRef.current);
+        lineRef.current.geometry.attributes.position.needsUpdate = true;
+    });
+
+    return (
+        <line ref={lineRef}>
+            <bufferGeometry />
+            <lineBasicMaterial color="#00BFFF" linewidth={2} />
+        </line>
+    );
+}
+
 export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: CombatLoop, isRunning?: boolean }) {
     // Optimization: Only force re-render when the number of enemies changes
     const [version, setVersion] = useState(0);
@@ -97,6 +149,9 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
         <group>
             <GameEffects />
             <Starfield />
+
+            {/* DEBUG: Aim line from muzzle to target */}
+            {combatLoop && <DebugAimLine combatLoop={combatLoop} />}
 
             {/* Bullets - Instanced for High Performance */}
             {combatLoop && <InstancedBulletRenderer combatLoop={combatLoop} />}
