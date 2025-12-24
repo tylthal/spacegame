@@ -74,6 +74,53 @@ function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
     );
 }
 
+// Render missiles - larger and more dramatic than bullets
+function InstancedMissileRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
+    const meshRef = useRef<InstancedMesh>(null);
+    const dummy = useRef(new Object3D());
+
+    useFrame(() => {
+        if (!meshRef.current) return;
+
+        const missiles = combatLoop.activeMissiles;
+
+        meshRef.current.count = missiles.length;
+
+        for (let i = 0; i < missiles.length; i++) {
+            const missile = missiles[i];
+            const { x, y, z } = missile.position;
+
+            dummy.current.position.set(x, y, z);
+
+            // Orient missile along velocity
+            dummy.current.lookAt(
+                x + missile.velocity.x,
+                y + missile.velocity.y,
+                z + missile.velocity.z
+            );
+
+            dummy.current.updateMatrix();
+            meshRef.current.setMatrixAt(i, dummy.current.matrix);
+        }
+
+        meshRef.current.instanceMatrix.needsUpdate = true;
+    });
+
+    return (
+        <instancedMesh ref={meshRef} args={[undefined, undefined, 50]} frustumCulled={false}>
+            {/* Missile style - larger cone shape with glow */}
+            <coneGeometry args={[0.3, 1.2, 6]} />
+            <meshStandardMaterial
+                color="#FF4400"
+                emissive="#FF6600"
+                emissiveIntensity={4}
+                roughness={0.1}
+                metalness={0.9}
+            />
+        </instancedMesh>
+    );
+}
+
 // Track enemy positions for explosion spawning
 interface EnemySnapshot {
     id: number;
@@ -217,6 +264,9 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
 
             {/* Bullets - Instanced for High Performance */}
             {combatLoop && <InstancedBulletRenderer combatLoop={combatLoop} />}
+
+            {/* Missiles - Larger projectiles with area damage */}
+            {combatLoop && <InstancedMissileRenderer combatLoop={combatLoop} />}
 
             {/* Enemies */}
             <group>

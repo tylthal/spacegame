@@ -17,6 +17,13 @@ export interface Bullet {
   active: boolean;
 }
 
+export interface Missile {
+  id: number;
+  position: Vector3;
+  velocity: Vector3;
+  active: boolean;
+}
+
 /**
  * Combat configuration options.
  * The player defends a space station from incoming enemy drones.
@@ -55,12 +62,14 @@ export interface CombatTickResult {
 export class CombatLoop {
   private readonly enemies: EnemyInstance[] = [];
   private readonly bullets: Bullet[] = [];
+  private readonly missiles: Missile[] = [];
   private readonly kills: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0 };
   private readonly spawns: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0 };
 
   // Public access for renderer
   public get activeEnemies(): ReadonlyArray<EnemyInstance> { return this.enemies; }
   public get activeBullets(): ReadonlyArray<Bullet> { return this.bullets; }
+  public get activeMissiles(): ReadonlyArray<Missile> { return this.missiles; }
 
   // Player state - Raw cursor position (0..1 range)
   // Used for inverse projection targeting
@@ -75,6 +84,16 @@ export class CombatLoop {
   // Firing state
   private _isFiring = false;
   public get isFiring(): boolean { return this._isFiring && !this._isOverheated; }
+
+  // Missile state (fist gesture)
+  private _isFiringMissile = false;
+  private missileCooldownMs = 0;
+  private readonly missileCooldownDuration = 1500; // 1.5 seconds between missiles
+  private readonly missileSpeed = 0.08; // Slower than bullets (0.18)
+  private readonly missileProximityRadius = 8; // Detonation proximity
+  private readonly missileBlastRadius = 15; // Area damage radius
+  private missileId = 0;
+  private readonly missilePool: Missile[] = [];
 
   // Heat system
   private _heat = 0;
@@ -113,14 +132,19 @@ export class CombatLoop {
   public reset(): void {
     this.enemies.length = 0;
     this.bullets.length = 0;
+    this.missiles.length = 0;
     this.bulletPool.length = 0;
+    this.missilePool.length = 0;
     this.hull = this.options.hull;
     this.elapsedMs = 0;
     this.enemyId = 0;
     this.bulletId = 0;
+    this.missileId = 0;
+    this.missileCooldownMs = 0;
     this._heat = 0;
     this._isOverheated = false;
     this._isFiring = false;
+    this._isFiringMissile = false;
     this.sinceLastShot = 450;
     this.kills.drone = 0;
     this.kills.scout = 0;
@@ -133,6 +157,10 @@ export class CombatLoop {
 
   public setFiring(firing: boolean) {
     this._isFiring = firing;
+  }
+
+  public setFiringMissile(firing: boolean) {
+    this._isFiringMissile = firing;
   }
 
   tick(deltaMs: number): CombatTickResult {
@@ -152,7 +180,8 @@ export class CombatLoop {
     // Move Entities
     this.advanceEnemies(deltaMs);
     const bulletCollisions = this.advanceBullets(deltaMs);
-    const destroyed = [...bulletCollisions];
+    const missileCollisions = this.advanceMissiles(deltaMs);
+    const destroyed = [...bulletCollisions, ...missileCollisions];
 
     // Heat Logic
     if (this._isFiring && !this._isOverheated) {
@@ -165,7 +194,13 @@ export class CombatLoop {
       }
     }
 
+    // Missile cooldown
+    if (this.missileCooldownMs > 0) {
+      this.missileCooldownMs = Math.max(0, this.missileCooldownMs - deltaMs);
+    }
+
     this.spawnBullets();
+    this.spawnMissiles();
     this.applyStationDamage();
 
     return {
@@ -428,5 +463,126 @@ export class CombatLoop {
         continue;
       }
     }
+  }
+
+  /**
+   * Spawn missiles when fist gesture is detected and cooldown allows
+   */
+  private spawnMissiles(): void {
+    if (!this._isFiringMissile || this.missileCooldownMs > 0) return;
+
+    // Fire one missile and start cooldown
+    this.missileCooldownMs = this.missileCooldownDuration;
+    const speed = this.missileSpeed;
+
+    // Use same targeting system as bullets
+    const VERTICAL_FOV = 60 * (Math.PI / 180);
+    const ASPECT_RATIO = typeof window !== 'undefined'
+      ? window.innerWidth / window.innerHeight
+      : 16 / 9;
+
+    const MUZZLE_DISTANCE = 5;
+    const muzzleHalfHeight = MUZZLE_DISTANCE * Math.tan(VERTICAL_FOV / 2);
+    const MUZZLE_X = 0;
+    const MUZZLE_Y = -muzzleHalfHeight;
+    const MUZZLE_Z = -MUZZLE_DISTANCE;
+
+    const TARGET_DISTANCE = 100;
+    const halfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);
+    const halfWidth = halfHeight * ASPECT_RATIO;
+
+    const targetX = (this._cursorX - 0.5) * 2 * halfWidth;
+    const targetY = (0.5 - this._cursorY) * 2 * halfHeight;
+    const targetZ = -TARGET_DISTANCE;
+
+    const dx = targetX - MUZZLE_X;
+    const dy = targetY - MUZZLE_Y;
+    const dz = targetZ - MUZZLE_Z;
+    const dist = Math.hypot(dx, dy, dz);
+    const vx = (dx / dist) * speed;
+    const vy = (dy / dist) * speed;
+    const vz = (dz / dist) * speed;
+
+    this.missileId++;
+    let missile = this.missilePool.pop();
+    if (!missile) {
+      missile = {
+        id: this.missileId,
+        position: { x: MUZZLE_X, y: MUZZLE_Y, z: MUZZLE_Z },
+        velocity: { x: vx, y: vy, z: vz },
+        active: true,
+      };
+    } else {
+      missile.id = this.missileId;
+      missile.position.x = MUZZLE_X; missile.position.y = MUZZLE_Y; missile.position.z = MUZZLE_Z;
+      missile.velocity.x = vx; missile.velocity.y = vy; missile.velocity.z = vz;
+      missile.active = true;
+    }
+    this.missiles.push(missile);
+  }
+
+  /**
+   * Advance missiles and check for proximity detonation with area damage
+   */
+  private advanceMissiles(deltaMs: number): EnemyInstance[] {
+    const destroyed: EnemyInstance[] = [];
+
+    for (let i = this.missiles.length - 1; i >= 0; i--) {
+      const missile = this.missiles[i];
+      if (!missile.active) continue;
+
+      // Move missile
+      missile.position.x += missile.velocity.x * deltaMs;
+      missile.position.y += missile.velocity.y * deltaMs;
+      missile.position.z += missile.velocity.z * deltaMs;
+
+      // Check proximity to any enemy
+      let detonated = false;
+      for (const enemy of this.enemies) {
+        const dx = missile.position.x - enemy.position.x;
+        const dy = missile.position.y - enemy.position.y;
+        const dz = missile.position.z - enemy.position.z;
+        const dist = Math.hypot(dx, dy, dz);
+
+        if (dist <= this.missileProximityRadius) {
+          // DETONATE - area damage
+          detonated = true;
+          break;
+        }
+      }
+
+      if (detonated) {
+        // Apply area damage to all enemies in blast radius
+        for (let j = this.enemies.length - 1; j >= 0; j--) {
+          const enemy = this.enemies[j];
+          const dx = missile.position.x - enemy.position.x;
+          const dy = missile.position.y - enemy.position.y;
+          const dz = missile.position.z - enemy.position.z;
+          const dist = Math.hypot(dx, dy, dz);
+
+          if (dist <= this.missileBlastRadius) {
+            destroyed.push(enemy);
+            this.enemies.splice(j, 1);
+            this.kills[enemy.kind] += 1;
+          }
+        }
+
+        // Remove missile
+        missile.active = false;
+        this.missilePool.push(missile);
+        this.missiles.splice(i, 1);
+        continue;
+      }
+
+      // Despawn if too far
+      const distSq = missile.position.x ** 2 + missile.position.y ** 2 + missile.position.z ** 2;
+      if (distSq > (this.options.spawnRadius * 1.5) ** 2) {
+        missile.active = false;
+        this.missilePool.push(missile);
+        this.missiles.splice(i, 1);
+      }
+    }
+
+    return destroyed;
   }
 }

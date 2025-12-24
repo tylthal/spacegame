@@ -177,9 +177,13 @@ const App: React.FC = () => {
       // Pass RAW 0-1 cursor values - CombatLoop handles the transformation
       combatLoop.setPlayerPosition(event.cursor.x, event.cursor.y);
 
-      // 3. Firing
+      // 3. Firing - pinch = bullets, fist = missiles
       const pinching = event.gesture === 'pinch';
       combatLoop.setFiring(pinching);
+
+      // 4. Missiles - left hand fist gesture
+      const leftHandFist = event.hands.left?.gesture === 'fist';
+      combatLoop.setFiringMissile(leftHandFist);
     });
   }, [inputProcessor, phaseManager, combatLoop]);
 
