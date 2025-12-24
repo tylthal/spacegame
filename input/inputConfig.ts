@@ -10,10 +10,11 @@ export const INPUT_CONFIG = {
      * Virtual Mousepad Settings
      * Controls how hand movement maps to screen coordinates.
      * Smaller values = higher sensitivity (less movement needed)
+     * Note: Y is typically more constrained, so we use higher value for more reach
      */
     virtualPad: {
-        width: 0.4,     // 40% of camera width = full screen X range
-        height: 0.4,    // 40% of camera height = full screen Y range
+        width: 0.35,    // 35% of camera width = full screen X range (more sensitive)
+        height: 0.5,    // 50% of camera height = full screen Y range (easier to reach edges)
         stabilityTolerance: 0.015,
     },
 
@@ -48,11 +49,13 @@ export const INPUT_CONFIG = {
     /**
      * One Euro Filter Settings
      * Controls input smoothing to reduce jitter.
+     * Lower minCutoff = more responsive but more jitter
+     * Higher beta = more responsive during fast movement
      */
     smoothing: {
         dCutoff: 1,
-        minCutoff: 1.2,
-        beta: 0.002,
+        minCutoff: 0.8,   // Reduced from 1.2 for more responsiveness
+        beta: 0.007,      // Increased from 0.002 for faster tracking during movement
     },
 
     /**
