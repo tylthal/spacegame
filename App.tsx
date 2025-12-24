@@ -18,6 +18,7 @@ import { PhaseManager, Phase, PhaseEvent } from './phase/PhaseManager';
 import { GameHUD } from './components/GameHUD';
 import { GameOverScreen } from './components/GameOverScreen';
 import { HandCursor } from './components/HandCursor';
+import { CursorLayer } from './components/CursorLayer';
 
 const USE_REAL_INPUT = import.meta.env.VITE_USE_REAL_INPUT === '1' || import.meta.env.VITE_USE_REAL_INPUT === 'true';
 
@@ -30,9 +31,7 @@ const App: React.FC = () => {
   const [inputProcessor, setInputProcessor] = useState<InputProcessor | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
-  // Cursor state for gameplay display
-  const [cursorPos, setCursorPos] = useState({ x: 0.5, y: 0.5 });
-  const [isPinching, setIsPinching] = useState(false);
+  // Cursor state moved to CursorLayer
 
   // Calibration Progress visual (0-1)
   const [calibrationProgress, setCalibrationProgress] = useState(0);
@@ -129,9 +128,9 @@ const App: React.FC = () => {
       const pinching = event.gesture === 'pinch';
       combatLoop.setFiring(pinching);
 
-      // 4. Update cursor display state (for gameplay cursor)
-      setCursorPos(event.cursor);
-      setIsPinching(pinching);
+      // 4. Update cursor display state (Delegated to CursorLayer)
+      // setCursorPos(event.cursor);
+      // setIsPinching(pinching);
     });
   }, [inputProcessor, phaseManager, combatLoop]);
 
@@ -236,11 +235,9 @@ const App: React.FC = () => {
           {/* Game HUD */}
           <GameHUD {...hudState} />
 
-          {/* Gameplay Cursor */}
-          <HandCursor
-            position={cursorPos}
-            isPinching={isPinching}
-          />
+
+          {/* Gameplay Cursor Layer - Isolated re-renders */}
+          <CursorLayer inputProcessor={inputProcessor} />
 
           {/* Game Over Screen */}
           {isGameOver && (

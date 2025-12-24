@@ -73,13 +73,20 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
     // I need to fix this.
 
     // I will add a `useFrame` that uses `useState` to force render if counts change.
-    const [tick, setTick] = useState(0);
+    // Optimization: Only force re-render when the number of entities changes
+    // This reduces React reconciliation overhead significantly vs 60fps forced updates.
+    // Ideally we'd use InstancedMesh (Phase 2), but this is a good Phase 1 fix.
+    const [version, setVersion] = useState(0);
+    const lastEntityCount = useRef(0);
+
     useFrame(() => {
         if (!combatLoop) return;
-        // Cheap check: if enemy/bullet count changed, or just 30fps update?
-        // Let's force update every few frames or just rely on React's speed?
-        // For "Arcade", let's force render.
-        setTick(t => (t + 1) % 60);
+
+        const count = combatLoop.activeBullets.length + combatLoop.activeEnemies.length;
+        if (count !== lastEntityCount.current) {
+            lastEntityCount.current = count;
+            setVersion(v => v + 1);
+        }
     });
 
     return (
