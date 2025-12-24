@@ -20,11 +20,14 @@ describe('CombatLoop integration', () => {
     const summary = loop.summary();
 
     expect(summary.elapsedMs).toBe(65000);
-    // With current spawn curve (drone-only), verify drones spawn
-    expect(summary.spawns.drone).toBeGreaterThan(25);
+    // With max enemies limit (6), spawns are capped by active enemy count
+    // Enemies spawn and get destroyed/fly past, so total spawns depend on turnover
+    expect(summary.spawns.drone).toBeGreaterThan(0);
     // Current curve doesn't spawn scouts or bombers
     expect(summary.spawns.scout).toBe(0);
     expect(summary.spawns.bomber).toBe(0);
+    // Max active enemies should never exceed the limit
+    expect(summary.active).toBeLessThanOrEqual(6);
     // Enemies that reach the player are destroyed (not counted as kills)
     expect(summary.hull).toBeLessThanOrEqual(100);
     expect(summary.hull).toBeGreaterThanOrEqual(0);

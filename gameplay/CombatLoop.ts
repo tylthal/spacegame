@@ -25,6 +25,7 @@ export interface CombatOptions {
   enemyDamage: Record<EnemyKind, number>;
   spawnRadius: number; // Radius of the spawn shell
   bulletSpeed: number;
+  maxEnemies: number; // Maximum enemies on screen at once
 }
 
 const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
@@ -35,6 +36,7 @@ const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   enemyDamage: { drone: 5, scout: 8, bomber: 15 },
   spawnRadius: 250, // Increased from 150 - enemies spawn farther away
   bulletSpeed: 0.08, // Slowed from 0.2 - visible travel time, requires leading targets
+  maxEnemies: 6, // Limit enemies on screen
 };
 
 export interface CombatTickResult {
@@ -131,9 +133,15 @@ export class CombatLoop {
     if (deltaMs < 0) throw new Error('deltaMs must be non-negative');
     this.elapsedMs += deltaMs;
 
-    // Spawn Logic
-    const spawned = this.scheduler.step(deltaMs).map(event => this.createEnemy(event.kind));
-    spawned.forEach(enemy => this.enemies.push(enemy));
+    // Spawn Logic - respect max enemies limit
+    const spawnEvents = this.scheduler.step(deltaMs);
+    const spawned: EnemyInstance[] = [];
+    for (const event of spawnEvents) {
+      if (this.enemies.length >= this.options.maxEnemies) break;
+      const enemy = this.createEnemy(event.kind);
+      this.enemies.push(enemy);
+      spawned.push(enemy);
+    }
 
     // Move Entities
     this.advanceEnemies(deltaMs);
