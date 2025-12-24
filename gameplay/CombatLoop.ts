@@ -269,15 +269,34 @@ export class CombatLoop {
       const nextPz = bullet.position.z;
 
       // Check Collision with all Enemies
+      // Use swept collision: check against enemy's previous AND current position
+      // This prevents enemies slipping through bullets between frames
       let hit = false;
       for (let j = this.enemies.length - 1; j >= 0; j--) {
         const enemy = this.enemies[j];
-        if (segmentHitsSphere(
+        const radius = this.options.enemyRadius[enemy.kind];
+
+        // Calculate enemy's previous position (before advanceEnemies moved them)
+        const prevEnemyX = enemy.position.x - enemy.velocity.x * deltaMs;
+        const prevEnemyY = enemy.position.y - enemy.velocity.y * deltaMs;
+        const prevEnemyZ = enemy.position.z - enemy.velocity.z * deltaMs;
+
+        // Check both: current position AND previous position
+        const hitsCurrent = segmentHitsSphere(
           { x: px, y: py, z: pz },
           { x: nextPx, y: nextPy, z: nextPz },
           enemy.position,
-          this.options.enemyRadius[enemy.kind]
-        )) {
+          radius
+        );
+
+        const hitsPrevious = segmentHitsSphere(
+          { x: px, y: py, z: pz },
+          { x: nextPx, y: nextPy, z: nextPz },
+          { x: prevEnemyX, y: prevEnemyY, z: prevEnemyZ },
+          radius
+        );
+
+        if (hitsCurrent || hitsPrevious) {
           destroyed.push(enemy);
           this.enemies.splice(j, 1);
           this.kills[enemy.kind] += 1;
