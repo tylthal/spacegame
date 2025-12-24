@@ -1,6 +1,5 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import HudOverlay from './components/HudOverlay';
 import DebugPanel from './components/DebugPanel';
 import { resolveDebugConfig } from './observability/DebugConfig';
 import { runDiagnosticsPipeline } from './observability/DiagnosticsHarness';
@@ -17,6 +16,8 @@ import { WebcamPreview } from './components/WebcamPreview';
 import { CRTOverlay } from './components/CRTOverlay';
 import { InputProcessor } from './input/InputProcessor';
 import { PhaseManager, Phase, PhaseEvent } from './phase/PhaseManager';
+import { GameHUD } from './components/GameHUD';
+import { GameOverScreen } from './components/GameOverScreen';
 
 const USE_REAL_INPUT = import.meta.env.VITE_USE_REAL_INPUT === '1' || import.meta.env.VITE_USE_REAL_INPUT === 'true';
 
@@ -140,20 +141,31 @@ const App: React.FC = () => {
   const [hudState, setHudState] = useState({
     score: 0,
     hull: 100,
-    lives: 3,
-    multiplier: 1.0
+    kills: 0,
+    elapsedMs: 0,
   });
+  const [isGameOver, setIsGameOver] = useState(false);
 
   useEffect(() => {
     if (phase !== 'PLAYING') return;
+    setIsGameOver(false); // Reset on new game
+
     const interval = setInterval(() => {
       const summary = combatLoop.summary();
+      const totalKills = summary.kills.drone + summary.kills.scout + summary.kills.bomber;
+      const score = summary.kills.drone * 100 + summary.kills.scout * 200 + summary.kills.bomber * 500;
+
       setHudState({
-        score: summary.kills.drone * 100 + summary.kills.scout * 200 + summary.kills.bomber * 500,
+        score,
         hull: summary.hull,
-        lives: 3,
-        multiplier: 1.0
+        kills: totalKills,
+        elapsedMs: summary.elapsedMs,
       });
+
+      // Check for game over
+      if (summary.hull <= 0) {
+        setIsGameOver(true);
+      }
     }, 100);
     return () => clearInterval(interval);
   }, [phase, combatLoop]);
@@ -203,19 +215,36 @@ const App: React.FC = () => {
 
       {phase === 'PLAYING' && (
         <>
-          <HudOverlay {...hudState} />
+          {/* Game HUD */}
+          <GameHUD {...hudState} />
 
-          {/* Exit Button */}
-          <div className="absolute top-4 left-4 z-50 pointer-events-auto">
-            <button
-              onClick={() => {
-                phaseManager.reset(); // Go back to start
+          {/* Game Over Screen */}
+          {isGameOver && (
+            <GameOverScreen
+              score={hudState.score}
+              kills={hudState.kills}
+              survivalTimeMs={hudState.elapsedMs}
+              onRestart={() => {
+                // Reset game state and go back to title
+                phaseManager.reset();
+                setIsGameOver(false);
               }}
-              className="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white border border-red-500/50 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition"
-            >
-              Abort
-            </button>
-          </div>
+            />
+          )}
+
+          {/* Exit Button (hidden when game over) */}
+          {!isGameOver && (
+            <div className="absolute top-4 left-4 z-50 pointer-events-auto">
+              <button
+                onClick={() => {
+                  phaseManager.reset();
+                }}
+                className="bg-y2k-red/20 hover:bg-y2k-red text-y2k-red hover:text-black border border-y2k-red/50 px-4 py-2 text-xs font-bold uppercase tracking-wider transition"
+              >
+                Abort
+              </button>
+            </div>
+          )}
 
           <div className="absolute bottom-4 right-4 z-50 pointer-events-auto">
             {debugConfig.debugPanels && <DebugPanel config={debugConfig} diagnostics={diagnostics} />}

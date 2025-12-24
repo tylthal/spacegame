@@ -1,6 +1,6 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Group, Mesh } from 'three';
+import { Group, Mesh, Vector3 } from 'three';
 import { CombatLoop } from '../../gameplay/CombatLoop';
 import { useSpaceshipAsset, AssetId } from './assets/AssetLoader';
 import { GameEffects } from './effects/EffectComposer';
@@ -20,77 +20,58 @@ function AssetMesh({ id, ...props }: { id: AssetId } & any) {
     );
 }
 
+// Laser beam component
+function LaserBeam({ visible, playerX }: { visible: boolean; playerX: number }) {
+    const meshRef = useRef<Mesh>(null);
+
+    useFrame(() => {
+        if (meshRef.current) {
+            meshRef.current.position.x = playerX * 5;
+        }
+    });
+
+    if (!visible) return null;
+
+    return (
+        <mesh ref={meshRef} position={[0, 0, 0]}>
+            <boxGeometry args={[0.08, 10, 0.08]} />
+            <meshBasicMaterial color="#FFFF00" transparent opacity={0.8} />
+        </mesh>
+    );
+}
+
 export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
     const playerRef = useRef<Group>(null);
-    const enemyGroupRef = useRef<Group>(null);
+    const lastPlayerX = useRef(0);
+    const [laserVisible, setLaserVisible] = useState(false);
 
     useFrame((state, delta) => {
-        if (!combatLoop || !enemyGroupRef.current) return;
+        if (!playerRef.current || !combatLoop) return;
 
-        const enemies = combatLoop.activeEnemies;
-        const group = enemyGroupRef.current;
+        // Get current player X from combat loop (-1 to 1)
+        const targetX = combatLoop.playerX * 5; // Scale to scene coordinates
+        const currentX = playerRef.current.position.x;
 
-        // Reconciliation (Naive for now)
-        // Optimize: Use key-based reconciliation or object pooling in Phase 3 polish
-        while (group.children.length > enemies.length) {
-            group.remove(group.children[0]);
-        }
-        // Add new enemies if needed (Note: This simple logic assumes enemies are added at end, 
-        // but splicing happens in storage. This visual glitches if IDs aren't tracked.
-        // For "Assets & Polish", we should map by ID. But for now, let's keep it simple to verify visuals first.)
+        // Smooth interpolation for fluid movement
+        const smoothedX = currentX + (targetX - currentX) * Math.min(1, delta * 10);
+        playerRef.current.position.x = smoothedX;
 
-        // Ideally we render declarative list: {enemies.map(e => <Enemy key={e.id} ... />)} 
-        // But doing that directly in generic React reconciler inside useFrame is bad.
-        // We'll stick to manual manipulation for performance, but we need to track mesh<->id.
-        // For this step: CLEAR AND REBUILD is safest to ensure correct asset type.
-        // BUT it kills performance. 
+        // Calculate velocity for tilt effect
+        const velocity = smoothedX - lastPlayerX.current;
+        lastPlayerX.current = smoothedX;
 
-        // Better approach for smooth movement: 
-        // Just update existing children. If count mismatch, rebuild or add/remove.
-        // Note: Enemy types vary! So index-based reuse only works if type matches.
+        // Tilt based on movement direction (bank into the turn)
+        const targetTilt = -velocity * 2;
+        const currentTilt = playerRef.current.rotation.z;
+        playerRef.current.rotation.z = currentTilt + (targetTilt - currentTilt) * Math.min(1, delta * 5);
 
-        // FAST PATH for demo:
-        while (group.children.length < enemies.length) {
-            // We don't know the type of the NEW enemy here quickly without looking up the generic list index.
-            // Let's just create generic meshes and update their Geometry/Material in the loop below?
-            // No, swapping geometry is expensive.
+        // Subtle hover animation
+        playerRef.current.position.y = -4 + Math.sin(state.clock.elapsedTime * 2) * 0.05;
 
-            // Let's create a placeholder container (Group) and mount the asset inside it relative to 0,0,0
-            const container = new Group();
-            group.add(container);
-        }
-
-        // Update
-        for (let i = 0; i < enemies.length; i++) {
-            const enemy = enemies[i];
-            const container = group.children[i] as Group;
-
-            // Check if we need to hydrate the asset (if empty)
-            if (container.children.length === 0) {
-                // This part effectively happens once per spawn
-                // We can't easily use React components here imperatively.
-                // We should probably rely on the React tree for spawning, 
-                // `combatLoop` updates state -> React Renders <Enemy> components.
-                // `useFrame` is for position updates.
-            }
-
-            // POSITION UPDATE
-            // Map Game Y[0->1] to Scene Y[5 -> -5]. 
-            // X [-0.9, 0.9] -> Scene X [-5, 5] approx.
-
-            container.position.set(enemy.position.x * 5, 5 - (enemy.position.y * 10), 0);
-
-            // Tilt bank based on velocity?
-            container.rotation.z = -enemy.velocity.x * 1000;
-            container.rotation.y += delta; // Spin
-        }
-
-        // Spin Player
-        if (playerRef.current) {
-            // Player movement follow mouse? 
-            // For now just idle animation
-            playerRef.current.rotation.z = Math.sin(state.clock.elapsedTime) * 0.1;
-        }
+        // Flash laser beam periodically (synced with fire rate)
+        // Fire rate is 450ms, show laser for 50ms
+        const firePhase = (state.clock.elapsedTime * 1000) % 450;
+        setLaserVisible(firePhase < 50);
     });
 
     return (
@@ -98,25 +79,31 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
             <GameEffects />
             <Starfield />
 
-            {/* Player Ship */}
+            {/* Laser Beam */}
+            <LaserBeam visible={laserVisible} playerX={combatLoop?.playerX ?? 0} />
+
+            {/* Player Ship - now positioned dynamically */}
             <group ref={playerRef} position={[0, -4, 0]}>
                 <AssetMesh id="hero" />
+
+                {/* Muzzle flash when firing */}
+                {laserVisible && (
+                    <pointLight position={[0, 0.5, 0]} color="#FFFF00" intensity={2} distance={3} />
+                )}
             </group>
 
-            {/* Enemies: Declarative approach is better for asset stable mounting */}
-            {/* We will let React manage the specific meshes, and useFrame to animate them via refs if possible? */}
-            {/* Actually, for high performance, we want imperative, but for 20 enemies, React is fine. */}
-            {/* Let's switch to Declarative for Enemy Spawning to simplify asset logic. */}
-
+            {/* Enemies: Declarative approach */}
             <group>
                 {combatLoop?.activeEnemies.map(enemy => (
                     <EnemyRenderer key={enemy.id} enemy={enemy as any} />
-                    // cast as any because of strict type mismatch in EnemyKind vs AssetId string
-                    // We need a mapping function.
                 ))}
             </group>
 
-            <gridHelper args={[20, 20, 0x222222, 0x111111]} position={[0, -5, 0]} />
+            {/* Base platform / defense line indicator */}
+            <mesh position={[0, -4.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[12, 0.5]} />
+                <meshBasicMaterial color="#FFFF00" transparent opacity={0.3} />
+            </mesh>
         </group>
     );
 }
