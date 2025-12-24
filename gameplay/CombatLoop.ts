@@ -233,9 +233,9 @@ export class CombatLoop {
         this._isOverheated = true;
       }
 
-      // Fire from base (y=1) toward cursor aim (y=-1)
+      // Fire from below the base (y=1.2) toward cursor aim (y=-1)
       const startX = 0;
-      const startY = this.options.baseY;
+      const startY = 1.2; // Start off-screen (Logic coords: 1 is base, >1 is below)
       const targetX = this._playerX;
       const targetY = -1;
 

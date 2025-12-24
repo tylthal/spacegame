@@ -62,9 +62,9 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
                 ))}
             </group>
 
-            {/* Muzzle flash at bottom center when firing */}
+            {/* Muzzle flash at bottom center when firing - moved offscreen to match new launch point */}
             {isFiring && (
-                <pointLight position={[0, -5, 0]} color="#FFFF00" intensity={3} distance={4} />
+                <pointLight position={[0, -6, 0]} color="#FFFF00" intensity={3} distance={5} />
             )}
 
             {/* Enemies: Declarative approach */}
@@ -73,12 +73,6 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
                     <EnemyRenderer key={enemy.id} enemy={enemy as any} />
                 ))}
             </group>
-
-            {/* Gun turret / firing origin indicator */}
-            <mesh position={[0, -5, 0]}>
-                <boxGeometry args={[0.5, 0.2, 0.5]} />
-                <meshBasicMaterial color="#FFFF00" />
-            </mesh>
         </group>
     );
 }
