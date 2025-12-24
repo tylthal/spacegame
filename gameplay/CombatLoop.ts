@@ -1,19 +1,19 @@
 import type { EnemyKind } from '../rendering/EnemyFactory';
-import { segmentHitsCircle, type Vector2 } from './Collision';
+import { segmentHitsSphere, type Vector3 } from './Collision';
 import { SpawnScheduler } from './SpawnScheduler';
 import type { RandomSource } from './Rng';
 
 export interface EnemyInstance {
   id: number;
   kind: EnemyKind;
-  position: Vector2;
-  velocity: Vector2;
+  position: Vector3;
+  velocity: Vector3;
 }
 
 export interface Bullet {
   id: number;
-  position: Vector2;
-  velocity: Vector2;
+  position: Vector3;
+  velocity: Vector3;
   active: boolean;
 }
 
@@ -23,18 +23,18 @@ export interface CombatOptions {
   enemyRadius: Record<EnemyKind, number>;
   enemySpeedPerMs: Record<EnemyKind, number>;
   enemyDamage: Record<EnemyKind, number>;
-  baseY: number;
+  spawnRadius: number; // Radius of the spawn shell
   bulletSpeed: number;
 }
 
 const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   hull: 100,
-  fireIntervalMs: 125, // Much faster fire rate (approx 8 shots/sec)
-  enemyRadius: { drone: 0.075, scout: 0.09, bomber: 0.12 },
-  enemySpeedPerMs: { drone: 0.0006, scout: 0.00075, bomber: 0.0005 },
+  fireIntervalMs: 125,
+  enemyRadius: { drone: 1.5, scout: 2.0, bomber: 2.5 }, // Increased for 3D scale
+  enemySpeedPerMs: { drone: 0.012, scout: 0.015, bomber: 0.01 }, // Faster for long distance
   enemyDamage: { drone: 5, scout: 8, bomber: 15 },
-  baseY: 1,
-  bulletSpeed: 0.008, // Faster projectiles for snappy feel
+  spawnRadius: 50, // Enemies spawn at Radius 50
+  bulletSpeed: 0.2, // much faster 3D bullets
 };
 
 export interface CombatTickResult {
@@ -54,28 +54,30 @@ export class CombatLoop {
   public get activeEnemies(): ReadonlyArray<EnemyInstance> { return this.enemies; }
   public get activeBullets(): ReadonlyArray<Bullet> { return this.bullets; }
 
-  // Player state
-  private _playerX = 0;
-  private _playerY = 0;
-  public get playerX(): number { return this._playerX; }
-  public get playerY(): number { return this._playerY; }
+  // Player state (Spherical Aim)
+  // Yaw (Theta): 0 to 2*PI
+  // Pitch (Phi): 0 (Up) to PI (Down). Mid is PI/2.
+  private _yaw = 0;
+  private _pitch = Math.PI / 2;
 
-  // Firing state (controlled by pinch gesture)
+  public get yaw(): number { return this._yaw; }
+  public get pitch(): number { return this._pitch; }
+
+
+  // Firing state
   private _isFiring = false;
   public get isFiring(): boolean { return this._isFiring && !this._isOverheated; }
 
   // Heat system
-  private _heat = 0;           // Current heat (0-100)
+  private _heat = 0;
   private _isOverheated = false;
-  private sinceLastShot = 450; // Start ready to fire immediately
-
-  // Heat settings
+  private sinceLastShot = 450;
   private readonly maxHeat = 100;
-  private readonly heatPerShot = 5;            // Lower heat per shot for rapid fire
-  private readonly heatCooldownPerMs = 0.08;   // Faster cooldown
-  private readonly overheatCooldownPerMs = 0.03; // Slower cooldown when overheated
-  private readonly overheatThreshold = 100;    // Heat level that triggers overheat
-  private readonly overheatRecoveryThreshold = 30; // Must cool to this to recover
+  private readonly heatPerShot = 5;
+  private readonly heatCooldownPerMs = 0.08;
+  private readonly overheatCooldownPerMs = 0.03;
+  private readonly overheatThreshold = 100;
+  private readonly overheatRecoveryThreshold = 30;
 
   public get heat(): number { return this._heat; }
   public get isOverheated(): boolean { return this._isOverheated; }
@@ -93,21 +95,33 @@ export class CombatLoop {
     this.hull = options.hull;
   }
 
-  // Update player position (called by InputProcessor/App)
+  // Set Aim from Input (0..1 range)
+  // x: 0 (Left) -> 1 (Right) => Maps to Yaw
+  // y: 0 (Top) -> 1 (Bottom) => Maps to Pitch
   public setPlayerPosition(x: number, y: number) {
-    // Clamp to valid range [-1, 1] for X
-    this._playerX = Math.max(-1, Math.min(1, x));
-    // Y is roughly 0 (top) to 1 (base).
-    this._playerY = Math.max(-1, Math.min(2, y)); // Allow some overflow?
+    // Map X (0..1) to Yaw (-PI to PI) - Full 360 could be disorienting, let's do 180 FOV first?
+    // Actually, user wants "Sphere", so 360 is ideal.
+    // Let's map x=0.5 to Forward (Angle 0).
+    // x=0 -> -PI (Back?), x=1 -> PI (Back?)
+
+    // For comfort, let's Map X (-1 to 1) to Yaw (-PI/2 to PI/2) => 180 degrees front facing
+    // Or full 360? Let's try 180 first for playability.
+    this._yaw = x * (Math.PI); // -PI to PI (Full 360 if Input sends -1..1)
+
+    // Map Y (-1 to 2) to Pitch
+    // y=0 is Center? No, usually Y is Top-Down on screen.
+    // Let's say y=0 is Up (Phi=0), y=1 is Horizon (Phi=PI/2), y=2 is Down (Phi=PI).
+    // Input Y comes in roughly 0 (top) to 1 (bottom).
+    const clampedY = Math.max(0, Math.min(1, y)); // clamp 0..1
+    // Map 0..1 to (PI/4 .. 3PI/4) - Limited vertical look to avoid neck strain?
+    // Or full look: 0..PI
+    this._pitch = clampedY * Math.PI; // Full Up to Down
   }
 
-  // Reset state for new game
   public reset(): void {
     this.enemies.length = 0;
     this.bullets.length = 0;
-    this.bulletPool.length = 0; // Optional: clear pool or keep it? Keep it for perf.
-
-    // Reset Counters
+    this.bulletPool.length = 0;
     this.hull = this.options.hull;
     this.elapsedMs = 0;
     this.enemyId = 0;
@@ -116,54 +130,44 @@ export class CombatLoop {
     this._isOverheated = false;
     this._isFiring = false;
     this.sinceLastShot = 450;
-
-    // Reset Stats
     this.kills.drone = 0;
     this.kills.scout = 0;
     this.kills.bomber = 0;
     this.spawns.drone = 0;
     this.spawns.scout = 0;
     this.spawns.bomber = 0;
-
-    // Reset Scheduler
     this.scheduler.reset();
   }
 
-  // Set firing state (true = pinching/firing)
   public setFiring(firing: boolean) {
     this._isFiring = firing;
   }
 
   tick(deltaMs: number): CombatTickResult {
     if (deltaMs < 0) throw new Error('deltaMs must be non-negative');
-
     this.elapsedMs += deltaMs;
 
+    // Spawn Logic
     const spawned = this.scheduler.step(deltaMs).map(event => this.createEnemy(event.kind));
     spawned.forEach(enemy => this.enemies.push(enemy));
 
+    // Move Entities
     this.advanceEnemies(deltaMs);
     const bulletCollisions = this.advanceBullets(deltaMs);
     const destroyed = [...bulletCollisions];
 
-    // Heat management
+    // Heat Logic
     if (this._isFiring && !this._isOverheated) {
-      // While firing: accumulate shot timer and try to fire
       this.sinceLastShot += deltaMs;
     } else {
-      // Not firing: cool down
       const cooldownRate = this._isOverheated ? this.overheatCooldownPerMs : this.heatCooldownPerMs;
       this._heat = Math.max(0, this._heat - cooldownRate * deltaMs);
-
-      // Recover from overheat when cooled enough
       if (this._isOverheated && this._heat <= this.overheatRecoveryThreshold) {
         this._isOverheated = false;
       }
     }
 
-    // Fire shots (auto-fire while holding, limited by overheat)
     this.spawnBullets();
-
     this.applyHullDamage();
 
     return {
@@ -174,7 +178,7 @@ export class CombatLoop {
     };
   }
 
-  summary(): { hull: number; kills: Record<EnemyKind, number>; spawns: Record<EnemyKind, number>; active: number; elapsedMs: number; heat: number; isOverheated: boolean } {
+  summary() {
     return {
       hull: this.hull,
       kills: { ...this.kills },
@@ -189,148 +193,194 @@ export class CombatLoop {
   private createEnemy(kind: EnemyKind): EnemyInstance {
     this.enemyId += 1;
     this.spawns[kind] += 1;
+
+    // Spawn on Shell
+    // Random Point on Sphere Surface
+    const u = this.rng.next();
+    const v = this.rng.next();
+    const theta = 2 * Math.PI * u;
+    const phi = Math.acos(2 * v - 1);
+
+    // Cartesian conversion
+    const r = this.options.spawnRadius;
+    const x = r * Math.sin(phi) * Math.cos(theta);
+    const y = r * Math.sin(phi) * Math.sin(theta);
+    const z = r * Math.cos(phi);
+
+    // Velocity: Target is (0,0,0)
+    // Direction = Target - Pos = -Pos
+    // Normalize and scale
+    const dist = Math.hypot(x, y, z);
+    const speed = this.options.enemySpeedPerMs[kind];
+    const vx = (-x / dist) * speed;
+    const vy = (-y / dist) * speed;
+    const vz = (-z / dist) * speed;
+
     return {
       id: this.enemyId,
       kind,
-      position: { x: this.randomX(), y: 0 },
-      velocity: { x: 0, y: this.options.enemySpeedPerMs[kind] },
+      position: { x, y, z },
+      velocity: { x: vx, y: vy, z: vz },
     };
-  }
-
-  private randomX(): number {
-    return -0.9 + this.rng.next() * 1.8;
   }
 
   private advanceEnemies(deltaMs: number): void {
     for (const enemy of this.enemies) {
-      enemy.position = {
-        x: enemy.position.x + enemy.velocity.x * deltaMs,
-        y: enemy.position.y + enemy.velocity.y * deltaMs,
-      };
+      enemy.position.x += enemy.velocity.x * deltaMs;
+      enemy.position.y += enemy.velocity.y * deltaMs;
+      enemy.position.z += enemy.velocity.z * deltaMs;
     }
   }
 
   private advanceBullets(deltaMs: number): EnemyInstance[] {
     const destroyed: EnemyInstance[] = [];
-
-    // Iterate backwards so we can swap-remove without breaking indices
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const bullet = this.bullets[i];
 
-      // Move bullet
+      const px = bullet.position.x;
+      const py = bullet.position.y;
+      const pz = bullet.position.z;
+
+      // Update Pos
       bullet.position.x += bullet.velocity.x * deltaMs;
       bullet.position.y += bullet.velocity.y * deltaMs;
+      bullet.position.z += bullet.velocity.z * deltaMs;
 
-      // Check for collisions
+      const nextPx = bullet.position.x;
+      const nextPy = bullet.position.y;
+      const nextPz = bullet.position.z;
+
+      // Check Collision with all Enemies
       let hit = false;
       for (let j = this.enemies.length - 1; j >= 0; j--) {
         const enemy = this.enemies[j];
-        const dist = Math.hypot(bullet.position.x - enemy.position.x, bullet.position.y - enemy.position.y);
-
-        // Simple point-circle collision for bullets
-        if (dist < this.options.enemyRadius[enemy.kind]) {
-          // Hit!
+        if (segmentHitsSphere(
+          { x: px, y: py, z: pz },
+          { x: nextPx, y: nextPy, z: nextPz },
+          enemy.position,
+          this.options.enemyRadius[enemy.kind]
+        )) {
           destroyed.push(enemy);
           this.enemies.splice(j, 1);
           this.kills[enemy.kind] += 1;
           hit = true;
-          break; // Bullet destroys only one enemy
+          break;
         }
       }
 
-      // Check bounds (off screen top) or hit
-      if (hit || bullet.position.y < -1.5) {
-        // Recycle bullet to pool
+      // Despawn if too far (Range check > Spawn Radius + Buffer)
+      const distSq = nextPx * nextPx + nextPy * nextPy + nextPz * nextPz;
+      if (hit || distSq > (this.options.spawnRadius * 1.5) ** 2) {
         bullet.active = false;
         this.bulletPool.push(bullet);
-
-        // Swap-Pop Removal (O(1))
-        // 1. Overwrite current element with the last element
         this.bullets[i] = this.bullets[this.bullets.length - 1];
-        // 2. Remove the last element
         this.bullets.pop();
       }
     }
-
     return destroyed;
   }
 
-  // Object pool for active bullets to reduce GC
-  // We grow this on demand.
   private readonly bulletPool: Bullet[] = [];
 
   private spawnBullets(): void {
-    // Only fire if pinching and not overheated
-    if (!this._isFiring || this._isOverheated) {
-      return;
-    }
+    if (!this._isFiring || this._isOverheated) return;
 
-    // Auto-fire while holding (limited by fire rate)
     while (this.sinceLastShot >= this.options.fireIntervalMs) {
       this.sinceLastShot -= this.options.fireIntervalMs;
-
-      // Add heat for this shot
       this._heat += this.heatPerShot;
-
-      // Check for overheat
       if (this._heat >= this.overheatThreshold) {
         this._heat = this.maxHeat;
         this._isOverheated = true;
       }
 
-      // console.log("FIRING BULLET", this.activeBullets.length + 1);
+      // Fire from Center (0,0,0) towards Aim Direction
+      // Aim is defined by _yaw and _pitch
+      // Convert Spherical to Cartesian Direction
+      // x = sin(phi) * cos(theta)
+      // y = sin(phi) * sin(theta)  <-- Wait, usually Y is UP in ThreeJS. 
+      // Standard Physics: Z is Up. ThreeJS: Y is Up.
+      // Let's stick to ThreeJS Y-Up convention.
+      // x = r * sin(phi) * sin(theta)
+      // y = r * cos(phi)
+      // z = r * sin(phi) * cos(theta)
 
+      // Let's re-verify Aim Mapping.
+      // Yaw (Theta) rotates around Y axis.
+      // Pitch (Phi) rotates from Y-axis down?
 
-      // Fire from the Player's position UPWARDS (towards y=0 / depth)
-      const startX = this._playerX;
-      const startY = this._playerY;
+      // Direction Vector:
+      // x = sin(pitch) * sin(yaw)
+      // y = cos(pitch)
+      // z = sin(pitch) * cos(yaw)
 
-      // Fire straight up in logic space (which becomes "forward" in 3D view)
-      // Enemies are at y=0, Player is at y=1. Direction is negative Y.
+      // But we want Forward to be -Z when Yaw=0.
+      // Let's just use Euler rotations logic simpler.
+      // Or just standard Math.
+
       const speed = this.options.bulletSpeed;
 
-      const velocity = {
-        x: 0,          // No horizontal spread for now, precise shooting
-        y: -speed,     // Negative Y = Up/Forward
-      };
+      // Standard Math:
+      // x = r sin(phi) cos(theta)
+      // y = r sin(phi) sin(theta)
+      // z = r cos(phi)
+      // This assumes Z is up.
+
+      // ThreeJS: Y is Up.
+      // x = sin(phase) * sin(theta) ... 
+      // Let's just create a Vector3 and apply Euler.
+
+      // Simple Trig for Y-Up:
+      // y = cos(pitch) (if pitch 0 is up)
+      // h = sin(pitch) (horizontal radius)
+      // x = h * sin(yaw)
+      // z = h * cos(yaw)
+      // If Pitch 0 is Up, Pitch PI is Down.
+
+      // ThreeJS Forward is -Z.
+      // Yaw 0 -> Forward (-Z)
+      // Yaw +PI/2 -> Right (+X)
+
+      const dirY = Math.cos(this._pitch);
+      const h = Math.sin(this._pitch);
+      const dirX = h * Math.sin(this._yaw);
+      const dirZ = -h * Math.cos(this._yaw); // Invert Z for -Z Forward
+
+      // Normalize just in case
+      const mag = Math.hypot(dirX, dirY, dirZ);
+
+      const vx = (dirX / mag) * speed;
+      const vy = (dirY / mag) * speed;
+      const vz = (dirZ / mag) * speed;
 
       this.bulletId++;
-
-      // Try to reuse from pool
       let bullet = this.bulletPool.pop();
       if (!bullet) {
-        // Pool empty, create new (allocate)
         bullet = {
           id: this.bulletId,
-          position: { x: startX, y: startY },
-          velocity: velocity, // This allocates a new object, could be optimized further with Vector2 pool
+          position: { x: 0, y: 0, z: 0 },
+          velocity: { x: vx, y: vy, z: vz },
           active: true,
         };
       } else {
-        // Reset pooled bullet
         bullet.id = this.bulletId;
-        bullet.position.x = startX;
-        bullet.position.y = startY;
-        bullet.velocity = velocity; // Replaces ref, but old ref is garbage. Ideally copy x/y to avoid alloc.
+        bullet.position.x = 0; bullet.position.y = 0; bullet.position.z = 0;
+        bullet.velocity.x = vx; bullet.velocity.y = vy; bullet.velocity.z = vz;
         bullet.active = true;
       }
-
       this.bullets.push(bullet);
 
-      // Stop firing more this frame if overheated
       if (this._isOverheated) break;
     }
-  }
-
-  // Legacy method placeholder
-  private fireShots(): EnemyInstance[] {
-    return [];
   }
 
   private applyHullDamage(): void {
     for (let i = this.enemies.length - 1; i >= 0; i -= 1) {
       const enemy = this.enemies[i];
-      if (enemy.position.y >= this.options.baseY) {
+      // Check distance to center (Player at 0,0,0)
+      const distSq = enemy.position.x ** 2 + enemy.position.y ** 2 + enemy.position.z ** 2;
+
+      // If too close, damage and destroy
+      if (distSq < 2 * 2) { // 2 meter radius
         this.hull = Math.max(0, this.hull - this.options.enemyDamage[enemy.kind]);
         this.enemies.splice(i, 1);
       }

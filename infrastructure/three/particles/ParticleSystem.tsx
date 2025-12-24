@@ -23,9 +23,9 @@ export function Starfield({ count = 2000 }) {
     useFrame((state, delta) => {
         if (!points.current) return;
 
-        // Stationary Defense Mode: majestic slow rotation, no forward warping
-        points.current.rotation.z += delta * 0.01; // Very slow drift
-        // points.current.position.z += delta * 10; // Disabled warp speed
+        // Stationary Mode: No manual rotation. The Camera does all the moving now.
+        // points.current.rotation.z += delta * 0.01; 
+        // points.current.position.z += delta * 10;
     });
 
     return (

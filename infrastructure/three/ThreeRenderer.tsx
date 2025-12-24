@@ -1,4 +1,4 @@
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { GameScene } from './GameScene';
 import { CombatLoop } from '../../gameplay/CombatLoop';
 import { useEffect } from 'react';
@@ -9,46 +9,27 @@ interface ThreeRendererProps {
     isRunning?: boolean;
 }
 
-function AdaptiveCamera() {
-    const { camera, size } = useThree();
+function TurretCamera({ combatLoop }: { combatLoop?: CombatLoop }) {
+    const { camera } = useThree();
 
-    useEffect(() => {
-        if (!(camera instanceof THREE.PerspectiveCamera)) return;
-        if (size.width === 0 || size.height === 0) return;
+    useFrame(() => {
+        if (!combatLoop) return;
 
-        const aspect = size.width / size.height;
-        const targetWidth = 20; // Visibility width (approx -10 to 10)
+        // Position: Center of the Universe (Turret)
+        camera.position.set(0, 0, 0);
 
-        // Base distance logic
-        // If landscape (aspect > 1): Default [0, 5, 10] works well.
-        // If portrait (aspect < 1): We need to pull back to see the width.
+        // Rotation: Sync with CombatLoop Aim
+        // CombatLoop Yaw: -PI to PI
+        // CombatLoop Pitch: 0 (Up) to PI (Down) -> ThreeJS: -PI/2 (Up) to PI/2 (Down)
 
-        // At y=0, with camera at y=5, z=10.
-        // Distance to origin approx sqrt(5^2 + 10^2) = 11.18
+        const camPitch = combatLoop.pitch - (Math.PI / 2);
+        // Invert Pitch if needed based on controls feel, but let's stick to map
+        // Yaw: standard rotation around Y
+        const camYaw = -combatLoop.yaw; // Invert yaw to match intuitive "Move hand left to look left"
 
-        // Simple heuristic: Maintain horizontal FOV
-        // VFOV = 2 * atan( tan(HFOV/2) / aspect )
-        // We can just adjust Z position based on 1/aspect.
-
-        // Star Fox / Tunnel Perspective
-        // Camera is lower (Y=3) and closer (Z=5) relative to base, looking DEEP (-20)
-        const baseZ = 5;
-        const baseY = 3;
-
-        if (aspect < 1.0) {
-            // Portrait: Pull back proportional to how narrow it is
-            const factor = 1.0 / aspect;
-            camera.position.set(0, baseY * factor, baseZ * factor);
-        } else {
-            // Landscape: Default
-            camera.position.set(0, baseY, baseZ);
-        }
-
-        // Look down the tunnel (Z=-20), slightly up from floor
-        camera.lookAt(0, 0, -20);
-        camera.updateProjectionMatrix();
-
-    }, [camera, size]);
+        // Order YXZ: Rotate Yaw (Y) then Pitch (X) local
+        camera.rotation.set(camPitch, camYaw, 0, 'YXZ');
+    });
 
     return null;
 }
@@ -63,7 +44,7 @@ export function ThreeRenderer(props: ThreeRendererProps) {
             >
                 <color attach="background" args={['#000000']} />
 
-                <AdaptiveCamera />
+                <TurretCamera combatLoop={combatLoop} />
 
                 {/* Basic lighting */}
                 <ambientLight intensity={0.5} />
