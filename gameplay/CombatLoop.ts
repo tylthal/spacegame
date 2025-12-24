@@ -178,18 +178,19 @@ export class CombatLoop {
     this.enemyId += 1;
     this.spawns[kind] += 1;
 
-    // Spawn in Forward Cone (Sector)
-    // Random Yaw/Pitch within Spawn Cone
-    const SPAWN_YAW = Math.PI / 3; // 60 degrees total width (+/- 30)
-    const SPAWN_PITCH = Math.PI / 4; // 45 degrees height range
+    // Spawn in Forward Cone (Sector) - CONSTRAINED TO CAMERA FOV
+    // Camera FOV: 60° vertical, ~90° horizontal (16:9 aspect)
+    // Spawn slightly inside FOV edges to ensure enemies are always visible
+    const SPAWN_YAW = Math.PI / 4; // 45 degrees width (+/- 22.5) - fits in ~90° horizontal FOV
+    const SPAWN_PITCH = Math.PI / 6; // 30 degrees height - fits in 60° vertical FOV
 
-    // Yaw: Random across full width (-0.5 to 0.5)
+    // Yaw: Random across width (-0.5 to 0.5)
     const u = this.rng.next() - 0.5;
-    // Pitch: Biased upward (0.1 to 0.9 -> mostly positive pitch = upper screen)
-    const v = this.rng.next() * 0.8 + 0.1; // Range: 0.1 to 0.9 (top-biased)
+    // Pitch: Biased upward (spawn in upper portion of screen)
+    const v = this.rng.next() * 0.7 + 0.1; // Range: 0.1 to 0.8 (top-biased, within FOV)
 
     const yaw = u * SPAWN_YAW;
-    const pitch = v * SPAWN_PITCH; // Now mostly positive = above center
+    const pitch = v * SPAWN_PITCH; // Positive = above center, within FOV
 
     const r = this.options.spawnRadius;
 
