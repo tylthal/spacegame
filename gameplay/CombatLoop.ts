@@ -319,33 +319,26 @@ export class CombatLoop {
       const targetY = this._pitch * halfHeight;
       const targetZ = -D; // Forward is -Z
 
-      // MUZZLE POSITION: Fixed at bottom center of screen (visual origin)
-      const muzzleX = 0;
-      const muzzleY = -3; // Below camera
-      const muzzleZ = 0;
-
       // Calculate velocity direction from CAMERA ORIGIN (0,0,0) to TARGET
-      // This eliminates parallax - bullets go EXACTLY where you aim
-      // But they spawn at muzzle for visual effect
       const dist = Math.hypot(targetX, targetY, targetZ);
 
       const vx = (targetX / dist) * speed;
       const vy = (targetY / dist) * speed;
       const vz = (targetZ / dist) * speed;
 
-      // Spawn at muzzle position
+      // Spawn at camera origin for PERFECT accuracy (no parallax)
       this.bulletId++;
       let bullet = this.bulletPool.pop();
       if (!bullet) {
         bullet = {
           id: this.bulletId,
-          position: { x: muzzleX, y: muzzleY, z: muzzleZ },
+          position: { x: 0, y: 0, z: 0 },
           velocity: { x: vx, y: vy, z: vz },
           active: true,
         };
       } else {
         bullet.id = this.bulletId;
-        bullet.position.x = muzzleX; bullet.position.y = muzzleY; bullet.position.z = muzzleZ;
+        bullet.position.x = 0; bullet.position.y = 0; bullet.position.z = 0;
         bullet.velocity.x = vx; bullet.velocity.y = vy; bullet.velocity.z = vz;
         bullet.active = true;
       }
