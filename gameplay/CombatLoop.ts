@@ -400,13 +400,13 @@ export class CombatLoop {
       const CAMERA_Y = 3;
       const CAMERA_Z = 5;
 
-      // 1. MUZZLE: Fixed at visual BOTTOM-CENTER of screen
-      // This is in front of the camera, at the bottom edge of what's visible
-      const MUZZLE_DISTANCE = 5;
+      // 1. MUZZLE: At bottom of screen, a few units in front of camera
+      // Camera looks toward -Z, so muzzle Z should be less than CAMERA_Z
+      const MUZZLE_DISTANCE = 8; // Distance in front of camera (along -Z)
       const muzzleHalfHeight = MUZZLE_DISTANCE * Math.tan(VERTICAL_FOV / 2);
       const MUZZLE_X = 0;
-      const MUZZLE_Y = CAMERA_Y - muzzleHalfHeight; // Bottom of screen at this distance
-      const MUZZLE_Z = CAMERA_Z - MUZZLE_DISTANCE;   // In front of camera
+      const MUZZLE_Y = CAMERA_Y - muzzleHalfHeight * 0.8; // 80% down from center = bottom of screen
+      const MUZZLE_Z = CAMERA_Z - MUZZLE_DISTANCE; // In front of camera
 
       // 2. TARGET: Where crosshair is pointing in world space (far away)
       const TARGET_DISTANCE = 100;
@@ -496,18 +496,19 @@ export class CombatLoop {
     const CAMERA_Y = 3;
     const CAMERA_Z = 5;
 
-    const MUZZLE_DISTANCE = 5;
+    // Muzzle at bottom of visible screen
+    const MUZZLE_DISTANCE = 8;
     const muzzleHalfHeight = MUZZLE_DISTANCE * Math.tan(VERTICAL_FOV / 2);
     const MUZZLE_X = 0;
-    const MUZZLE_Y = CAMERA_Y - muzzleHalfHeight;
+    const MUZZLE_Y = CAMERA_Y - muzzleHalfHeight * 0.8;
     const MUZZLE_Z = CAMERA_Z - MUZZLE_DISTANCE;
 
     const TARGET_DISTANCE = 100;
-    const halfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);
-    const halfWidth = halfHeight * ASPECT_RATIO;
+    const targetHalfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);
+    const targetHalfWidth = targetHalfHeight * ASPECT_RATIO;
 
-    const targetX = (this._cursorX - 0.5) * 2 * halfWidth;
-    const targetY = CAMERA_Y + (0.5 - this._cursorY) * 2 * halfHeight;
+    const targetX = (this._cursorX - 0.5) * 2 * targetHalfWidth;
+    const targetY = CAMERA_Y + (0.5 - this._cursorY) * 2 * targetHalfHeight;
     const targetZ = CAMERA_Z - TARGET_DISTANCE;
 
     const dx = targetX - MUZZLE_X;
