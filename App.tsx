@@ -1,5 +1,5 @@
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DebugPanel from './components/DebugPanel';
 import { resolveDebugConfig } from './observability/DebugConfig';
 import { runDiagnosticsPipeline } from './observability/DiagnosticsHarness';
@@ -63,9 +63,9 @@ const App: React.FC = () => {
     });
   }, [phaseManager]);
 
-  // Tick the loop only when PLAYING
+  // Tick the loop only when PLAYING and not game over
   useEffect(() => {
-    if (phase !== 'PLAYING') return;
+    if (phase !== 'PLAYING' || isGameOver) return;
 
     let lastTime: number | null = null;
     let frameId = 0;
@@ -85,7 +85,7 @@ const App: React.FC = () => {
     };
     frameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frameId);
-  }, [phase, combatLoop]);
+  }, [phase, combatLoop, isGameOver]);
 
 
   // Initialize HandTracker & InputProcessor
@@ -164,23 +164,23 @@ const App: React.FC = () => {
     isOverheated: false,
   });
   const [isGameOver, setIsGameOver] = useState(false);
+  const frozenTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (phase !== 'PLAYING') return;
-    setIsGameOver(false); // Reset on new game
 
-    let frozenTime: number | null = null; // Store time when game ends
+    // Reset on new game
+    setIsGameOver(false);
+    frozenTimeRef.current = null;
 
     const interval = setInterval(() => {
       const summary = combatLoop.summary();
       const totalKills = summary.kills.drone + summary.kills.scout + summary.kills.bomber;
       const score = summary.kills.drone * 100 + summary.kills.scout * 200 + summary.kills.bomber * 500;
 
-      // Check for game over - freeze the timer
-      if (summary.hull <= 0 && !isGameOver) {
-        if (frozenTime === null) {
-          frozenTime = summary.elapsedMs;
-        }
+      // Check for game over - freeze the timer (only once)
+      if (summary.hull <= 0 && frozenTimeRef.current === null) {
+        frozenTimeRef.current = summary.elapsedMs;
         setIsGameOver(true);
       }
 
@@ -188,13 +188,13 @@ const App: React.FC = () => {
         score,
         hull: summary.hull,
         kills: totalKills,
-        elapsedMs: frozenTime !== null ? frozenTime : summary.elapsedMs,
+        elapsedMs: frozenTimeRef.current !== null ? frozenTimeRef.current : summary.elapsedMs,
         heat: summary.heat,
         isOverheated: summary.isOverheated,
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [phase, combatLoop, isGameOver]);
+  }, [phase, combatLoop]);
 
   return (
     <div
