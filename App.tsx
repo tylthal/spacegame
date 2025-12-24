@@ -108,12 +108,11 @@ const App: React.FC = () => {
       // 2. Feed CombatLoop (Input Mapping)
       // Cursor X is 0..1. Map to -1..1 for game
       const gameX = (event.cursor.x * 2) - 1;
-      // Invert X because camera is mirrored? Usually mirrors are intuitive (Left is Left).
-      // But webcams often mirror image. 
-      // If I move right, image moves right. 
-      // Let's stick to direct mapping for now.
       combatLoop.setPlayerX(gameX);
 
+      // 3. Firing: pinch gesture triggers shooting
+      const isPinching = event.gesture === 'pinch';
+      combatLoop.setFiring(isPinching);
     });
   }, [inputProcessor, phaseManager, combatLoop]);
 

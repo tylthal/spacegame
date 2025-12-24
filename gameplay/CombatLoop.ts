@@ -47,9 +47,13 @@ export class CombatLoop {
   private _playerX = 0;
   public get playerX(): number { return this._playerX; }
 
+  // Firing state (controlled by pinch gesture)
+  private _isFiring = false;
+  private _wasFiring = false;
+  public get isFiring(): boolean { return this._isFiring; }
+
   private hull: number;
   private elapsedMs = 0;
-  private sinceLastShot = 0;
   private enemyId = 0;
 
   constructor(
@@ -62,23 +66,29 @@ export class CombatLoop {
 
   // Update player position (called by InputProcessor/App)
   public setPlayerX(x: number) {
-    // Clamp to valid range [-1, 1] approx (or whatever the game width is)
-    // GameScene maps X [-0.9, 0.9] -> [-5, 5]
-    // Let's keep normalized [-1, 1] here
+    // Clamp to valid range [-1, 1]
     this._playerX = Math.max(-1, Math.min(1, x));
+  }
+
+  // Set firing state (true = pinching/firing)
+  public setFiring(firing: boolean) {
+    this._isFiring = firing;
   }
 
   tick(deltaMs: number): CombatTickResult {
     if (deltaMs < 0) throw new Error('deltaMs must be non-negative');
 
     this.elapsedMs += deltaMs;
-    this.sinceLastShot += deltaMs;
 
     const spawned = this.scheduler.step(deltaMs).map(event => this.createEnemy(event.kind));
     spawned.forEach(enemy => this.enemies.push(enemy));
 
     this.advanceEnemies(deltaMs);
+
+    // Fire only on pinch START (edge trigger)
     const destroyed = this.fireShots();
+    this._wasFiring = this._isFiring;
+
     this.applyHullDamage();
 
     return {
@@ -125,45 +135,39 @@ export class CombatLoop {
 
   private fireShots(): EnemyInstance[] {
     const destroyed: EnemyInstance[] = [];
-    while (this.sinceLastShot >= this.options.fireIntervalMs) {
-      this.sinceLastShot -= this.options.fireIntervalMs;
 
-      // Fire from current player position
-      const shotStart = { x: this._playerX, y: this.options.baseY }; // Player is at baseY effectively (or -4 in scene, which is 0-1 logic inverted)
-      // Actually CombatLoop logic: Enemies start at y=0, Base is at y=1.
-      // So Player is at y=1 (defending the base).
-      // Shots go from y=1 to y=-1 (upwards in screen space if 0 is top? No.)
-      // Wait, let's check advanceEnemies.
-      // y += velocity * delta. Velocity is positive. So enemies move 0 -> 1.
-      // So Player (base) is at +1.
-      // Shots should go "out" from base. 1 -> 0 -> -1.
+    // Only fire on pinch START (rising edge - was not firing, now firing)
+    if (!this._isFiring || this._wasFiring) {
+      return destroyed;
+    }
 
-      const shotEnd = { x: this._playerX, y: -1 };
+    // Fire from base (y=1) toward cursor aim (y=-1)
+    // Shot goes from bottom center (0, 1) toward the cursor X position
+    const shotStart = { x: 0, y: this.options.baseY }; // Origin: bottom center
+    const shotEnd = { x: this._playerX, y: -1 };       // Target: cursor position extended
 
-      // Simple collision check against all enemies
-      // Optimize: spatial partition if needed, but for <50 enemies loop is fine.
+    // Simple collision check against all enemies
+    let hitEnemyIndex = -1;
+    let closestDist = Infinity;
 
-      let hitEnemyIndex = -1;
-      let closestDist = Infinity;
-
-      for (let i = 0; i < this.enemies.length; i++) {
-        const enemy = this.enemies[i];
-        if (segmentHitsCircle(shotStart, shotEnd, enemy.position, this.options.enemyRadius[enemy.kind])) {
-          // Find closest hit (highest Y is closest to player at 1)
-          const dist = 1 - enemy.position.y;
-          if (dist < closestDist) {
-            closestDist = dist;
-            hitEnemyIndex = i;
-          }
+    for (let i = 0; i < this.enemies.length; i++) {
+      const enemy = this.enemies[i];
+      if (segmentHitsCircle(shotStart, shotEnd, enemy.position, this.options.enemyRadius[enemy.kind])) {
+        // Find closest hit to the base (highest Y value)
+        const dist = this.options.baseY - enemy.position.y;
+        if (dist < closestDist) {
+          closestDist = dist;
+          hitEnemyIndex = i;
         }
       }
-
-      if (hitEnemyIndex !== -1) {
-        const [hit] = this.enemies.splice(hitEnemyIndex, 1);
-        destroyed.push(hit);
-        this.kills[hit.kind] += 1;
-      }
     }
+
+    if (hitEnemyIndex !== -1) {
+      const [hit] = this.enemies.splice(hitEnemyIndex, 1);
+      destroyed.push(hit);
+      this.kills[hit.kind] += 1;
+    }
+
     return destroyed;
   }
 

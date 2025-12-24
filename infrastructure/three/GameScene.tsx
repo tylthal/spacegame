@@ -59,13 +59,11 @@ function LaserBeam({ visible, targetX }: { visible: boolean; targetX: number }) 
 export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
     const [laserVisible, setLaserVisible] = useState(false);
 
-    useFrame((state) => {
+    useFrame(() => {
         if (!combatLoop) return;
 
-        // Flash laser beam periodically (synced with fire rate)
-        // Fire rate is 450ms, show laser for 50ms
-        const firePhase = (state.clock.elapsedTime * 1000) % 450;
-        setLaserVisible(firePhase < 50);
+        // Show laser when firing (pinching)
+        setLaserVisible(combatLoop.isFiring);
     });
 
     return (
