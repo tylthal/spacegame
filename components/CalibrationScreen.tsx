@@ -127,8 +127,9 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                             const offsetY = fingertipPos.y - finalCalibrationOffsetRef.current.y;
 
                             // Scale by virtual pad sensitivity and center at 0.5
+                            // X-axis: INVERTED for webcam mirror effect
                             // Y-axis: MediaPipe Y=0 is top, screen Y=0 is top - no inversion needed
-                            const calibratedX = (offsetX / VIRTUAL_PAD_SIZE) + 0.5;
+                            const calibratedX = (-offsetX / VIRTUAL_PAD_SIZE) + 0.5;
                             const calibratedY = (offsetY / VIRTUAL_PAD_SIZE) + 0.5;
 
                             setCursorPos({

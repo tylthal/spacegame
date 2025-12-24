@@ -209,8 +209,9 @@ export class InputProcessor {
     const offsetY = landmark.y - this.calibrationOffsetY;
 
     // Scale by virtual pad size (smaller pad = higher sensitivity)
+    // X-axis: INVERTED because webcam is mirrored (move left = cursor goes left)
     // Y-axis: MediaPipe Y=0 is top, which matches screen Y=0 at top - no inversion needed
-    const scaledX = (offsetX / this.virtualPad.width) + 0.5;
+    const scaledX = (-offsetX / this.virtualPad.width) + 0.5;
     const scaledY = (offsetY / this.virtualPad.height) + 0.5;
 
     return {
