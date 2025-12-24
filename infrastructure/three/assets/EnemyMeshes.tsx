@@ -5,6 +5,11 @@ import React from 'react';
  * 
  * Multi-part enemy designs with metallic materials and detailed geometry.
  * Each enemy type has a unique silhouette for easy identification.
+ * 
+ * MESH CONVENTION:
+ * - Nose/Front at +Z (intuitive for artists)
+ * - Engine/Back at -Z
+ * - The EnemyMesh wrapper handles Three.js lookAt convention internally
  */
 
 // Shared metallic material presets with emissive glow for space visibility
@@ -43,9 +48,9 @@ const METAL_GOLD = {
 /**
  * DRONE - Fast, small attack craft
  * Design: Compact fighter with swept-back wings and glowing engine
- * NOTE: Nose points to -Z (Three.js forward direction for lookAt)
+ * Orientation: Nose at +Z, Engine at -Z
  */
-export function DroneMesh() {
+function DroneMesh() {
     return (
         <group>
             {/* Main fuselage - compact body */}
@@ -54,8 +59,8 @@ export function DroneMesh() {
                 <meshStandardMaterial {...METAL_CHROME} />
             </mesh>
 
-            {/* Red nose cone - at FRONT (-Z) */}
-            <mesh position={[0, 0, -0.9]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.12, 0.25, 0.12]}>
+            {/* Red nose cone - FRONT (+Z) */}
+            <mesh position={[0, 0, 0.9]} rotation={[Math.PI / 2, 0, 0]} scale={[0.12, 0.25, 0.12]}>
                 <coneGeometry args={[1, 1, 6]} />
                 <meshStandardMaterial
                     color="#FF3366"
@@ -66,20 +71,20 @@ export function DroneMesh() {
                 />
             </mesh>
 
-            {/* Left swept wing - rear position at +Z */}
-            <mesh position={[-0.5, 0, 0.2]} rotation={[0, 0.3, 0]} scale={[0.6, 0.04, 0.5]}>
+            {/* Left swept wing */}
+            <mesh position={[-0.5, 0, -0.2]} rotation={[0, -0.3, 0]} scale={[0.6, 0.04, 0.5]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Right swept wing - rear position at +Z */}
-            <mesh position={[0.5, 0, 0.2]} rotation={[0, -0.3, 0]} scale={[0.6, 0.04, 0.5]}>
+            {/* Right swept wing */}
+            <mesh position={[0.5, 0, -0.2]} rotation={[0, 0.3, 0]} scale={[0.6, 0.04, 0.5]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
             {/* Left wingtip glow */}
-            <mesh position={[-0.75, 0, 0.35]} scale={[0.1, 0.06, 0.15]}>
+            <mesh position={[-0.75, 0, -0.35]} scale={[0.1, 0.06, 0.15]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
                     color="#FF0044"
@@ -89,7 +94,7 @@ export function DroneMesh() {
             </mesh>
 
             {/* Right wingtip glow */}
-            <mesh position={[0.75, 0, 0.35]} scale={[0.1, 0.06, 0.15]}>
+            <mesh position={[0.75, 0, -0.35]} scale={[0.1, 0.06, 0.15]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
                     color="#FF0044"
@@ -98,14 +103,14 @@ export function DroneMesh() {
                 />
             </mesh>
 
-            {/* Engine housing - at BACK (+Z) */}
-            <mesh position={[0, 0, 0.7]} rotation={[Math.PI / 2, 0, 0]} scale={[0.18, 0.25, 0.18]}>
+            {/* Engine housing - BACK (-Z) */}
+            <mesh position={[0, 0, -0.7]} rotation={[Math.PI / 2, 0, 0]} scale={[0.18, 0.25, 0.18]}>
                 <cylinderGeometry args={[1, 0.8, 1, 8]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Engine glow - at BACK (+Z) */}
-            <mesh position={[0, 0, 0.85]} scale={[0.15, 0.15, 0.1]}>
+            {/* Engine glow - BACK (-Z) */}
+            <mesh position={[0, 0, -0.85]} scale={[0.15, 0.15, 0.1]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#00FFFF"
@@ -120,9 +125,9 @@ export function DroneMesh() {
 /**
  * SCOUT - Medium interceptor with sensor array
  * Design: Angular body with sensor dish and twin engines
- * NOTE: Nose points to -Z (Three.js forward direction for lookAt)
+ * Orientation: Nose at +Z, Engine at -Z
  */
-export function ScoutMesh() {
+function ScoutMesh() {
     return (
         <group>
             {/* Main hull - angular body */}
@@ -131,46 +136,14 @@ export function ScoutMesh() {
                 <meshStandardMaterial {...METAL_CHROME} />
             </mesh>
 
-            {/* Copper sensor dish - at FRONT (-Z) */}
-            <mesh position={[0, 0.25, -0.5]} rotation={[Math.PI / 2, 0, 0]} scale={[0.3, 0.05, 0.3]}>
+            {/* Copper sensor dish - FRONT (+Z) */}
+            <mesh position={[0, 0.25, 0.5]} rotation={[Math.PI / 2, 0, 0]} scale={[0.3, 0.05, 0.3]}>
                 <cylinderGeometry args={[1, 0.6, 1, 8]} />
                 <meshStandardMaterial {...METAL_COPPER} />
             </mesh>
 
-            {/* Left engine nacelle - at BACK (+Z) */}
-            <mesh position={[-0.4, 0, 0.5]} scale={[0.15, 0.15, 0.8]}>
-                <cylinderGeometry args={[1, 1, 1, 6]} />
-                <meshStandardMaterial {...METAL_GUNMETAL} />
-            </mesh>
-
-            {/* Right engine nacelle - at BACK (+Z) */}
-            <mesh position={[0.4, 0, 0.5]} scale={[0.15, 0.15, 0.8]}>
-                <cylinderGeometry args={[1, 1, 1, 6]} />
-                <meshStandardMaterial {...METAL_GUNMETAL} />
-            </mesh>
-
-            {/* Left engine glow - at BACK (+Z) */}
-            <mesh position={[-0.4, 0, 0.95]} scale={[0.12, 0.12, 0.05]}>
-                <sphereGeometry args={[1, 8, 6]} />
-                <meshStandardMaterial
-                    color="#FFAA00"
-                    emissive="#FF6600"
-                    emissiveIntensity={3.0}
-                />
-            </mesh>
-
-            {/* Right engine glow - at BACK (+Z) */}
-            <mesh position={[0.4, 0, 0.95]} scale={[0.12, 0.12, 0.05]}>
-                <sphereGeometry args={[1, 8, 6]} />
-                <meshStandardMaterial
-                    color="#FFAA00"
-                    emissive="#FF6600"
-                    emissiveIntensity={3.0}
-                />
-            </mesh>
-
-            {/* Cockpit window - at FRONT (-Z) */}
-            <mesh position={[0, 0.1, -0.8]} scale={[0.2, 0.1, 0.3]}>
+            {/* Cockpit window - FRONT (+Z) */}
+            <mesh position={[0, 0.1, 0.8]} scale={[0.2, 0.1, 0.3]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#00FFFF"
@@ -180,6 +153,38 @@ export function ScoutMesh() {
                     roughness={0.1}
                 />
             </mesh>
+
+            {/* Left engine nacelle - BACK (-Z) */}
+            <mesh position={[-0.4, 0, -0.5]} scale={[0.15, 0.15, 0.8]}>
+                <cylinderGeometry args={[1, 1, 1, 6]} />
+                <meshStandardMaterial {...METAL_GUNMETAL} />
+            </mesh>
+
+            {/* Right engine nacelle - BACK (-Z) */}
+            <mesh position={[0.4, 0, -0.5]} scale={[0.15, 0.15, 0.8]}>
+                <cylinderGeometry args={[1, 1, 1, 6]} />
+                <meshStandardMaterial {...METAL_GUNMETAL} />
+            </mesh>
+
+            {/* Left engine glow - BACK (-Z) */}
+            <mesh position={[-0.4, 0, -0.95]} scale={[0.12, 0.12, 0.05]}>
+                <sphereGeometry args={[1, 8, 6]} />
+                <meshStandardMaterial
+                    color="#FFAA00"
+                    emissive="#FF6600"
+                    emissiveIntensity={3.0}
+                />
+            </mesh>
+
+            {/* Right engine glow - BACK (-Z) */}
+            <mesh position={[0.4, 0, -0.95]} scale={[0.12, 0.12, 0.05]}>
+                <sphereGeometry args={[1, 8, 6]} />
+                <meshStandardMaterial
+                    color="#FFAA00"
+                    emissive="#FF6600"
+                    emissiveIntensity={3.0}
+                />
+            </mesh>
         </group>
     );
 }
@@ -187,9 +192,9 @@ export function ScoutMesh() {
 /**
  * BOMBER - Heavy assault craft
  * Design: Bulky armored body with gold accents and triple engines
- * NOTE: Nose points to -Z (Three.js forward direction for lookAt)
+ * Orientation: Nose at +Z, Engine at -Z
  */
-export function BomberMesh() {
+function BomberMesh() {
     return (
         <group>
             {/* Main armored hull */}
@@ -216,32 +221,42 @@ export function BomberMesh() {
                 <meshStandardMaterial {...METAL_GOLD} />
             </mesh>
 
-            {/* Chrome nose spike - at FRONT (-Z) */}
-            <mesh position={[0, 0, -1.4]} rotation={[Math.PI, 0, 0]} scale={[0.15, 0.15, 0.5]}>
+            {/* Chrome nose spike - FRONT (+Z) */}
+            <mesh position={[0, 0, 1.4]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.15, 0.5, 0.15]}>
                 <coneGeometry args={[1, 2, 6]} />
                 <meshStandardMaterial {...METAL_CHROME} />
             </mesh>
 
-            {/* Center engine - at BACK (+Z) */}
-            <mesh position={[0, 0, 1.2]} scale={[0.25, 0.25, 0.4]}>
+            {/* Weapon pods - FRONT (+Z) */}
+            <mesh position={[-0.5, -0.2, 0.5]} scale={[0.12, 0.12, 0.4]}>
+                <cylinderGeometry args={[1, 1, 1, 6]} />
+                <meshStandardMaterial {...METAL_CHROME} />
+            </mesh>
+            <mesh position={[0.5, -0.2, 0.5]} scale={[0.12, 0.12, 0.4]}>
+                <cylinderGeometry args={[1, 1, 1, 6]} />
+                <meshStandardMaterial {...METAL_CHROME} />
+            </mesh>
+
+            {/* Center engine - BACK (-Z) */}
+            <mesh position={[0, 0, -1.2]} scale={[0.25, 0.25, 0.4]}>
                 <cylinderGeometry args={[1, 0.8, 1, 8]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Left engine - at BACK (+Z) */}
-            <mesh position={[-0.35, -0.15, 1.0]} scale={[0.18, 0.18, 0.35]}>
+            {/* Left engine - BACK (-Z) */}
+            <mesh position={[-0.35, -0.15, -1.0]} scale={[0.18, 0.18, 0.35]}>
                 <cylinderGeometry args={[1, 0.8, 1, 8]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Right engine - at BACK (+Z) */}
-            <mesh position={[0.35, -0.15, 1.0]} scale={[0.18, 0.18, 0.35]}>
+            {/* Right engine - BACK (-Z) */}
+            <mesh position={[0.35, -0.15, -1.0]} scale={[0.18, 0.18, 0.35]}>
                 <cylinderGeometry args={[1, 0.8, 1, 8]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Center engine glow - at BACK (+Z) */}
-            <mesh position={[0, 0, 1.45]} scale={[0.2, 0.2, 0.1]}>
+            {/* Center engine glow */}
+            <mesh position={[0, 0, -1.45]} scale={[0.2, 0.2, 0.1]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#9900FF"
@@ -250,8 +265,8 @@ export function BomberMesh() {
                 />
             </mesh>
 
-            {/* Left engine glow - at BACK (+Z) */}
-            <mesh position={[-0.35, -0.15, 1.2]} scale={[0.12, 0.12, 0.05]}>
+            {/* Left engine glow */}
+            <mesh position={[-0.35, -0.15, -1.2]} scale={[0.12, 0.12, 0.05]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#9900FF"
@@ -260,43 +275,43 @@ export function BomberMesh() {
                 />
             </mesh>
 
-            {/* Right engine glow - at BACK (+Z) */}
-            <mesh position={[0.35, -0.15, 1.2]} scale={[0.12, 0.12, 0.05]}>
+            {/* Right engine glow */}
+            <mesh position={[0.35, -0.15, -1.2]} scale={[0.12, 0.12, 0.05]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#9900FF"
                     emissive="#6600FF"
                     emissiveIntensity={2.5}
                 />
-            </mesh>
-
-            {/* Weapon pod - left - at FRONT (-Z) */}
-            <mesh position={[-0.5, -0.2, -0.5]} scale={[0.12, 0.12, 0.4]}>
-                <cylinderGeometry args={[1, 1, 1, 6]} />
-                <meshStandardMaterial {...METAL_CHROME} />
-            </mesh>
-
-            {/* Weapon pod - right - at FRONT (-Z) */}
-            <mesh position={[0.5, -0.2, -0.5]} scale={[0.12, 0.12, 0.4]}>
-                <cylinderGeometry args={[1, 1, 1, 6]} />
-                <meshStandardMaterial {...METAL_CHROME} />
             </mesh>
         </group>
     );
 }
 
 /**
- * Get the appropriate mesh component for an enemy type
+ * Select and render the appropriate mesh for an enemy type.
+ * 
+ * IMPORTANT: This component handles the Three.js lookAt convention internally.
+ * All meshes are authored with nose at +Z (intuitive), but this wrapper
+ * rotates them so lookAt(target) makes the nose point at the target.
+ * 
+ * When creating new enemy types, just use +Z for front and -Z for back.
  */
 export function EnemyMesh({ kind }: { kind: string }) {
-    switch (kind) {
-        case 'drone':
-            return <DroneMesh />;
-        case 'scout':
-            return <ScoutMesh />;
-        case 'bomber':
-            return <BomberMesh />;
-        default:
-            return <DroneMesh />;
-    }
+    const getMesh = () => {
+        switch (kind) {
+            case 'drone': return <DroneMesh />;
+            case 'scout': return <ScoutMesh />;
+            case 'bomber': return <BomberMesh />;
+            default: return <DroneMesh />;
+        }
+    };
+
+    // Rotate 180° around Y to convert from intuitive (+Z = front) 
+    // to Three.js lookAt convention (-Z = front)
+    return (
+        <group rotation={[0, Math.PI, 0]}>
+            {getMesh()}
+        </group>
+    );
 }
