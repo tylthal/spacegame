@@ -19,15 +19,8 @@ export function Starfield({ count = 1000 }) {
         return positions;
     }, [count]);
 
-    useFrame((state, delta) => {
-        if (!points.current) return;
-        // Simple fly-through effect
-        points.current.rotation.z += delta * 0.05;
-        points.current.position.z += delta * 2;
-        if (points.current.position.z > 10) {
-            points.current.position.z = -10;
-        }
-    });
+    // Static starfield - no animation
+    // useFrame((state, delta) => { ... });
 
     return (
         <points ref={points}>
