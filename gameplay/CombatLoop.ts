@@ -29,12 +29,12 @@ export interface CombatOptions {
 
 const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   hull: 100,
-  fireIntervalMs: 450,
+  fireIntervalMs: 125, // Much faster fire rate (approx 8 shots/sec)
   enemyRadius: { drone: 0.075, scout: 0.09, bomber: 0.12 },
   enemySpeedPerMs: { drone: 0.0006, scout: 0.00075, bomber: 0.0005 },
   enemyDamage: { drone: 5, scout: 8, bomber: 15 },
   baseY: 1,
-  bulletSpeed: 0.005, // Fast projectile speed
+  bulletSpeed: 0.008, // Faster projectiles for snappy feel
 };
 
 export interface CombatTickResult {
@@ -71,8 +71,8 @@ export class CombatLoop {
 
   // Heat settings
   private readonly maxHeat = 100;
-  private readonly heatPerShot = 15;           // Heat gained per shot
-  private readonly heatCooldownPerMs = 0.05;   // Heat lost per ms when not firing
+  private readonly heatPerShot = 5;            // Lower heat per shot for rapid fire
+  private readonly heatCooldownPerMs = 0.08;   // Faster cooldown
   private readonly overheatCooldownPerMs = 0.03; // Slower cooldown when overheated
   private readonly overheatThreshold = 100;    // Heat level that triggers overheat
   private readonly overheatRecoveryThreshold = 30; // Must cool to this to recover

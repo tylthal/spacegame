@@ -218,7 +218,7 @@ const App: React.FC = () => {
 
       {phase === 'CALIBRATING' && (
         <CalibrationScreen
-          tracker={tracker}
+          inputProcessor={inputProcessor}
           onComplete={(offset) => {
             // Apply the calibrated 'Zero Point' (now 2D)
             if (inputProcessor) {

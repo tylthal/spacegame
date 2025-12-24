@@ -1,18 +1,17 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { HandTracker, HandFrame } from '../input/HandTracker';
-import * as fp from 'fingerpose';
-import { PointGesture, PinchGesture } from '../input/Gestures';
+import { HandFrame } from '../input/HandTracker';
+import { InputProcessor, ProcessedHandEvent } from '../input/InputProcessor';
 import { INPUT_CONFIG } from '../input/inputConfig';
 import { CursorMapper } from '../input/CursorMapper';
 import { HandCursor } from './HandCursor';
 
 interface CalibrationScreenProps {
-    tracker: HandTracker | null;
+    inputProcessor: InputProcessor | null;
     onComplete: (offset: { x: number; y: number }) => void;
 }
 
 export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
-    tracker,
+    inputProcessor,
     onComplete
 }) => {
     const [rightPointDetected, setRightPointDetected] = useState(false);
@@ -52,16 +51,14 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
         gracePeriodMs: GRACE_PERIOD_MS,
         spatialSeparationThreshold: SPATIAL_SEPARATION_THRESHOLD,
         movementThreshold: MOVEMENT_THRESHOLD,
-        pinchClickDebounceMs: PINCH_CLICK_DEBOUNCE_MS,
     } = INPUT_CONFIG.calibration;
-
-    const { pinchDistanceThreshold: PINCH_DISTANCE_THRESHOLD, fingerposeScoreThreshold: FINGERPOSE_SCORE_THRESHOLD } = INPUT_CONFIG.gestures;
 
     // Handle pinch click on START GAME button
     const handlePinchClick = useCallback(() => {
         if (isSuccess && buttonRef.current) {
             // Check if cursor is over the button
             const rect = buttonRef.current.getBoundingClientRect();
+            // InputProcessor returns 0-1, so map to screen pixels
             const cursorScreenX = cursorPos.x * window.innerWidth;
             const cursorScreenY = cursorPos.y * window.innerHeight;
 
@@ -77,8 +74,8 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
     }, [isSuccess, cursorPos, onComplete]);
 
     useEffect(() => {
-        if (!tracker) {
-            console.warn("CalibrationScreen: No tracker provided");
+        if (!inputProcessor) {
+            console.warn("CalibrationScreen: No inputProcessor provided");
             return;
         }
 
@@ -101,79 +98,85 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
         setCursorPos({ x: 0.5, y: 0.5 });
         setIsPinching(false);
 
-        const estimator = new fp.GestureEstimator([PointGesture, PinchGesture]);
+        // CRITICAL: Reset all state on mount
+        calibrationStartTimeRef.current = null;
+        positionBufferRef.current = [];
+        lastRightPointRef.current = 0;
+        lastLeftPinchRef.current = 0;
+        lastValidTimeRef.current = 0;
+        leftWristRef.current = null;
+        rightWristRef.current = null;
+        isSuccessRef.current = false;
+        finalCalibrationOffsetRef.current = { x: 0.5, y: 0.5 };
+        lastPinchTimeRef.current = 0;
+        setProgress(0);
+        setIsSuccess(false);
+        setRightPointDetected(false);
+        setLeftPinchDetected(false);
+        setFailureReason(null);
+        setCursorPos({ x: 0.5, y: 0.5 });
+        setIsPinching(false);
 
-        const handleFrame = (frame: HandFrame) => {
+        const handleHandEvent = (event: ProcessedHandEvent) => {
             const now = Date.now();
-            const landmarksArray = frame.landmarks.map(l => [l.x, l.y, l.z]);
 
-            try {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const estimation = estimator.estimate(landmarksArray as any, 7.5);
+            // Use SMOOTHED landmarks for stable calibration
+            const landmarks = event.smoothedLandmarks;
+            const handedness = event.raw.handedness;
 
-                if (frame.handedness === 'Right') {
-                    const pointMatch = estimation.gestures.find(g => g.name === 'point');
-                    if (pointMatch && pointMatch.score > FINGERPOSE_SCORE_THRESHOLD) {
-                        lastRightPointRef.current = now;
+            if (handedness === 'Right') {
+                // Right hand: Pointing (Index Finger)
+                // We don't need Fingerpose anymore, InputProcessor does gesture detecion implicitly? 
+                // Wait, InputProcessor only detects "Pinch" vs "Fist" vs "Palm". It doesn't detect "Point".
+                // But generally, if it's not a Fist and not a Pinch, and index is extended, it's a Point.
+                // For simplicity, let's assume 'Palm' or 'Pinch' (Index extended) is fine for Right Hand.
+                // Actually, let's just track the index tip if the hand is visible.
 
-                        // Use INDEX FINGERTIP (landmark 8) for aiming, not wrist
-                        const fingertipPos = { x: frame.landmarks[8].x, y: frame.landmarks[8].y };
-                        rightWristRef.current = fingertipPos; // Still using this ref for compatibility
+                lastRightPointRef.current = now;
 
-                        // POST-CALIBRATION: Update cursor position using CursorMapper
-                        if (isSuccessRef.current) {
-                            // Create temporary mapper with current calibration
-                            const tempMapper = new CursorMapper();
-                            tempMapper.setCalibration(finalCalibrationOffsetRef.current);
-                            const mappedPos = tempMapper.toCursor(fingertipPos);
-                            setCursorPos(mappedPos);
-                        }
+                // Use INDEX FINGERTIP (landmark 8) for aiming
+                const fingertipPos = { x: landmarks[8].x, y: landmarks[8].y };
+                rightWristRef.current = fingertipPos;
 
-                        if (!isSuccessRef.current) {
-                            setRightPointDetected(true);
-                        }
-                    }
-                } else if (frame.handedness === 'Left') {
-                    const thumbTip = frame.landmarks[4];
-                    const indexTip = frame.landmarks[8];
-                    const wrist = frame.landmarks[0];
-
-                    const handSize = Math.hypot(
-                        frame.landmarks[12].x - wrist.x,
-                        frame.landmarks[12].y - wrist.y
-                    );
-                    const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
-                    const normalizedPinch = pinchDist / Math.max(handSize, 0.01);
-
-                    const isPinch = normalizedPinch < PINCH_DISTANCE_THRESHOLD;
-
-                    if (isPinch) {
-                        lastLeftPinchRef.current = now;
-                        leftWristRef.current = { x: wrist.x, y: wrist.y };
-
-                        // POST-CALIBRATION: Detect pinch for clicking
-                        if (isSuccessRef.current) {
-                            // Only trigger on pinch START (not hold)
-                            // Requires: 1 second since last pinch AND pinch was released
-                            if (now - lastPinchTimeRef.current > 1000) {
-                                setIsPinching(true);
-                                lastPinchTimeRef.current = now;
-                            }
-                        }
-
-                        if (!isSuccessRef.current) {
-                            setLeftPinchDetected(true);
-                        }
-                    } else {
-                        // Not pinching - reset state
-                        if (isSuccessRef.current) {
-                            setIsPinching(false);
-                        }
-                    }
+                // POST-CALIBRATION: Update cursor position
+                if (isSuccessRef.current) {
+                    // Create temporary mapper with current calibration
+                    const tempMapper = new CursorMapper();
+                    tempMapper.setCalibration(finalCalibrationOffsetRef.current);
+                    const mappedPos = tempMapper.toCursor(fingertipPos);
+                    setCursorPos(mappedPos);
                 }
-            } catch (err) {
-                if (import.meta.env.DEV) {
-                    console.error('Fingerpose estimation error:', err);
+
+                if (!isSuccessRef.current) {
+                    setRightPointDetected(true);
+                }
+
+            } else if (handedness === 'Left') {
+                // Left Hand: Pinching check
+                // InputProcessor already classifies this!
+                const isPinch = event.gesture === 'pinch';
+                const wrist = landmarks[0];
+
+                if (isPinch) {
+                    lastLeftPinchRef.current = now;
+                    leftWristRef.current = { x: wrist.x, y: wrist.y };
+
+                    // POST-CALIBRATION: Detect pinch for clicking
+                    if (isSuccessRef.current) {
+                        // Only trigger on pinch START (debounce)
+                        if (now - lastPinchTimeRef.current > 1000) {
+                            setIsPinching(true);
+                            lastPinchTimeRef.current = now;
+                        }
+                    }
+
+                    if (!isSuccessRef.current) {
+                        setLeftPinchDetected(true);
+                    }
+                } else {
+                    if (isSuccessRef.current) {
+                        setIsPinching(false);
+                    }
                 }
             }
         };
@@ -275,13 +278,13 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
             }
         }, 50);
 
-        const unsubscribe = tracker.subscribe(handleFrame);
+        const unsubscribe = inputProcessor.subscribe(handleHandEvent);
 
         return () => {
             unsubscribe();
             clearInterval(intervalId);
         };
-    }, [tracker]);
+    }, [inputProcessor]);
 
     // Handle pinch click effect
     useEffect(() => {

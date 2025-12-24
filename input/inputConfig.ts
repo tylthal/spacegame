@@ -44,7 +44,7 @@ export const INPUT_CONFIG = {
 
         // For InputProcessor gesture classification
         // Higher values = easier to trigger (more forgiving)
-        pinchThreshold: 0.18,  // Increased from 0.05 - much more forgiving
+        pinchThreshold: 0.22,  // Increased from 0.18 - very forgiving for rapid tapping
         fistThreshold: 0.20,   // Increased from 0.16
     },
 
