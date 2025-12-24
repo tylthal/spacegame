@@ -7,6 +7,7 @@ import { EnemyMesh } from './assets/EnemyMeshes';
 import { GameEffects } from './effects/EffectComposer';
 import { Starfield } from './particles/ParticleSystem';
 import { VoxelExplosion, Explosion, EXPLOSION_COLORS } from './effects/VoxelExplosion';
+import { MissileExplosion, MissileExplosionData } from './effects/MissileExplosion';
 
 function AssetMesh({ id, ...props }: { id: AssetId } & any) {
     const { geometryType, args, materialParams, scale } = useSpaceshipAsset(id);
@@ -204,6 +205,16 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
         setExplosions(prev => prev.filter(e => e.id !== id));
     }, []);
 
+    // Missile explosion system
+    const [missileExplosions, setMissileExplosions] = useState<MissileExplosionData[]>([]);
+    const missileSnapshotsRef = useRef<Map<number, { id: number, x: number, y: number, z: number }>>(new Map());
+    const missileExplosionIdRef = useRef(0);
+    const MISSILE_BLAST_RADIUS = 15; // Must match CombatLoop's missileBlastRadius
+
+    const handleMissileExplosionComplete = useCallback((id: number) => {
+        setMissileExplosions(prev => prev.filter(e => e.id !== id));
+    }, []);
+
     useFrame((state, delta) => {
         if (!combatLoop) return;
 
@@ -249,6 +260,41 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
             setExplosions(prev => [...prev, ...newExplosions]);
         }
 
+        // Track missiles for missile explosions
+        const currentMissiles = combatLoop.activeMissiles;
+        const currentMissileIds = new Set(currentMissiles.map(m => m.id));
+
+        // Update missile snapshots
+        for (const missile of currentMissiles) {
+            missileSnapshotsRef.current.set(missile.id, {
+                id: missile.id,
+                x: missile.position.x,
+                y: missile.position.y,
+                z: missile.position.z,
+            });
+        }
+
+        // Find missiles that detonated (were in snapshot but not in current)
+        const newMissileExplosions: MissileExplosionData[] = [];
+        for (const [id, snapshot] of missileSnapshotsRef.current) {
+            if (!currentMissileIds.has(id)) {
+                // Missile detonated - spawn explosion at last known position
+                newMissileExplosions.push({
+                    id: missileExplosionIdRef.current++,
+                    x: snapshot.x,
+                    y: snapshot.y,
+                    z: snapshot.z,
+                    blastRadius: MISSILE_BLAST_RADIUS,
+                    createdAt: Date.now(),
+                });
+                missileSnapshotsRef.current.delete(id);
+            }
+        }
+
+        if (newMissileExplosions.length > 0) {
+            setMissileExplosions(prev => [...prev, ...newMissileExplosions]);
+        }
+
         // Only track enemies for React updates now
         const count = currentEnemies.length;
         if (count !== lastEntityCount.current) {
@@ -281,6 +327,15 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
                     key={explosion.id}
                     explosion={explosion}
                     onComplete={handleExplosionComplete}
+                />
+            ))}
+
+            {/* Missile Explosions */}
+            {missileExplosions.map(explosion => (
+                <MissileExplosion
+                    key={explosion.id}
+                    explosion={explosion}
+                    onComplete={handleMissileExplosionComplete}
                 />
             ))}
         </group>
