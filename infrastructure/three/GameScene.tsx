@@ -20,13 +20,29 @@ function AssetMesh({ id, ...props }: { id: AssetId } & any) {
     );
 }
 
-// Laser beam component
-function LaserBeam({ visible, playerX }: { visible: boolean; playerX: number }) {
+// Laser beam component - fires from bottom center toward cursor
+function LaserBeam({ visible, targetX }: { visible: boolean; targetX: number }) {
     const meshRef = useRef<Mesh>(null);
 
     useFrame(() => {
         if (meshRef.current) {
-            meshRef.current.position.x = playerX * 5;
+            // Position at midpoint between bottom center and target
+            const startX = 0;  // Bottom center
+            const startY = -5; // Bottom of screen
+            const endX = targetX * 5; // Target X in scene coords
+            const endY = 6;    // Top of screen
+
+            // Calculate angle and position
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dx, dy);
+
+            // Position at midpoint
+            meshRef.current.position.x = (startX + endX) / 2;
+            meshRef.current.position.y = (startY + endY) / 2;
+            meshRef.current.rotation.z = -angle;
+            meshRef.current.scale.y = length / 10; // Adjust for base geometry height
         }
     });
 
@@ -35,38 +51,16 @@ function LaserBeam({ visible, playerX }: { visible: boolean; playerX: number }) 
     return (
         <mesh ref={meshRef} position={[0, 0, 0]}>
             <boxGeometry args={[0.08, 10, 0.08]} />
-            <meshBasicMaterial color="#FFFF00" transparent opacity={0.8} />
+            <meshBasicMaterial color="#FFFF00" transparent opacity={0.9} />
         </mesh>
     );
 }
 
 export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
-    const playerRef = useRef<Group>(null);
-    const lastPlayerX = useRef(0);
     const [laserVisible, setLaserVisible] = useState(false);
 
-    useFrame((state, delta) => {
-        if (!playerRef.current || !combatLoop) return;
-
-        // Get current player X from combat loop (-1 to 1)
-        const targetX = combatLoop.playerX * 5; // Scale to scene coordinates
-        const currentX = playerRef.current.position.x;
-
-        // Smooth interpolation for fluid movement
-        const smoothedX = currentX + (targetX - currentX) * Math.min(1, delta * 10);
-        playerRef.current.position.x = smoothedX;
-
-        // Calculate velocity for tilt effect
-        const velocity = smoothedX - lastPlayerX.current;
-        lastPlayerX.current = smoothedX;
-
-        // Tilt based on movement direction (bank into the turn)
-        const targetTilt = -velocity * 2;
-        const currentTilt = playerRef.current.rotation.z;
-        playerRef.current.rotation.z = currentTilt + (targetTilt - currentTilt) * Math.min(1, delta * 5);
-
-        // Subtle hover animation
-        playerRef.current.position.y = -4 + Math.sin(state.clock.elapsedTime * 2) * 0.05;
+    useFrame((state) => {
+        if (!combatLoop) return;
 
         // Flash laser beam periodically (synced with fire rate)
         // Fire rate is 450ms, show laser for 50ms
@@ -79,18 +73,13 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
             <GameEffects />
             <Starfield />
 
-            {/* Laser Beam */}
-            <LaserBeam visible={laserVisible} playerX={combatLoop?.playerX ?? 0} />
+            {/* Laser Beam - fires from bottom center toward cursor */}
+            <LaserBeam visible={laserVisible} targetX={combatLoop?.playerX ?? 0} />
 
-            {/* Player Ship - now positioned dynamically */}
-            <group ref={playerRef} position={[0, -4, 0]}>
-                <AssetMesh id="hero" />
-
-                {/* Muzzle flash when firing */}
-                {laserVisible && (
-                    <pointLight position={[0, 0.5, 0]} color="#FFFF00" intensity={2} distance={3} />
-                )}
-            </group>
+            {/* Muzzle flash at bottom center when firing */}
+            {laserVisible && (
+                <pointLight position={[0, -5, 0]} color="#FFFF00" intensity={3} distance={4} />
+            )}
 
             {/* Enemies: Declarative approach */}
             <group>
@@ -99,10 +88,10 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
                 ))}
             </group>
 
-            {/* Base platform / defense line indicator */}
-            <mesh position={[0, -4.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[12, 0.5]} />
-                <meshBasicMaterial color="#FFFF00" transparent opacity={0.3} />
+            {/* Gun turret / firing origin indicator */}
+            <mesh position={[0, -5, 0]}>
+                <boxGeometry args={[0.5, 0.2, 0.5]} />
+                <meshBasicMaterial color="#FFFF00" />
             </mesh>
         </group>
     );
