@@ -274,7 +274,18 @@ export class CombatLoop {
       let hit = false;
       for (let j = this.enemies.length - 1; j >= 0; j--) {
         const enemy = this.enemies[j];
-        const radius = this.options.enemyRadius[enemy.kind];
+        const baseRadius = this.options.enemyRadius[enemy.kind];
+
+        // Distance-scaled hitbox: closer enemies have larger effective hitbox
+        // At distance 0-50: up to 2x base radius
+        // At distance 50+: normal radius
+        const enemyDist = Math.abs(enemy.position.z);
+        const CLOSE_RANGE = 50;
+        const MAX_SCALE = 2.0;
+        const distanceScale = enemyDist < CLOSE_RANGE
+          ? 1 + (MAX_SCALE - 1) * (1 - enemyDist / CLOSE_RANGE)
+          : 1.0;
+        const radius = baseRadius * distanceScale;
 
         // Calculate enemy's previous position (before advanceEnemies moved them)
         const prevEnemyX = enemy.position.x - enemy.velocity.x * deltaMs;
