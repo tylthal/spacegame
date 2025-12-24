@@ -298,20 +298,24 @@ export class CombatLoop {
       const speed = this.options.bulletSpeed;
 
       // ===== TARGETING OVERHAUL =====
-      // Fixed muzzle at bottom of screen, bullets travel to target point
+      // Fixed muzzle at VISUAL bottom-center of screen, bullets travel to target point
 
-      // 1. MUZZLE: Fixed gun position below camera (screen bottom)
-      const MUZZLE_X = 0;
-      const MUZZLE_Y = -5;
-      const MUZZLE_Z = 0;
-
-      // 2. TARGET: Calculate using inverse projection (camera FOV)
-      const TARGET_DISTANCE = 100;
-      const VERTICAL_FOV = 60 * (Math.PI / 180); // 60 degrees (matches camera)
-      // Use actual window aspect ratio (same as Three.js camera)
+      // Camera properties (must match Three.js camera)
+      const VERTICAL_FOV = 60 * (Math.PI / 180); // 60 degrees
       const ASPECT_RATIO = typeof window !== 'undefined'
         ? window.innerWidth / window.innerHeight
         : 16 / 9;
+
+      // 1. MUZZLE: Fixed at visual BOTTOM-CENTER of screen
+      // At MUZZLE_DISTANCE, the bottom of the screen is at Y = -distance * tan(FOV/2)
+      const MUZZLE_DISTANCE = 5; // Small distance in front of camera
+      const muzzleHalfHeight = MUZZLE_DISTANCE * Math.tan(VERTICAL_FOV / 2);
+      const MUZZLE_X = 0;
+      const MUZZLE_Y = -muzzleHalfHeight;
+      const MUZZLE_Z = -MUZZLE_DISTANCE;
+
+      // 2. TARGET: Calculate using inverse projection (camera FOV)
+      const TARGET_DISTANCE = 100;
 
       // Half-extents of virtual screen at TARGET_DISTANCE
       const halfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);

@@ -102,8 +102,11 @@ function DebugAimLine({ combatLoop }: { combatLoop: CombatLoop }) {
         const targetY = (0.5 - cursorY) * 2 * halfHeight;
         const targetZ = -TARGET_DISTANCE;
 
-        // Muzzle position
-        const muzzle = new Vector3(0, MUZZLE_Y, 0);
+        // MUZZLE: Fixed at visual BOTTOM-CENTER of screen
+        // At distance MUZZLE_DISTANCE, the bottom of the screen is at Y = -halfHeight at that distance
+        const MUZZLE_DISTANCE = 5; // Small distance in front of camera
+        const muzzleHalfHeight = MUZZLE_DISTANCE * Math.tan(fov / 2);
+        const muzzle = new Vector3(0, -muzzleHalfHeight, -MUZZLE_DISTANCE);
 
         // Target position
         const target = new Vector3(targetX, targetY, targetZ);
