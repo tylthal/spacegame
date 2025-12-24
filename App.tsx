@@ -44,6 +44,10 @@ const App: React.FC = () => {
     return new CombatLoop(scheduler, rng);
   }, []);
 
+  // Game Over state (declared here so it's available in tick useEffect)
+  const [isGameOver, setIsGameOver] = useState(false);
+  const frozenTimeRef = useRef<number | null>(null);
+
   // Sync Phase Manager -> React State
   useEffect(() => {
     // Initial sync
@@ -163,8 +167,6 @@ const App: React.FC = () => {
     heat: 0,
     isOverheated: false,
   });
-  const [isGameOver, setIsGameOver] = useState(false);
-  const frozenTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (phase !== 'PLAYING') return;
