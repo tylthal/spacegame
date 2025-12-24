@@ -313,27 +313,17 @@ function BomberMesh() {
 /**
  * Select and render the appropriate mesh for an enemy type.
  * 
- * IMPORTANT: This component handles the Three.js lookAt convention internally.
- * All meshes are authored with nose at +Z (intuitive), but this wrapper
- * rotates them so lookAt(target) makes the nose point at the target.
+ * MESH CONVENTION: 
+ * - Nose at +Z (front), Engine at -Z (back)
+ * - GameScene uses lookAt(behind) to orient enemies correctly
  * 
- * When creating new enemy types, just use +Z for front and -Z for back.
+ * When creating new enemy types, use +Z for front, -Z for back.
  */
 export function EnemyMesh({ kind }: { kind: string }) {
-    const getMesh = () => {
-        switch (kind) {
-            case 'drone': return <DroneMesh />;
-            case 'scout': return <ScoutMesh />;
-            case 'bomber': return <BomberMesh />;
-            default: return <DroneMesh />;
-        }
-    };
-
-    // Rotate 180° around Y to convert from intuitive (+Z = front) 
-    // to Three.js lookAt convention (-Z = front)
-    return (
-        <group rotation={[0, Math.PI, 0]}>
-            {getMesh()}
-        </group>
-    );
+    switch (kind) {
+        case 'drone': return <DroneMesh />;
+        case 'scout': return <ScoutMesh />;
+        case 'bomber': return <BomberMesh />;
+        default: return <DroneMesh />;
+    }
 }
