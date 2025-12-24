@@ -360,13 +360,15 @@ export class CombatLoop {
       const targetY = (0.5 - this._cursorY) * 2 * halfHeight;
       const targetZ = -TARGET_DISTANCE;
 
-      // 3. BULLET DIRECTION: From CAMERA ORIGIN (0,0,0) to target
-      // This makes bullets travel PARALLEL to the camera view ray
-      // Even though they spawn at the muzzle, they go toward the crosshair
-      const dist = Math.hypot(targetX, targetY, targetZ);
-      const vx = (targetX / dist) * speed;
-      const vy = (targetY / dist) * speed;
-      const vz = (targetZ / dist) * speed;
+      // 3. BULLET DIRECTION: From MUZZLE to target point
+      // This makes bullets hit exactly where the crosshair is pointing
+      const dx = targetX - MUZZLE_X;
+      const dy = targetY - MUZZLE_Y;
+      const dz = targetZ - MUZZLE_Z;
+      const dist = Math.hypot(dx, dy, dz);
+      const vx = (dx / dist) * speed;
+      const vy = (dy / dist) * speed;
+      const vz = (dz / dist) * speed;
 
       // 4. SPAWN: At muzzle with calculated velocity
       this.bulletId++;
