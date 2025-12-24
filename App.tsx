@@ -48,10 +48,12 @@ const App: React.FC = () => {
   const [isGameOver, setIsGameOver] = useState(false);
   const frozenTimeRef = useRef<number | null>(null);
 
-  // Pause state
+  // Pause state - strict detection to avoid false positives
   const [isPaused, setIsPaused] = useState(false);
   const palmHoldStartRef = useRef<number | null>(null);
-  const PAUSE_HOLD_MS = 800; // Hold RIGHT palm for 800ms to pause (intentional)
+  const palmConsecutiveFramesRef = useRef(0); // Track consecutive palm frames
+  const PAUSE_HOLD_MS = 1200; // Hold RIGHT palm for 1.2 seconds (very intentional)
+  const PAUSE_MIN_FRAMES = 10; // Require at least 10 consecutive palm frames
 
   // Sync Phase Manager -> React State
   useEffect(() => {
@@ -96,9 +98,9 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(frameId);
   }, [phase, combatLoop, isGameOver, isPaused]);
 
-  // Pause gesture detection - RIGHT hand palm held for 800ms (intentional pause only)
+  // Pause gesture detection - RIGHT hand palm held for 1.2s (very intentional pause only)
   // Resume must be done via the Resume button, not by gesture
-  // IMPORTANT: Only trigger if left hand is NOT pinching (not shooting)
+  // STRICT: Requires consecutive palm frames + time + no pinching from either hand
   useEffect(() => {
     if (!inputProcessor || phase !== 'PLAYING' || isGameOver || isPaused) return;
 
@@ -106,33 +108,41 @@ const App: React.FC = () => {
       const rightHand = event.hands.right;
       const leftHand = event.hands.left;
 
-      // Don't trigger pause if:
-      // 1. No right hand detected
-      // 2. Left hand is pinching (actively shooting)
+      // Block pause if either hand is pinching (any shooting gesture)
+      const isAnyPinching = rightHand?.gesture === 'pinch' || leftHand?.gesture === 'pinch';
+      if (isAnyPinching) {
+        palmHoldStartRef.current = null;
+        palmConsecutiveFramesRef.current = 0;
+        return;
+      }
+
+      // No right hand = reset
       if (!rightHand) {
         palmHoldStartRef.current = null;
+        palmConsecutiveFramesRef.current = 0;
         return;
       }
 
-      // If left hand is pinching (shooting), don't allow pause
-      const isLeftPinching = leftHand?.gesture === 'pinch';
-      if (isLeftPinching) {
-        palmHoldStartRef.current = null;
-        return;
-      }
-
+      // Only count palm gesture
       if (rightHand.gesture === 'palm') {
+        palmConsecutiveFramesRef.current++;
+
+        // Start timer on first palm frame
         if (!palmHoldStartRef.current) {
           palmHoldStartRef.current = Date.now();
-        } else {
-          const heldMs = Date.now() - palmHoldStartRef.current;
-          if (heldMs >= PAUSE_HOLD_MS) {
-            setIsPaused(true); // Only pause, don't toggle - resume via button
-            palmHoldStartRef.current = null;
-          }
+        }
+
+        // Only trigger if BOTH time AND frame count requirements are met
+        const heldMs = Date.now() - palmHoldStartRef.current;
+        if (heldMs >= PAUSE_HOLD_MS && palmConsecutiveFramesRef.current >= PAUSE_MIN_FRAMES) {
+          setIsPaused(true);
+          palmHoldStartRef.current = null;
+          palmConsecutiveFramesRef.current = 0;
         }
       } else {
+        // Any non-palm gesture resets everything
         palmHoldStartRef.current = null;
+        palmConsecutiveFramesRef.current = 0;
       }
     });
   }, [inputProcessor, phase, isGameOver, isPaused]);
