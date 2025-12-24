@@ -193,23 +193,24 @@ function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kin
         group.current.position.set(x, y, z);
 
         // VELOCITY-BASED ROTATION
-        // Point the needle in the direction of travel
+        // Point the nose in the direction of travel
         const { x: vx, y: vy, z: vz } = enemy.velocity;
         velocityVec.current.set(vx, vy, vz);
 
-        // Calculate a target point ahead in the velocity direction
+        // lookAt() makes -Z point at target (Three.js convention)
+        // But our mesh has nose at +Z, so we look OPPOSITE to velocity
+        // This makes +Z (nose) point in direction of travel
         targetPos.current.set(
-            x + vx * 10,
-            y + vy * 10,
-            z + vz * 10
+            x - vx * 10,  // Look behind to make nose point forward
+            y - vy * 10,
+            z - vz * 10
         );
 
-        // Look at the point ahead (needle points where it's going)
-        group.current.lookAt(targetPos.current);
+        // Reset rotation before applying new one
+        group.current.rotation.set(0, 0, 0);
 
-        // Rotate 90 degrees so the elongated Z-axis points forward
-        // (octahedron's natural orientation has the pointy ends on Y)
-        group.current.rotateX(Math.PI / 2);
+        // Look at the point behind (this makes +Z point forward)
+        group.current.lookAt(targetPos.current);
     });
 
     const hitboxRadius = HITBOX_RADIUS[enemy.kind] || 1.5;
