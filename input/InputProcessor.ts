@@ -74,8 +74,6 @@ export class InputProcessor {
   private lastRawCursor?: { x: number; y: number };
   private readonly gestureConfig: GestureConfig;
   private readonly virtualPad: VirtualMousepadConfig;
-  private readonly gestureConfig: GestureConfig;
-  private readonly virtualPad: VirtualMousepadConfig;
   // Maintain separate mappers to preserve state (deadzones/smoothing) per hand
   private readonly cursorMappers = new Map<string, CursorMapper>();
 
