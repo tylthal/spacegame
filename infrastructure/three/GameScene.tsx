@@ -199,7 +199,7 @@ function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kin
 
         // Calculate point ahead in velocity direction
         targetPos.current.set(
-            x + vx * 10,  // Look ahead
+            x + vx * 10,
             y + vy * 10,
             z + vz * 10
         );
@@ -207,17 +207,18 @@ function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kin
         // Reset rotation before applying new one
         group.current.rotation.set(0, 0, 0);
 
-        // Look at the point ahead, then rotate 180° around Y so nose points forward
-        // (lookAt makes -Z point at target, but our mesh has nose at +Z)
+        // Look at the point ahead - mesh is pre-flipped so -Z is nose
         group.current.lookAt(targetPos.current);
-        group.current.rotateY(Math.PI);  // Flip 180° to point nose forward
     });
 
     const hitboxRadius = HITBOX_RADIUS[enemy.kind] || 1.5;
 
     return (
         <group ref={group}>
-            <EnemyMesh kind={enemy.kind} />
+            {/* Wrapper group rotated 180° so mesh nose aligns with -Z (lookAt convention) */}
+            <group rotation={[0, Math.PI, 0]}>
+                <EnemyMesh kind={enemy.kind} />
+            </group>
             {/* Debug hitbox visualization */}
             {showHitbox && (
                 <mesh>
