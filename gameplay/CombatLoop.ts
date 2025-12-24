@@ -54,14 +54,14 @@ export class CombatLoop {
   public get activeEnemies(): ReadonlyArray<EnemyInstance> { return this.enemies; }
   public get activeBullets(): ReadonlyArray<Bullet> { return this.bullets; }
 
-  // Player state (Spherical Aim)
-  // Yaw (Theta): 0 to 2*PI
-  // Pitch (Phi): 0 (Up) to PI (Down). Mid is PI/2.
-  private _yaw = 0;
-  private _pitch = Math.PI / 2;
+  // Player state - Raw cursor position (0..1 range)
+  // Used for inverse projection targeting
+  private _cursorX = 0.5; // 0=left, 1=right
+  private _cursorY = 0.5; // 0=top, 1=bottom
 
-  public get yaw(): number { return this._yaw; }
-  public get pitch(): number { return this._pitch; }
+  // Expose for external use (renderer crosshair, etc.)
+  public get cursorX(): number { return this._cursorX; }
+  public get cursorY(): number { return this._cursorY; }
 
 
   // Firing state
@@ -96,14 +96,10 @@ export class CombatLoop {
   }
 
   // Set Aim from Input (0..1 range)
-  // Using linear screen projection instead of spherical coordinates
-  // x: 0 (Left) -> 1 (Right)
-  // y: 0 (Top) -> 1 (Bottom)
+  // Stores raw cursor position for inverse projection targeting
   public setPlayerPosition(x: number, y: number) {
-    // Store as normalized device coordinates (-1 to 1)
-    // This will be used directly for linear projection in spawnBullets
-    this._yaw = (x - 0.5) * 2;   // -1 (left) to 1 (right)
-    this._pitch = (0.5 - y) * 2; // -1 (bottom) to 1 (top)
+    this._cursorX = Math.max(0, Math.min(1, x));
+    this._cursorY = Math.max(0, Math.min(1, y));
   }
 
   public reset(): void {
@@ -301,44 +297,53 @@ export class CombatLoop {
 
       const speed = this.options.bulletSpeed;
 
-      // LINEAR SCREEN PROJECTION
-      // Camera FOV: 60° vertical, ~90° horizontal (16:9 aspect)
-      // Project cursor position to a point on a virtual screen plane at distance D
+      // ===== TARGETING OVERHAUL =====
+      // Fixed muzzle at bottom of screen, bullets travel to target point
 
-      const D = 100; // Virtual screen distance
+      // 1. MUZZLE: Fixed gun position below camera (screen bottom)
+      const MUZZLE_X = 0;
+      const MUZZLE_Y = -5;
+      const MUZZLE_Z = 0;
+
+      // 2. TARGET: Calculate using inverse projection (camera FOV)
+      const TARGET_DISTANCE = 100;
       const VERTICAL_FOV = 60 * (Math.PI / 180); // 60 degrees
       const ASPECT_RATIO = 16 / 9;
 
-      // Calculate half-extents of the virtual screen at distance D
-      const halfHeight = D * Math.tan(VERTICAL_FOV / 2);
+      // Half-extents of virtual screen at TARGET_DISTANCE
+      const halfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);
       const halfWidth = halfHeight * ASPECT_RATIO;
 
-      // _yaw is now NDC X: -1 (left) to 1 (right)
-      // _pitch is now NDC Y: -1 (bottom) to 1 (top)
-      const targetX = this._yaw * halfWidth;
-      const targetY = this._pitch * halfHeight;
-      const targetZ = -D; // Forward is -Z
+      // Convert cursor (0..1) to world coordinates
+      // cursorX: 0=left, 1=right -> targetX: -halfWidth to +halfWidth
+      // cursorY: 0=top, 1=bottom -> targetY: +halfHeight to -halfHeight
+      const targetX = (this._cursorX - 0.5) * 2 * halfWidth;
+      const targetY = (0.5 - this._cursorY) * 2 * halfHeight;
+      const targetZ = -TARGET_DISTANCE; // Forward is -Z
 
-      // Calculate velocity direction from CAMERA ORIGIN (0,0,0) to TARGET
-      const dist = Math.hypot(targetX, targetY, targetZ);
+      // 3. BULLET DIRECTION: From muzzle to target (normalized)
+      const dx = targetX - MUZZLE_X;
+      const dy = targetY - MUZZLE_Y;
+      const dz = targetZ - MUZZLE_Z;
+      const dist = Math.hypot(dx, dy, dz);
 
-      const vx = (targetX / dist) * speed;
-      const vy = (targetY / dist) * speed;
-      const vz = (targetZ / dist) * speed;
+      const vx = (dx / dist) * speed;
+      const vy = (dy / dist) * speed;
+      const vz = (dz / dist) * speed;
 
-      // Spawn at camera origin for PERFECT accuracy (no parallax)
+      // 4. SPAWN: At muzzle with calculated velocity
       this.bulletId++;
       let bullet = this.bulletPool.pop();
       if (!bullet) {
         bullet = {
           id: this.bulletId,
-          position: { x: 0, y: 0, z: 0 },
+          position: { x: MUZZLE_X, y: MUZZLE_Y, z: MUZZLE_Z },
           velocity: { x: vx, y: vy, z: vz },
           active: true,
         };
       } else {
         bullet.id = this.bulletId;
-        bullet.position.x = 0; bullet.position.y = 0; bullet.position.z = 0;
+        bullet.position.x = MUZZLE_X; bullet.position.y = MUZZLE_Y; bullet.position.z = MUZZLE_Z;
         bullet.velocity.x = vx; bullet.velocity.y = vy; bullet.velocity.z = vz;
         bullet.active = true;
       }
