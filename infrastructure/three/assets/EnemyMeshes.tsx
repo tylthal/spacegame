@@ -109,13 +109,35 @@ function DroneMesh() {
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Engine glow - BACK (-Z) */}
+            {/* Engine glow core - BACK (-Z) */}
             <mesh position={[0, 0, -0.85]} scale={[0.15, 0.15, 0.1]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#00FFFF"
                     emissive="#00FFFF"
-                    emissiveIntensity={4.0}
+                    emissiveIntensity={6.0}
+                />
+            </mesh>
+
+            {/* Engine outer glow halo */}
+            <mesh position={[0, 0, -0.9]} scale={[0.25, 0.25, 0.05]}>
+                <sphereGeometry args={[1, 8, 6]} />
+                <meshStandardMaterial
+                    color="#00CCFF"
+                    emissive="#00AAFF"
+                    emissiveIntensity={3.0}
+                    transparent={true}
+                    opacity={0.6}
+                />
+            </mesh>
+
+            {/* Front yellow running light */}
+            <mesh position={[0, 0.15, 0.6]} scale={[0.08, 0.04, 0.08]}>
+                <sphereGeometry args={[1, 6, 4]} />
+                <meshStandardMaterial
+                    color="#FFCC00"
+                    emissive="#FFAA00"
+                    emissiveIntensity={1.5}
                 />
             </mesh>
         </group>
