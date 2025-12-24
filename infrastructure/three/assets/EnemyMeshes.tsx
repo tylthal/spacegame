@@ -34,38 +34,44 @@ const METAL_GOLD = {
 
 /**
  * DRONE - Fast, small attack craft
- * Design: Sleek needle with side fins and glowing core
+ * Design: Compact fighter with swept-back wings and glowing engine
  */
 export function DroneMesh() {
     return (
         <group>
-            {/* Main body - elongated needle */}
-            <mesh scale={[0.4, 0.4, 2.0]}>
-                <octahedronGeometry args={[0.5]} />
-                <meshStandardMaterial {...METAL_GUNMETAL} />
-            </mesh>
-
-            {/* Chrome nose tip */}
-            <mesh position={[0, 0, 1.1]} scale={[0.2, 0.2, 0.3]}>
+            {/* Main fuselage - compact body */}
+            <mesh scale={[0.5, 0.35, 1.6]}>
                 <octahedronGeometry args={[0.5]} />
                 <meshStandardMaterial {...METAL_CHROME} />
             </mesh>
 
-            {/* Left fin */}
-            <mesh position={[-0.3, 0, -0.3]} rotation={[0, 0, Math.PI / 4]} scale={[0.1, 0.4, 0.6]}>
+            {/* Red nose cone */}
+            <mesh position={[0, 0, 0.9]} rotation={[Math.PI / 2, 0, 0]} scale={[0.12, 0.25, 0.12]}>
+                <coneGeometry args={[1, 1, 6]} />
+                <meshStandardMaterial
+                    color="#FF3366"
+                    emissive="#FF0044"
+                    emissiveIntensity={1.0}
+                    metalness={0.8}
+                    roughness={0.2}
+                />
+            </mesh>
+
+            {/* Left swept wing */}
+            <mesh position={[-0.5, 0, -0.2]} rotation={[0, -0.3, 0]} scale={[0.6, 0.04, 0.5]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Right fin */}
-            <mesh position={[0.3, 0, -0.3]} rotation={[0, 0, -Math.PI / 4]} scale={[0.1, 0.4, 0.6]}>
+            {/* Right swept wing */}
+            <mesh position={[0.5, 0, -0.2]} rotation={[0, 0.3, 0]} scale={[0.6, 0.04, 0.5]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Glowing red core */}
-            <mesh position={[0, 0, 0]} scale={[0.25, 0.25, 0.5]}>
-                <sphereGeometry args={[1, 8, 6]} />
+            {/* Left wingtip glow */}
+            <mesh position={[-0.75, 0, -0.35]} scale={[0.1, 0.06, 0.15]}>
+                <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
                     color="#FF0044"
                     emissive="#FF0044"
@@ -73,13 +79,29 @@ export function DroneMesh() {
                 />
             </mesh>
 
+            {/* Right wingtip glow */}
+            <mesh position={[0.75, 0, -0.35]} scale={[0.1, 0.06, 0.15]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial
+                    color="#FF0044"
+                    emissive="#FF0044"
+                    emissiveIntensity={2.0}
+                />
+            </mesh>
+
+            {/* Engine housing */}
+            <mesh position={[0, 0, -0.7]} rotation={[Math.PI / 2, 0, 0]} scale={[0.18, 0.25, 0.18]}>
+                <cylinderGeometry args={[1, 0.8, 1, 8]} />
+                <meshStandardMaterial {...METAL_GUNMETAL} />
+            </mesh>
+
             {/* Engine glow */}
-            <mesh position={[0, 0, -1.0]} scale={[0.15, 0.15, 0.2]}>
+            <mesh position={[0, 0, -0.85]} scale={[0.15, 0.15, 0.1]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#00FFFF"
                     emissive="#00FFFF"
-                    emissiveIntensity={3.0}
+                    emissiveIntensity={4.0}
                 />
             </mesh>
         </group>
