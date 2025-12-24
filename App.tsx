@@ -98,12 +98,25 @@ const App: React.FC = () => {
 
   // Pause gesture detection - RIGHT hand palm held for 800ms (intentional pause only)
   // Resume must be done via the Resume button, not by gesture
+  // IMPORTANT: Only trigger if left hand is NOT pinching (not shooting)
   useEffect(() => {
     if (!inputProcessor || phase !== 'PLAYING' || isGameOver || isPaused) return;
 
     return inputProcessor.subscribe(event => {
       const rightHand = event.hands.right;
+      const leftHand = event.hands.left;
+
+      // Don't trigger pause if:
+      // 1. No right hand detected
+      // 2. Left hand is pinching (actively shooting)
       if (!rightHand) {
+        palmHoldStartRef.current = null;
+        return;
+      }
+
+      // If left hand is pinching (shooting), don't allow pause
+      const isLeftPinching = leftHand?.gesture === 'pinch';
+      if (isLeftPinching) {
         palmHoldStartRef.current = null;
         return;
       }
@@ -244,7 +257,7 @@ const App: React.FC = () => {
           Actually, we want the starfield to move. The starfield animation is in GameScene/ParticleSystem based on 'delta'.
           useFrame still runs even if combatLoop doesn't tick, so Stars WILL animate. 
           Enemies won't move/spawn, which is perfect for Title Screen (Safety). */}
-      <ThreeRenderer combatLoop={combatLoop} isRunning={phase === 'PLAYING'} />
+      <ThreeRenderer combatLoop={combatLoop} isRunning={phase === 'PLAYING' && !isPaused && !isGameOver} />
 
       {/* FOREGROUND UI LAYERS */}
 
