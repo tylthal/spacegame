@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { Group, Mesh, Vector3, Object3D, InstancedMesh } from 'three';
+import { useFrame, useThree } from '@react-three/fiber';
+import { Group, Mesh, Vector3, Object3D, InstancedMesh, PerspectiveCamera } from 'three';
 import { CombatLoop } from '../../gameplay/CombatLoop';
 import { useSpaceshipAsset, AssetId } from './assets/AssetLoader';
 import { GameEffects } from './effects/EffectComposer';
@@ -75,24 +75,29 @@ function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
 function DebugAimLine({ combatLoop }: { combatLoop: CombatLoop }) {
     const lineRef = useRef<any>(null);
     const pointsRef = useRef([new Vector3(), new Vector3()]);
+    const { camera } = useThree();
 
     useFrame(() => {
         if (!lineRef.current) return;
 
-        // Constants matching CombatLoop
+        // Get actual camera properties
+        const perspCamera = camera as PerspectiveCamera;
+        const fov = perspCamera.fov * (Math.PI / 180); // vertical FOV in radians
+        const aspect = perspCamera.aspect; // actual aspect ratio
+
+        // Muzzle and target distance
         const MUZZLE_Y = -5;
         const TARGET_DISTANCE = 100;
-        const VERTICAL_FOV = 60 * (Math.PI / 180);
-        const ASPECT_RATIO = 16 / 9;
 
-        const halfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);
-        const halfWidth = halfHeight * ASPECT_RATIO;
+        // Calculate half-extents using camera's actual FOV and aspect
+        const halfHeight = TARGET_DISTANCE * Math.tan(fov / 2);
+        const halfWidth = halfHeight * aspect;
 
         // Get cursor from combatLoop
         const cursorX = combatLoop.cursorX;
         const cursorY = combatLoop.cursorY;
 
-        // Calculate target (same as CombatLoop)
+        // Calculate target (using actual camera projection)
         const targetX = (cursorX - 0.5) * 2 * halfWidth;
         const targetY = (0.5 - cursorY) * 2 * halfHeight;
         const targetZ = -TARGET_DISTANCE;
@@ -103,7 +108,7 @@ function DebugAimLine({ combatLoop }: { combatLoop: CombatLoop }) {
         // Target position
         const target = new Vector3(targetX, targetY, targetZ);
 
-        // Extend line past target to make it more visible
+        // Calculate direction from muzzle to target
         const direction = target.clone().sub(muzzle).normalize();
         const extendedTarget = muzzle.clone().add(direction.multiplyScalar(200));
 
