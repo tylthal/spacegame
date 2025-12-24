@@ -49,6 +49,8 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
     onRestartRef.current = onRestart;
 
     // Check if cursor is over the button and handle pinch-click
+    const prevHoveringRef = useRef(false);
+
     useEffect(() => {
         if (!buttonRef.current) return;
 
@@ -63,7 +65,11 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
             cursorScreenY <= rect.bottom
         );
 
-        setIsHovering(isOver);
+        // Only update state when hovering status changes
+        if (isOver !== prevHoveringRef.current) {
+            prevHoveringRef.current = isOver;
+            setIsHovering(isOver);
+        }
 
         // Trigger restart on pinch while hovering (only once)
         if (isOver && isPinching && !triggeredRef.current) {
