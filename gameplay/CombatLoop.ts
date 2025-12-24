@@ -307,8 +307,11 @@ export class CombatLoop {
 
       // 2. TARGET: Calculate using inverse projection (camera FOV)
       const TARGET_DISTANCE = 100;
-      const VERTICAL_FOV = 60 * (Math.PI / 180); // 60 degrees
-      const ASPECT_RATIO = 16 / 9;
+      const VERTICAL_FOV = 60 * (Math.PI / 180); // 60 degrees (matches camera)
+      // Use actual window aspect ratio (same as Three.js camera)
+      const ASPECT_RATIO = typeof window !== 'undefined'
+        ? window.innerWidth / window.innerHeight
+        : 16 / 9;
 
       // Half-extents of virtual screen at TARGET_DISTANCE
       const halfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);
