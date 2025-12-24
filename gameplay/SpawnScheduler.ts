@@ -13,10 +13,11 @@ export interface SpawnEvent {
 }
 
 export const DEFAULT_SPAWN_CURVE: SpawnTier[] = [
-  { startMs: 0, intervalMs: 1200, weights: { drone: 10, scout: 0, bomber: 0 } },
-  { startMs: 20000, intervalMs: 900, weights: { drone: 10, scout: 0, bomber: 0 } },
-  { startMs: 40000, intervalMs: 700, weights: { drone: 10, scout: 0, bomber: 0 } },
-  { startMs: 60000, intervalMs: 550, weights: { drone: 10, scout: 0, bomber: 0 } },
+  // Increased intervals to space out enemies more
+  { startMs: 0, intervalMs: 2500, weights: { drone: 10, scout: 0, bomber: 0 } },      // 2.5s between spawns
+  { startMs: 30000, intervalMs: 2000, weights: { drone: 10, scout: 0, bomber: 0 } },  // 2.0s after 30s
+  { startMs: 60000, intervalMs: 1500, weights: { drone: 10, scout: 0, bomber: 0 } },  // 1.5s after 60s
+  { startMs: 90000, intervalMs: 1200, weights: { drone: 10, scout: 0, bomber: 0 } },  // 1.2s after 90s
 ];
 
 export class SpawnScheduler {
