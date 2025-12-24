@@ -9,8 +9,19 @@ interface WebcamPreviewProps {
 export function WebcamPreview({ onStreamReady, onError }: WebcamPreviewProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
 
+    // Use refs for callbacks to avoid re-running useEffect on callback changes
+    const onStreamReadyRef = useRef(onStreamReady);
+    const onErrorRef = useRef(onError);
+
+    // Keep refs in sync with props
+    useEffect(() => {
+        onStreamReadyRef.current = onStreamReady;
+        onErrorRef.current = onError;
+    });
+
     useEffect(() => {
         let stream: MediaStream | null = null;
+        let isMounted = true;
 
         async function setupCamera() {
             try {
@@ -23,29 +34,30 @@ export function WebcamPreview({ onStreamReady, onError }: WebcamPreviewProps) {
                     audio: false,
                 });
 
-                if (videoRef.current) {
+                if (videoRef.current && isMounted) {
                     videoRef.current.srcObject = stream;
                     videoRef.current.onloadedmetadata = () => {
-                        if (videoRef.current) {
+                        if (videoRef.current && isMounted) {
                             videoRef.current.play();
-                            onStreamReady(videoRef.current);
+                            onStreamReadyRef.current(videoRef.current);
                         }
                     };
                 }
             } catch (err) {
                 console.error('Camera access denied:', err);
-                onError?.(err instanceof Error ? err : new Error('Camera access denied'));
+                onErrorRef.current?.(err instanceof Error ? err : new Error('Camera access denied'));
             }
         }
 
         setupCamera();
 
         return () => {
+            isMounted = false;
             if (stream) {
                 stream.getTracks().forEach((track) => track.stop());
             }
         };
-    }, [onStreamReady, onError]);
+    }, []); // Empty deps - only run on mount
 
     // Hidden video element OR visible for calibration/debugging
     return (
@@ -60,3 +72,4 @@ export function WebcamPreview({ onStreamReady, onError }: WebcamPreviewProps) {
         </div>
     );
 }
+
