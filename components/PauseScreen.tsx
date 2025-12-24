@@ -160,7 +160,7 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
 
                 {/* Instructions */}
                 <div className="mt-6 text-xs font-mono text-y2k-white/50 uppercase space-y-1">
-                    <div>Pinch to select • Palm to pause/unpause</div>
+                    <div>Point at button and pinch to select</div>
                 </div>
 
                 {/* Corner decorations */}

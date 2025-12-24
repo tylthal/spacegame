@@ -51,7 +51,7 @@ const App: React.FC = () => {
   // Pause state
   const [isPaused, setIsPaused] = useState(false);
   const palmHoldStartRef = useRef<number | null>(null);
-  const PAUSE_HOLD_MS = 500; // Hold palm for 500ms to toggle pause
+  const PAUSE_HOLD_MS = 800; // Hold LEFT palm for 800ms to pause (intentional)
 
   // Sync Phase Manager -> React State
   useEffect(() => {
@@ -96,32 +96,33 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(frameId);
   }, [phase, combatLoop, isGameOver, isPaused]);
 
-  // Pause gesture detection - right hand palm held for 500ms
+  // Pause gesture detection - LEFT hand palm held for 800ms (intentional pause only)
+  // Resume must be done via the Resume button, not by gesture
   useEffect(() => {
-    if (!inputProcessor || phase !== 'PLAYING' || isGameOver) return;
+    if (!inputProcessor || phase !== 'PLAYING' || isGameOver || isPaused) return;
 
     return inputProcessor.subscribe(event => {
-      const rightHand = event.hands.right;
-      if (!rightHand) {
+      const leftHand = event.hands.left;
+      if (!leftHand) {
         palmHoldStartRef.current = null;
         return;
       }
 
-      if (rightHand.gesture === 'palm') {
+      if (leftHand.gesture === 'palm') {
         if (!palmHoldStartRef.current) {
           palmHoldStartRef.current = Date.now();
         } else {
           const heldMs = Date.now() - palmHoldStartRef.current;
           if (heldMs >= PAUSE_HOLD_MS) {
-            setIsPaused(prev => !prev);
-            palmHoldStartRef.current = null; // Reset after toggle
+            setIsPaused(true); // Only pause, don't toggle - resume via button
+            palmHoldStartRef.current = null;
           }
         }
       } else {
         palmHoldStartRef.current = null;
       }
     });
-  }, [inputProcessor, phase, isGameOver]);
+  }, [inputProcessor, phase, isGameOver, isPaused]);
 
 
   // Initialize HandTracker & InputProcessor
