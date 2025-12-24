@@ -73,7 +73,7 @@ export class CombatLoop {
   private _isOverheated = false;
   private sinceLastShot = 450;
   private readonly maxHeat = 100;
-  private readonly heatPerShot = 5;
+  private readonly heatPerShot = 1.67; // Reduced from 5 (takes 3x longer to overheat)
   private readonly heatCooldownPerMs = 0.08;
   private readonly overheatCooldownPerMs = 0.03;
   private readonly overheatThreshold = 100;
