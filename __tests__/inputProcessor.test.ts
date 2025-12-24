@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { InputProcessor } from '../input/InputProcessor';
-import { InMemoryHandTracker } from '../input/HandTracker';
+import { InMemoryHandTracker, FrameResult } from '../input/HandTracker';
 import { fistFrame, jitteredOpenPalm, openPalmFrame, pinchFrame } from '../input/fixtures/handFrames';
+
+// Helper to wrap HandFrame in FrameResult format
+const toFrameResult = (frame: typeof openPalmFrame): FrameResult => ({
+  timestamp: frame.timestamp,
+  hands: [frame],
+});
 
 describe('InputProcessor', () => {
   it('classifies pinch, fist, and palm gestures deterministically', () => {
@@ -11,9 +17,9 @@ describe('InputProcessor', () => {
 
     processor.subscribe(event => gestures.push(event.gesture));
 
-    tracker.emit(openPalmFrame);
-    tracker.emit(pinchFrame);
-    tracker.emit(fistFrame);
+    tracker.emit(toFrameResult(openPalmFrame));
+    tracker.emit(toFrameResult(pinchFrame));
+    tracker.emit(toFrameResult(fistFrame));
 
     expect(gestures).toEqual(['palm', 'pinch', 'fist']);
     processor.dispose();
@@ -29,9 +35,9 @@ describe('InputProcessor', () => {
     const cursorPositions: { x: number; y: number }[] = [];
     processor.subscribe(event => cursorPositions.push(event.cursor));
 
-    tracker.emit(openPalmFrame);
-    tracker.emit(jitteredOpenPalm(0.06, 8));
-    tracker.emit(jitteredOpenPalm(-0.04, 16));
+    tracker.emit(toFrameResult(openPalmFrame));
+    tracker.emit(toFrameResult(jitteredOpenPalm(0.06, 8)));
+    tracker.emit(toFrameResult(jitteredOpenPalm(-0.04, 16)));
 
     expect(cursorPositions[0].x).toBeGreaterThan(0);
     expect(cursorPositions[0].x).toBeLessThanOrEqual(1);
@@ -55,13 +61,13 @@ describe('InputProcessor', () => {
     const stability: boolean[] = [];
     processor.subscribe(event => stability.push(event.stable));
 
-    tracker.emit(openPalmFrame);
-    tracker.emit(jitteredOpenPalm(0.005, 12));
+    tracker.emit(toFrameResult(openPalmFrame));
+    tracker.emit(toFrameResult(jitteredOpenPalm(0.005, 12)));
 
     expect(stability[0]).toBe(true);
     expect(stability[1]).toBe(true);
 
-    tracker.emit(jitteredOpenPalm(0.05, 24));
+    tracker.emit(toFrameResult(jitteredOpenPalm(0.05, 24)));
 
     expect(stability[2]).toBe(false);
     processor.dispose();

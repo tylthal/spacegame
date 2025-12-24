@@ -69,7 +69,8 @@ export function runDiagnosticsPipeline(options: DiagnosticsOptions = {}): Diagno
     const wallclock = timelineStart + elapsedMs;
 
     while (frameIndex < frames.length && frames[frameIndex].timestamp <= wallclock) {
-      tracker.emit(frames[frameIndex]);
+      const frame = frames[frameIndex];
+      tracker.emit({ timestamp: frame.timestamp, hands: [frame] });
       frameIndex += 1;
     }
 

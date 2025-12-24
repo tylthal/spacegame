@@ -1,29 +1,35 @@
-import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, cleanup } from '@testing-library/react';
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import App from '../../App';
 
+// Mock the BrowserHandTracker since it requires browser APIs
+vi.mock('../../infrastructure/mediapipe/BrowserHandTracker', () => ({
+  BrowserHandTracker: class MockBrowserHandTracker {
+    subscribe() { return () => { }; }
+    initialize() { return Promise.resolve(); }
+    stop() { }
+  }
+}));
+
+afterEach(() => {
+  cleanup();
+});
+
 describe('App shell', () => {
-  it('surfaces the clean foundation copy', () => {
+  it('renders the title screen initially', () => {
     render(<App />);
 
-    expect(screen.getByText(/Fresh base with legacy code removed/i)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /rebuild checkpoints/i })).toBeInTheDocument();
+    // App should start on Title screen - check for "ORBITAL SNIPER" title
+    expect(screen.getAllByText(/ORBITAL/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/SNIPER/i).length).toBeGreaterThan(0);
   });
 
-  it('lets the user cycle through placeholder screens', async () => {
-    const user = userEvent.setup();
+  it('has an initialize button', () => {
     render(<App />);
 
-    const [phaseList] = screen.getAllByRole('list', { name: /rebuild phases/i });
-    const calibrationButton = within(phaseList).getByRole('button', { name: /calibration placeholder/i });
-
-    await user.click(calibrationButton);
-    expect(screen.getByText(/calibration shell placeholder/i)).toBeInTheDocument();
-
-    const advance = screen.getAllByRole('button', { name: /advance placeholder/i })[0];
-    await user.click(advance);
-    expect(screen.getByText(/ready screen placeholder/i)).toBeInTheDocument();
+    // Check that the INITIALIZE_SYSTEM button exists (may be multiple due to React strict mode)
+    const buttons = screen.getAllByRole('button', { name: /INITIALIZE_SYSTEM/i });
+    expect(buttons.length).toBeGreaterThan(0);
   });
 });
