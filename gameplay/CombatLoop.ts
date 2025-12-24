@@ -185,6 +185,7 @@ export class CombatLoop {
   private advanceBullets(deltaMs: number): EnemyInstance[] {
     const destroyed: EnemyInstance[] = [];
 
+    // Iterate backwards so we can swap-remove without breaking indices
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const bullet = this.bullets[i];
 
@@ -209,14 +210,26 @@ export class CombatLoop {
         }
       }
 
-      // Check bounds (off screen top)
+      // Check bounds (off screen top) or hit
       if (hit || bullet.position.y < -1.5) {
-        this.bullets.splice(i, 1);
+        // Recycle bullet to pool
+        bullet.active = false;
+        this.bulletPool.push(bullet);
+
+        // Swap-Pop Removal (O(1))
+        // 1. Overwrite current element with the last element
+        this.bullets[i] = this.bullets[this.bullets.length - 1];
+        // 2. Remove the last element
+        this.bullets.pop();
       }
     }
 
     return destroyed;
   }
+
+  // Object pool for active bullets to reduce GC
+  // We grow this on demand.
+  private readonly bulletPool: Bullet[] = [];
 
   private spawnBullets(): void {
     // Only fire if pinching and not overheated
@@ -258,12 +271,27 @@ export class CombatLoop {
       };
 
       this.bulletId++;
-      this.bullets.push({
-        id: this.bulletId,
-        position: { x: startX, y: startY },
-        velocity: velocity,
-        active: true,
-      });
+
+      // Try to reuse from pool
+      let bullet = this.bulletPool.pop();
+      if (!bullet) {
+        // Pool empty, create new (allocate)
+        bullet = {
+          id: this.bulletId,
+          position: { x: startX, y: startY },
+          velocity: velocity, // This allocates a new object, could be optimized further with Vector2 pool
+          active: true,
+        };
+      } else {
+        // Reset pooled bullet
+        bullet.id = this.bulletId;
+        bullet.position.x = startX;
+        bullet.position.y = startY;
+        bullet.velocity = velocity; // Replaces ref, but old ref is garbage. Ideally copy x/y to avoid alloc.
+        bullet.active = true;
+      }
+
+      this.bullets.push(bullet);
 
       // Stop firing more this frame if overheated
       if (this._isOverheated) break;
