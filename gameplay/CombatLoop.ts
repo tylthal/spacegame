@@ -96,26 +96,22 @@ export class CombatLoop {
   }
 
   // Set Aim from Input (0..1 range)
-  // x: 0 (Left) -> 1 (Right) => Maps to Yaw
-  // y: 0 (Top) -> 1 (Bottom) => Maps to Pitch
+  // x: 0 (Left) -> 1 (Right) => Maps to Yaw Cone (-30 to 30 deg)
+  // y: 0 (Top) -> 1 (Bottom) => Maps to Pitch Cone (15 to -15 deg)
   public setPlayerPosition(x: number, y: number) {
-    // Map X (0..1) to Yaw (-PI to PI) - Full 360 could be disorienting, let's do 180 FOV first?
-    // Actually, user wants "Sphere", so 360 is ideal.
-    // Let's map x=0.5 to Forward (Angle 0).
-    // x=0 -> -PI (Back?), x=1 -> PI (Back?)
+    // Forward Cone Scaling
+    const MAX_YAW = Math.PI / 6;   // 30 degrees
+    const MAX_PITCH = Math.PI / 12; // 15 degrees
 
-    // For comfort, let's Map X (-1 to 1) to Yaw (-PI/2 to PI/2) => 180 degrees front facing
-    // Or full 360? Let's try 180 first for playability.
-    this._yaw = x * (Math.PI); // -PI to PI (Full 360 if Input sends -1..1)
+    // Map X (0..1) to Yaw (-30 to +30 deg)
+    // 0 -> +30 (Left), 1 -> -30 (Right)
+    this._yaw = (0.5 - x) * 2 * MAX_YAW;
 
-    // Map Y (-1 to 2) to Pitch
-    // y=0 is Center? No, usually Y is Top-Down on screen.
-    // Let's say y=0 is Up (Phi=0), y=1 is Horizon (Phi=PI/2), y=2 is Down (Phi=PI).
-    // Input Y comes in roughly 0 (top) to 1 (bottom).
-    const clampedY = Math.max(0, Math.min(1, y)); // clamp 0..1
-    // Map 0..1 to (PI/4 .. 3PI/4) - Limited vertical look to avoid neck strain?
-    // Or full look: 0..PI
-    this._pitch = clampedY * Math.PI; // Full Up to Down
+    // Map Y (top..bottom) to Pitch
+    // Top (0) -> Up (+Pitch)
+    // Bottom (1) -> Down (-Pitch)
+    const clampedY = Math.max(0, Math.min(1, y));
+    this._pitch = (0.5 - clampedY) * 2 * MAX_PITCH;
   }
 
   public reset(): void {
@@ -194,22 +190,31 @@ export class CombatLoop {
     this.enemyId += 1;
     this.spawns[kind] += 1;
 
-    // Spawn on Shell
-    // Random Point on Sphere Surface
-    const u = this.rng.next();
-    const v = this.rng.next();
-    const theta = 2 * Math.PI * u;
-    const phi = Math.acos(2 * v - 1);
+    // Spawn in Forward Cone (Sector)
+    // Random Yaw/Pitch within Spawn Cone (slightly wider than aim cone)
+    const SPAWN_YAW = Math.PI / 3; // 60 degrees total width (+/- 30)
+    const SPAWN_PITCH = Math.PI / 6; // 30 degrees total height
 
-    // Cartesian conversion
+    // Random -0.5 .. 0.5
+    const u = this.rng.next() - 0.5;
+    const v = this.rng.next() - 0.5;
+
+    const yaw = u * SPAWN_YAW;
+    const pitch = v * SPAWN_PITCH;
+
     const r = this.options.spawnRadius;
-    const x = r * Math.sin(phi) * Math.cos(theta);
-    const y = r * Math.sin(phi) * Math.sin(theta);
-    const z = r * Math.cos(phi);
+
+    // Euler to Cartesian (Forward is -Z)
+    // x = r * sin(yaw) * cos(pitch)
+    // y = r * sin(pitch)
+    // z = -r * cos(yaw) * cos(pitch)
+
+    const x = r * Math.sin(yaw) * Math.cos(pitch);
+    const y = r * Math.sin(pitch);
+    const z = -r * Math.cos(yaw) * Math.cos(pitch);
 
     // Velocity: Target is (0,0,0)
     // Direction = Target - Pos = -Pos
-    // Normalize and scale
     const dist = Math.hypot(x, y, z);
     const speed = this.options.enemySpeedPerMs[kind];
     const vx = (-x / dist) * speed;
@@ -294,56 +299,19 @@ export class CombatLoop {
       }
 
       // Fire from Center (0,0,0) towards Aim Direction
-      // Aim is defined by _yaw and _pitch
-      // Convert Spherical to Cartesian Direction
-      // x = sin(phi) * cos(theta)
-      // y = sin(phi) * sin(theta)  <-- Wait, usually Y is UP in ThreeJS. 
-      // Standard Physics: Z is Up. ThreeJS: Y is Up.
-      // Let's stick to ThreeJS Y-Up convention.
-      // x = r * sin(phi) * sin(theta)
-      // y = r * cos(phi)
-      // z = r * sin(phi) * cos(theta)
-
-      // Let's re-verify Aim Mapping.
-      // Yaw (Theta) rotates around Y axis.
-      // Pitch (Phi) rotates from Y-axis down?
-
-      // Direction Vector:
-      // x = sin(pitch) * sin(yaw)
-      // y = cos(pitch)
-      // z = sin(pitch) * cos(yaw)
-
-      // But we want Forward to be -Z when Yaw=0.
-      // Let's just use Euler rotations logic simpler.
-      // Or just standard Math.
+      // Aim is defined by _yaw (Left/Right) and _pitch (Up/Down)
+      // Forward is -Z
 
       const speed = this.options.bulletSpeed;
 
-      // Standard Math:
-      // x = r sin(phi) cos(theta)
-      // y = r sin(phi) sin(theta)
-      // z = r cos(phi)
-      // This assumes Z is up.
+      // x = sin(yaw) * cos(pitch)
+      // y = sin(pitch)
+      // z = -cos(yaw) * cos(pitch)
 
-      // ThreeJS: Y is Up.
-      // x = sin(phase) * sin(theta) ... 
-      // Let's just create a Vector3 and apply Euler.
-
-      // Simple Trig for Y-Up:
-      // y = cos(pitch) (if pitch 0 is up)
-      // h = sin(pitch) (horizontal radius)
-      // x = h * sin(yaw)
-      // z = h * cos(yaw)
-      // If Pitch 0 is Up, Pitch PI is Down.
-
-      // ThreeJS Forward is -Z.
-      // Yaw 0 -> Forward (-Z)
-      // Yaw +PI/2 -> Right (+X)
-
-      const dirY = Math.cos(this._pitch);
-      const h = Math.sin(this._pitch);
+      const dirY = Math.sin(this._pitch);
+      const h = Math.cos(this._pitch); // horizontal proj
       const dirX = h * Math.sin(this._yaw);
-      const dirZ = -h * Math.cos(this._yaw); // Invert Z for -Z Forward
+      const dirZ = -h * Math.cos(this._yaw); // -Z is forward
 
       // Normalize just in case
       const mag = Math.hypot(dirX, dirY, dirZ);

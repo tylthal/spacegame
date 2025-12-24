@@ -9,26 +9,17 @@ interface ThreeRendererProps {
     isRunning?: boolean;
 }
 
-function TurretCamera({ combatLoop }: { combatLoop?: CombatLoop }) {
+function StaticFighterCamera({ combatLoop }: { combatLoop?: CombatLoop }) {
     const { camera } = useThree();
 
     useFrame(() => {
         if (!combatLoop) return;
 
-        // Position: Center of the Universe (Turret)
+        // Position: Center (Fixed)
         camera.position.set(0, 0, 0);
 
-        // Rotation: Sync with CombatLoop Aim
-        // CombatLoop Yaw: -PI to PI
-        // CombatLoop Pitch: 0 (Up) to PI (Down) -> ThreeJS: -PI/2 (Up) to PI/2 (Down)
-
-        const camPitch = combatLoop.pitch - (Math.PI / 2);
-        // Invert Pitch if needed based on controls feel, but let's stick to map
-        // Yaw: standard rotation around Y
-        const camYaw = -combatLoop.yaw; // Invert yaw to match intuitive "Move hand left to look left"
-
-        // Order YXZ: Rotate Yaw (Y) then Pitch (X) local
-        camera.rotation.set(camPitch, camYaw, 0, 'YXZ');
+        // Rotation: Fixed Forward (-Z)
+        camera.rotation.set(0, 0, 0);
     });
 
     return null;
@@ -44,7 +35,7 @@ export function ThreeRenderer(props: ThreeRendererProps) {
             >
                 <color attach="background" args={['#000000']} />
 
-                <TurretCamera combatLoop={combatLoop} />
+                <StaticFighterCamera combatLoop={combatLoop} />
 
                 {/* Basic lighting */}
                 <ambientLight intensity={0.5} />
