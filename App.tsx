@@ -113,35 +113,8 @@ const App: React.FC = () => {
       // Let's stick to direct mapping for now.
       combatLoop.setPlayerX(gameX);
 
-      // 3. Update local calibration visual state (hacky optimization)
-      if (phaseManager.phase === 'CALIBRATING') {
-        // We don't expose progress on PhaseManager yet, but we can guess or expose it?
-        // The PhaseManager tracks `calibrationStableMs`.
-        // Actually, we can't easily access private `calibrationStableMs` without exposing it.
-        // For now, let's just show "Stable" vs "Unstable" based on event.stable?
-        // Better: Update PhaseManager to emit progress or expose public getter?
-        // For MVP, let's just fake a "feeling" of calibration or add a getter.
-        // Let's rely on the transition to READY as the main feedback.
-        // To show a progress bar we'd need to poll PhaseManager or expose state.
-        // See below: I'll trust the user to hold it.
-      }
     });
   }, [inputProcessor, phaseManager, combatLoop]);
-
-  // HACK: Poll for calibration progress since it's internal to PhaseManager
-  // Efficient enough for React 18+
-  useEffect(() => {
-    if (phase !== 'CALIBRATING') return;
-    const interval = setInterval(() => {
-      // Use 'any' cast to access private property for visualization if needed,
-      // OR prefer modifying PhaseManager. 
-      // Let's just modify the UI to say "Holding..." vs "Searching" based on input stability?
-      // Actually, let's just be simple. If stable, increment visual bar? No.
-      // Let's skip the progress bar accuracy for this step or it gets complex.
-      // I will set it to 100% when phase becomes READY.
-    }, 100);
-    return () => clearInterval(interval);
-  }, [phase]);
 
 
   const handleStreamReady = useCallback((video: HTMLVideoElement) => {

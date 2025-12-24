@@ -1,5 +1,7 @@
 import { HandFrame, HandLandmark, HandTracker } from './HandTracker';
 import { OneEuroConfig, OneEuroFilter } from './OneEuroFilter';
+import { INPUT_CONFIG } from './inputConfig';
+import { CursorMapper } from './CursorMapper';
 
 type Gesture = 'pinch' | 'fist' | 'palm';
 
@@ -26,23 +28,20 @@ export interface ProcessedHandEvent {
   stable: boolean;
 }
 
+// Derived from centralized config
 const DEFAULT_VIRTUAL_PAD: VirtualMousepadConfig = {
-  // VIRTUAL MOUSEPAD STRATEGY:
-  // A smaller width/height = higher sensitivity
-  // With width: 0.4, moving hand 40% of camera frame covers full screen
-  // This provides good sensitivity without being too twitchy
   origin: { x: 0.3, y: 0.3 },
-  width: 0.4,     // 40% of camera width = full X range
-  height: 0.4,    // 40% of camera height = full Y range
-  stabilityTolerance: 0.015,
+  width: INPUT_CONFIG.virtualPad.width,
+  height: INPUT_CONFIG.virtualPad.height,
+  stabilityTolerance: INPUT_CONFIG.virtualPad.stabilityTolerance,
 };
 
 const DEFAULT_GESTURE_CONFIG: GestureConfig = {
-  pinchThreshold: 0.05,
-  fistThreshold: 0.16,
-  dCutoff: 1,
-  minCutoff: 1.2,
-  beta: 0.002,
+  pinchThreshold: INPUT_CONFIG.gestures.pinchThreshold,
+  fistThreshold: INPUT_CONFIG.gestures.fistThreshold,
+  dCutoff: INPUT_CONFIG.smoothing.dCutoff,
+  minCutoff: INPUT_CONFIG.smoothing.minCutoff,
+  beta: INPUT_CONFIG.smoothing.beta,
 };
 
 interface AxisFilters {
@@ -59,8 +58,7 @@ export class InputProcessor {
   private lastRawCursor?: { x: number; y: number };
   private readonly gestureConfig: GestureConfig;
   private readonly virtualPad: VirtualMousepadConfig;
-  private calibrationOffsetX = 0; // The 'zero point' X offset (0.0 to 1.0)
-  private calibrationOffsetY = 0; // The 'zero point' Y offset (0.0 to 1.0)
+  private readonly cursorMapper = new CursorMapper();
 
   constructor(
     tracker: HandTracker,
@@ -73,8 +71,7 @@ export class InputProcessor {
   }
 
   setCalibration(offset: { x: number; y: number }): void {
-    this.calibrationOffsetX = offset.x;
-    this.calibrationOffsetY = offset.y;
+    this.cursorMapper.setCalibration(offset);
     console.log(`[Input] Calibrated Zero Point: X=${offset.x.toFixed(3)}, Y=${offset.y.toFixed(3)}`);
   }
 
@@ -197,27 +194,8 @@ export class InputProcessor {
   }
 
   private toCursor(landmark: HandLandmark): { x: number; y: number } {
-    // VIRTUAL MOUSEPAD STRATEGY:
-    // The calibration offset is the user's natural "center" position.
-    // The virtual pad size determines sensitivity - smaller = more sensitive.
-    // 
-    // Formula: output = (input - calibratedCenter) / padSize + 0.5
-    // This centers the output at 0.5 when input equals the calibrated center.
-
-    // Calculate offset from calibrated center
-    const offsetX = landmark.x - this.calibrationOffsetX;
-    const offsetY = landmark.y - this.calibrationOffsetY;
-
-    // Scale by virtual pad size (smaller pad = higher sensitivity)
-    // X-axis: INVERTED because webcam is mirrored (move left = cursor goes left)
-    // Y-axis: MediaPipe Y=0 is top, which matches screen Y=0 at top - no inversion needed
-    const scaledX = (-offsetX / this.virtualPad.width) + 0.5;
-    const scaledY = (offsetY / this.virtualPad.height) + 0.5;
-
-    return {
-      x: Math.min(Math.max(scaledX, 0), 1),
-      y: Math.min(Math.max(scaledY, 0), 1),
-    };
+    // Delegate to CursorMapper for consistent coordinate transformation
+    return this.cursorMapper.toCursor({ x: landmark.x, y: landmark.y });
   }
 
   private isStable(cursor: { x: number; y: number }, rawCursor: { x: number; y: number }): boolean {

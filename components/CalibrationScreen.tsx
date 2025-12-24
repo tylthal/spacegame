@@ -2,7 +2,9 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { HandTracker, HandFrame } from '../input/HandTracker';
 import * as fp from 'fingerpose';
 import { PointGesture, PinchGesture } from '../input/Gestures';
-import { CALIBRATION_CONFIG } from '../input/calibrationConfig';
+import { INPUT_CONFIG } from '../input/inputConfig';
+import { CursorMapper } from '../input/CursorMapper';
+import { HandCursor } from './HandCursor';
 
 interface CalibrationScreenProps {
     tracker: HandTracker | null;
@@ -43,16 +45,17 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
     const lastPinchTimeRef = useRef<number>(0);
     const buttonRef = useRef<HTMLButtonElement>(null);
 
-    // Simplified config
+    // Config from centralized source
     const {
-        STABILITY_REQUIRED_MS,
-        DETECTION_TIMEOUT_MS,
-        GRACE_PERIOD_MS,
-        SPATIAL_SEPARATION_THRESHOLD,
-        MOVEMENT_THRESHOLD,
-        PINCH_DISTANCE_THRESHOLD,
-        FINGERPOSE_SCORE_THRESHOLD,
-    } = CALIBRATION_CONFIG;
+        stabilityRequiredMs: STABILITY_REQUIRED_MS,
+        detectionTimeoutMs: DETECTION_TIMEOUT_MS,
+        gracePeriodMs: GRACE_PERIOD_MS,
+        spatialSeparationThreshold: SPATIAL_SEPARATION_THRESHOLD,
+        movementThreshold: MOVEMENT_THRESHOLD,
+        pinchClickDebounceMs: PINCH_CLICK_DEBOUNCE_MS,
+    } = INPUT_CONFIG.calibration;
+
+    const { pinchDistanceThreshold: PINCH_DISTANCE_THRESHOLD, fingerposeScoreThreshold: FINGERPOSE_SCORE_THRESHOLD } = INPUT_CONFIG.gestures;
 
     // Handle pinch click on START GAME button
     const handlePinchClick = useCallback(() => {
@@ -117,25 +120,13 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                         const fingertipPos = { x: frame.landmarks[8].x, y: frame.landmarks[8].y };
                         rightWristRef.current = fingertipPos; // Still using this ref for compatibility
 
-                        // POST-CALIBRATION: Update cursor position with virtual mousepad
+                        // POST-CALIBRATION: Update cursor position using CursorMapper
                         if (isSuccessRef.current) {
-                            // Virtual Mousepad: 40% of camera frame = full screen
-                            const VIRTUAL_PAD_SIZE = 0.4;
-
-                            // Calculate offset from calibrated center
-                            const offsetX = fingertipPos.x - finalCalibrationOffsetRef.current.x;
-                            const offsetY = fingertipPos.y - finalCalibrationOffsetRef.current.y;
-
-                            // Scale by virtual pad sensitivity and center at 0.5
-                            // X-axis: INVERTED for webcam mirror effect
-                            // Y-axis: MediaPipe Y=0 is top, screen Y=0 is top - no inversion needed
-                            const calibratedX = (-offsetX / VIRTUAL_PAD_SIZE) + 0.5;
-                            const calibratedY = (offsetY / VIRTUAL_PAD_SIZE) + 0.5;
-
-                            setCursorPos({
-                                x: Math.min(Math.max(calibratedX, 0), 1),
-                                y: Math.min(Math.max(calibratedY, 0), 1)
-                            });
+                            // Create temporary mapper with current calibration
+                            const tempMapper = new CursorMapper();
+                            tempMapper.setCalibration(finalCalibrationOffsetRef.current);
+                            const mappedPos = tempMapper.toCursor(fingertipPos);
+                            setCursorPos(mappedPos);
                         }
 
                         if (!isSuccessRef.current) {
@@ -301,31 +292,12 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
 
     return (
         <>
-            {/* POST-CALIBRATION: Hand Cursor */}
-            {isSuccess && (
-                <div
-                    className="fixed pointer-events-none z-[9999] transition-transform duration-75"
-                    style={{
-                        left: `${cursorPos.x * 100}%`,
-                        top: `${cursorPos.y * 100}%`,
-                        transform: 'translate(-50%, -50%)'
-                    }}
-                >
-                    {/* Outer ring */}
-                    <div className={`w-12 h-12 rounded-full border-4 transition-all duration-100 ${isPinching
-                        ? 'border-y2k-red bg-y2k-red/30 scale-75'
-                        : 'border-y2k-yellow bg-y2k-yellow/20'
-                        }`}>
-                        {/* Center dot */}
-                        <div className={`absolute top-1/2 left-1/2 w-2 h-2 rounded-full -translate-x-1/2 -translate-y-1/2 ${isPinching ? 'bg-y2k-red' : 'bg-y2k-yellow'
-                            }`} />
-                    </div>
-
-                    {/* Crosshair lines */}
-                    <div className="absolute top-1/2 left-0 w-full h-px bg-y2k-yellow/50 -translate-y-1/2" />
-                    <div className="absolute left-1/2 top-0 h-full w-px bg-y2k-yellow/50 -translate-x-1/2" />
-                </div>
-            )}
+            {/* Hand Cursor (visible after calibration) */}
+            <HandCursor
+                position={cursorPos}
+                isPinching={isPinching}
+                visible={isSuccess}
+            />
 
             {/* Main Calibration UI */}
             <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">

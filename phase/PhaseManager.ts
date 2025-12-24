@@ -95,16 +95,8 @@ export class PhaseManager {
       }
     }
 
-    // NOTE: Calibration transition is now handled by CalibrationScreen component
-    // via its onComplete callback. We no longer auto-transition here.
-    // The CalibrationScreen requires user to pinch-click a button to proceed.
+    // Calibration is handled by CalibrationScreen component via onComplete callback
     if (this.state === 'CALIBRATING') {
-      // Still track stability for potential diagnostics, but don't auto-transition
-      this.calibrationStableMs = stable ? this.calibrationStableMs + delta : 0;
-      // Old auto-transition code (disabled):
-      // if (this.calibrationStableMs >= this.guards.requiredCalibrationStableMs) {
-      //   return this.transition('READY', 'calibration-complete', timestamp);
-      // }
       return this.state;
     }
 
