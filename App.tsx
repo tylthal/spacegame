@@ -98,9 +98,8 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(frameId);
   }, [phase, combatLoop, isGameOver, isPaused]);
 
-  // Pause gesture detection - RIGHT hand palm held for 1.2s (very intentional pause only)
+  // Pause gesture detection - BOTH hands palm for 1.2s (very intentional)
   // Resume must be done via the Resume button, not by gesture
-  // STRICT: Requires consecutive palm frames + time + no pinching from either hand
   useEffect(() => {
     if (!inputProcessor || phase !== 'PLAYING' || isGameOver || isPaused) return;
 
@@ -108,23 +107,13 @@ const App: React.FC = () => {
       const rightHand = event.hands.right;
       const leftHand = event.hands.left;
 
-      // Block pause if either hand is pinching (any shooting gesture)
-      const isAnyPinching = rightHand?.gesture === 'pinch' || leftHand?.gesture === 'pinch';
-      if (isAnyPinching) {
-        palmHoldStartRef.current = null;
-        palmConsecutiveFramesRef.current = 0;
-        return;
-      }
+      // Require BOTH hands to be showing palm
+      const bothHandsPalm = (
+        rightHand?.gesture === 'palm' &&
+        leftHand?.gesture === 'palm'
+      );
 
-      // No right hand = reset
-      if (!rightHand) {
-        palmHoldStartRef.current = null;
-        palmConsecutiveFramesRef.current = 0;
-        return;
-      }
-
-      // Only count palm gesture
-      if (rightHand.gesture === 'palm') {
+      if (bothHandsPalm) {
         palmConsecutiveFramesRef.current++;
 
         // Start timer on first palm frame
@@ -140,7 +129,7 @@ const App: React.FC = () => {
           palmConsecutiveFramesRef.current = 0;
         }
       } else {
-        // Any non-palm gesture resets everything
+        // Not both palms = reset
         palmHoldStartRef.current = null;
         palmConsecutiveFramesRef.current = 0;
       }
