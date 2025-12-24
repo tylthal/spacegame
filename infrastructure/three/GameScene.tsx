@@ -197,20 +197,20 @@ function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kin
         const { x: vx, y: vy, z: vz } = enemy.velocity;
         velocityVec.current.set(vx, vy, vz);
 
-        // lookAt() makes -Z point at target (Three.js convention)
-        // But our mesh has nose at +Z, so we look OPPOSITE to velocity
-        // This makes +Z (nose) point in direction of travel
+        // Calculate point ahead in velocity direction
         targetPos.current.set(
-            x - vx * 10,  // Look behind to make nose point forward
-            y - vy * 10,
-            z - vz * 10
+            x + vx * 10,  // Look ahead
+            y + vy * 10,
+            z + vz * 10
         );
 
         // Reset rotation before applying new one
         group.current.rotation.set(0, 0, 0);
 
-        // Look at the point behind (this makes +Z point forward)
+        // Look at the point ahead, then rotate 180° around Y so nose points forward
+        // (lookAt makes -Z point at target, but our mesh has nose at +Z)
         group.current.lookAt(targetPos.current);
+        group.current.rotateY(Math.PI);  // Flip 180° to point nose forward
     });
 
     const hitboxRadius = HITBOX_RADIUS[enemy.kind] || 1.5;
