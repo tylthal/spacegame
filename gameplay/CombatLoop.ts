@@ -405,7 +405,7 @@ export class CombatLoop {
       const MUZZLE_DISTANCE = 8; // Distance in front of camera (along -Z)
       const muzzleHalfHeight = MUZZLE_DISTANCE * Math.tan(VERTICAL_FOV / 2);
       const MUZZLE_X = 0;
-      const MUZZLE_Y = CAMERA_Y - muzzleHalfHeight * 0.8; // 80% down from center = bottom of screen
+      const MUZZLE_Y = CAMERA_Y - muzzleHalfHeight * 0.95; // 95% down = near bottom of screen
       const MUZZLE_Z = CAMERA_Z - MUZZLE_DISTANCE; // In front of camera
 
       // 2. TARGET: Where crosshair is pointing in world space (far away)
@@ -500,7 +500,7 @@ export class CombatLoop {
     const MUZZLE_DISTANCE = 8;
     const muzzleHalfHeight = MUZZLE_DISTANCE * Math.tan(VERTICAL_FOV / 2);
     const MUZZLE_X = 0;
-    const MUZZLE_Y = CAMERA_Y - muzzleHalfHeight * 0.8;
+    const MUZZLE_Y = CAMERA_Y - muzzleHalfHeight * 0.95;
     const MUZZLE_Z = CAMERA_Z - MUZZLE_DISTANCE;
 
     const TARGET_DISTANCE = 100;
