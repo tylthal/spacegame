@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { Group, Mesh, Vector3, Object3D, InstancedMesh, PerspectiveCamera } from 'three';
 import { CombatLoop } from '../../gameplay/CombatLoop';
 import { useSpaceshipAsset, AssetId } from './assets/AssetLoader';
+import { EnemyMesh } from './assets/EnemyMeshes';
 import { GameEffects } from './effects/EffectComposer';
 import { Starfield } from './particles/ParticleSystem';
 
@@ -215,7 +216,7 @@ function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kin
 
     return (
         <group ref={group}>
-            <AssetMesh id={enemy.kind as AssetId} />
+            <EnemyMesh kind={enemy.kind} />
             {/* Debug hitbox visualization */}
             {showHitbox && (
                 <mesh>
