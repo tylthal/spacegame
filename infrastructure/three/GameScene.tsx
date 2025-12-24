@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Group, Mesh, Vector3, Object3D, InstancedMesh, PerspectiveCamera } from 'three';
 import { CombatLoop } from '../../gameplay/CombatLoop';
@@ -6,6 +6,7 @@ import { useSpaceshipAsset, AssetId } from './assets/AssetLoader';
 import { EnemyMesh } from './assets/EnemyMeshes';
 import { GameEffects } from './effects/EffectComposer';
 import { Starfield } from './particles/ParticleSystem';
+import { VoxelExplosion, Explosion, EXPLOSION_COLORS } from './effects/VoxelExplosion';
 
 function AssetMesh({ id, ...props }: { id: AssetId } & any) {
     const { geometryType, args, materialParams, scale } = useSpaceshipAsset(id);
@@ -73,6 +74,15 @@ function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
     );
 }
 
+// Track enemy positions for explosion spawning
+interface EnemySnapshot {
+    id: number;
+    kind: string;
+    x: number;
+    y: number;
+    z: number;
+}
+
 // Debug: Draw line from muzzle to crosshair target
 function DebugAimLine({ combatLoop }: { combatLoop: CombatLoop }) {
     const lineRef = useRef<any>(null);
@@ -138,6 +148,15 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
     const [version, setVersion] = useState(0);
     const lastEntityCount = useRef(0);
 
+    // Explosion system
+    const [explosions, setExplosions] = useState<Explosion[]>([]);
+    const enemySnapshotsRef = useRef<Map<number, EnemySnapshot>>(new Map());
+    const explosionIdRef = useRef(0);
+
+    const handleExplosionComplete = useCallback((id: number) => {
+        setExplosions(prev => prev.filter(e => e.id !== id));
+    }, []);
+
     useFrame((state, delta) => {
         if (!combatLoop) return;
 
@@ -147,8 +166,44 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
             combatLoop.tick(delta * 1000);
         }
 
+        // Track current enemies and detect deaths for explosions
+        const currentEnemies = combatLoop.activeEnemies;
+        const currentIds = new Set(currentEnemies.map(e => e.id));
+
+        // Update snapshots for current enemies
+        for (const enemy of currentEnemies) {
+            enemySnapshotsRef.current.set(enemy.id, {
+                id: enemy.id,
+                kind: enemy.kind,
+                x: enemy.position.x,
+                y: enemy.position.y,
+                z: enemy.position.z,
+            });
+        }
+
+        // Find enemies that died (were in snapshot but not in current)
+        const newExplosions: Explosion[] = [];
+        for (const [id, snapshot] of enemySnapshotsRef.current) {
+            if (!currentIds.has(id)) {
+                // Enemy died - spawn explosion at last known position
+                newExplosions.push({
+                    id: explosionIdRef.current++,
+                    x: snapshot.x,
+                    y: snapshot.y,
+                    z: snapshot.z,
+                    color: EXPLOSION_COLORS[snapshot.kind] || '#00FFFF',
+                    createdAt: Date.now(),
+                });
+                enemySnapshotsRef.current.delete(id);
+            }
+        }
+
+        if (newExplosions.length > 0) {
+            setExplosions(prev => [...prev, ...newExplosions]);
+        }
+
         // Only track enemies for React updates now
-        const count = combatLoop.activeEnemies.length;
+        const count = currentEnemies.length;
         if (count !== lastEntityCount.current) {
             lastEntityCount.current = count;
             setVersion(v => v + 1);
@@ -169,6 +224,15 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
                     <EnemyRenderer key={enemy.id} enemy={enemy as any} />
                 ))}
             </group>
+
+            {/* Explosions */}
+            {explosions.map(explosion => (
+                <VoxelExplosion
+                    key={explosion.id}
+                    explosion={explosion}
+                    onComplete={handleExplosionComplete}
+                />
+            ))}
         </group>
     );
 }
