@@ -7,29 +7,37 @@ import React from 'react';
  * Each enemy type has a unique silhouette for easy identification.
  */
 
-// Shared metallic material presets
+// Shared metallic material presets with emissive glow for space visibility
 const METAL_CHROME = {
-    color: '#B8B8B8',
-    metalness: 1.0,
-    roughness: 0.1,
-};
-
-const METAL_GUNMETAL = {
-    color: '#2A2A35',
-    metalness: 0.95,
+    color: '#C0C0C0',
+    emissive: '#404050',
+    emissiveIntensity: 0.8,
+    metalness: 0.9,
     roughness: 0.2,
 };
 
-const METAL_COPPER = {
-    color: '#B87333',
+const METAL_GUNMETAL = {
+    color: '#4A4A5A',
+    emissive: '#303040',
+    emissiveIntensity: 0.6,
     metalness: 0.9,
     roughness: 0.3,
 };
 
+const METAL_COPPER = {
+    color: '#CD7F32',
+    emissive: '#8B4513',
+    emissiveIntensity: 0.5,
+    metalness: 0.85,
+    roughness: 0.35,
+};
+
 const METAL_GOLD = {
     color: '#FFD700',
-    metalness: 1.0,
-    roughness: 0.15,
+    emissive: '#CC9900',
+    emissiveIntensity: 0.6,
+    metalness: 0.95,
+    roughness: 0.2,
 };
 
 /**
