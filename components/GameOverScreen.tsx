@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { InputProcessor } from '../input/InputProcessor';
+import { HandCursor } from './HandCursor';
 
 export interface GameOverScreenProps {
     score: number;
     kills: number;
     survivalTimeMs: number;
     onRestart: () => void;
+    inputProcessor?: InputProcessor | null;
 }
 
 const formatTime = (ms: number): string => {
@@ -16,13 +19,53 @@ const formatTime = (ms: number): string => {
 
 /**
  * GameOverScreen - Y2K themed game over with stats and restart option
+ * Supports pinch-click on the restart button via hand tracking
  */
 export const GameOverScreen: React.FC<GameOverScreenProps> = ({
     score,
     kills,
     survivalTimeMs,
     onRestart,
+    inputProcessor,
 }) => {
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const [cursorPos, setCursorPos] = useState({ x: 0.5, y: 0.5 });
+    const [isPinching, setIsPinching] = useState(false);
+    const [isHovering, setIsHovering] = useState(false);
+
+    // Subscribe to input for cursor position and pinch detection
+    useEffect(() => {
+        if (!inputProcessor) return;
+
+        return inputProcessor.subscribe(event => {
+            setCursorPos(event.cursor);
+            setIsPinching(event.gesture === 'pinch');
+        });
+    }, [inputProcessor]);
+
+    // Check if cursor is over the button and handle pinch-click
+    useEffect(() => {
+        if (!buttonRef.current) return;
+
+        const rect = buttonRef.current.getBoundingClientRect();
+        const cursorScreenX = cursorPos.x * window.innerWidth;
+        const cursorScreenY = cursorPos.y * window.innerHeight;
+
+        const isOver = (
+            cursorScreenX >= rect.left &&
+            cursorScreenX <= rect.right &&
+            cursorScreenY >= rect.top &&
+            cursorScreenY <= rect.bottom
+        );
+
+        setIsHovering(isOver);
+
+        // Trigger restart on pinch while hovering
+        if (isOver && isPinching) {
+            onRestart();
+        }
+    }, [cursorPos, isPinching, onRestart]);
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             {/* Dark overlay */}
@@ -78,15 +121,24 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
                     <div className="text-y2k-yellow animate-pulse">&gt; Awaiting reboot command...</div>
                 </div>
 
-                {/* Restart Button */}
+                {/* Restart Button - with hover highlight for cursor */}
                 <button
+                    ref={buttonRef}
                     onClick={onRestart}
-                    className="w-full py-4 bg-y2k-yellow text-black font-display font-bold text-xl uppercase tracking-wider
-                     hover:bg-y2k-white transition-colors duration-100
-                     active:translate-y-0.5"
+                    className={`w-full py-4 font-display font-bold text-xl uppercase tracking-wider
+                     transition-all duration-100 active:translate-y-0.5
+                     ${isHovering
+                            ? 'bg-y2k-white text-black scale-105 shadow-[0_0_30px_rgba(255,255,0,0.5)]'
+                            : 'bg-y2k-yellow text-black hover:bg-y2k-white'
+                        }`}
                 >
                     [ REBOOT SYSTEM ]
                 </button>
+
+                {/* Pinch hint */}
+                <div className="mt-4 text-xs font-mono text-y2k-white/50 uppercase">
+                    Pinch on button to restart
+                </div>
 
                 {/* Corner decorations */}
                 <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-y2k-red" />
@@ -94,6 +146,13 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
                 <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-y2k-red" />
                 <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-y2k-red" />
             </div>
+
+            {/* Hand Cursor - visible on game over screen */}
+            <HandCursor
+                position={cursorPos}
+                isPinching={isPinching}
+                visible={!!inputProcessor}
+            />
         </div>
     );
 };

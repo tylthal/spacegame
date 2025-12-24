@@ -169,27 +169,32 @@ const App: React.FC = () => {
     if (phase !== 'PLAYING') return;
     setIsGameOver(false); // Reset on new game
 
+    let frozenTime: number | null = null; // Store time when game ends
+
     const interval = setInterval(() => {
       const summary = combatLoop.summary();
       const totalKills = summary.kills.drone + summary.kills.scout + summary.kills.bomber;
       const score = summary.kills.drone * 100 + summary.kills.scout * 200 + summary.kills.bomber * 500;
 
+      // Check for game over - freeze the timer
+      if (summary.hull <= 0 && !isGameOver) {
+        if (frozenTime === null) {
+          frozenTime = summary.elapsedMs;
+        }
+        setIsGameOver(true);
+      }
+
       setHudState({
         score,
         hull: summary.hull,
         kills: totalKills,
-        elapsedMs: summary.elapsedMs,
+        elapsedMs: frozenTime !== null ? frozenTime : summary.elapsedMs,
         heat: summary.heat,
         isOverheated: summary.isOverheated,
       });
-
-      // Check for game over
-      if (summary.hull <= 0) {
-        setIsGameOver(true);
-      }
     }, 100);
     return () => clearInterval(interval);
-  }, [phase, combatLoop]);
+  }, [phase, combatLoop, isGameOver]);
 
   return (
     <div
@@ -245,6 +250,7 @@ const App: React.FC = () => {
               score={hudState.score}
               kills={hudState.kills}
               survivalTimeMs={hudState.elapsedMs}
+              inputProcessor={inputProcessor}
               onRestart={() => {
                 // Reset game state and go back to title
                 phaseManager.reset();
