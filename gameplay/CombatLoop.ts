@@ -344,13 +344,12 @@ export class CombatLoop {
       const targetY = (0.5 - this._cursorY) * 2 * halfHeight;
       const targetZ = -TARGET_DISTANCE; // Forward is -Z
 
-      // 3. BULLET DIRECTION: Parallel ray from origin to target
-      // Direction is calculated from camera origin (0,0,0), NOT from muzzle
-      // This ensures bullets travel parallel to the camera ray at all distances
-      // Fixes: far enemies were easier to hit due to bullet convergence at Z=-100
-      const dx = targetX; // targetX - 0 (origin)
-      const dy = targetY; // targetY - 0 (origin)
-      const dz = targetZ; // targetZ - 0 (origin)
+      // 3. BULLET DIRECTION: From muzzle to target (realistic aiming)
+      // Direction is calculated from muzzle position to target
+      // Bullets go exactly where you point the crosshair
+      const dx = targetX - MUZZLE_X;
+      const dy = targetY - MUZZLE_Y;
+      const dz = targetZ - MUZZLE_Z;
       const dist = Math.hypot(dx, dy, dz);
 
       const vx = (dx / dist) * speed;
