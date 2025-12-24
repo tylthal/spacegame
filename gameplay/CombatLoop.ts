@@ -31,9 +31,9 @@ const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   hull: 100,
   fireIntervalMs: 125,
   enemyRadius: { drone: 1.5, scout: 2.0, bomber: 2.5 }, // Increased for 3D scale
-  enemySpeedPerMs: { drone: 0.012, scout: 0.015, bomber: 0.01 }, // Faster for long distance
+  enemySpeedPerMs: { drone: 0.02, scout: 0.015, bomber: 0.01 }, // Faster to cover distance
   enemyDamage: { drone: 5, scout: 8, bomber: 15 },
-  spawnRadius: 50, // Enemies spawn at Radius 50
+  spawnRadius: 150, // Enemies spawn at Radius 150 (Deep Space)
   bulletSpeed: 0.2, // much faster 3D bullets
 };
 
