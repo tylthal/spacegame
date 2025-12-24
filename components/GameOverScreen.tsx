@@ -7,6 +7,7 @@ export interface GameOverScreenProps {
     kills: number;
     survivalTimeMs: number;
     onRestart: () => void;
+    onExit: () => void;
     inputProcessor?: InputProcessor | null;
 }
 
@@ -18,20 +19,23 @@ const formatTime = (ms: number): string => {
 };
 
 /**
- * GameOverScreen - Y2K themed game over with stats and restart option
- * Supports pinch-click on the restart button via hand tracking
+ * GameOverScreen - Y2K themed game over with stats and restart/exit options
+ * Supports pinch-click on buttons via hand tracking
  */
 export const GameOverScreen: React.FC<GameOverScreenProps> = ({
     score,
     kills,
     survivalTimeMs,
     onRestart,
+    onExit,
     inputProcessor,
 }) => {
-    const buttonRef = useRef<HTMLButtonElement>(null);
+    const restartButtonRef = useRef<HTMLButtonElement>(null);
+    const exitButtonRef = useRef<HTMLButtonElement>(null);
     const [cursorPos, setCursorPos] = useState({ x: 0.5, y: 0.5 });
     const [isPinching, setIsPinching] = useState(false);
-    const [isHovering, setIsHovering] = useState(false);
+    const [hoveringRestart, setHoveringRestart] = useState(false);
+    const [hoveringExit, setHoveringExit] = useState(false);
 
     // Subscribe to input for cursor position and pinch detection
     useEffect(() => {
@@ -43,38 +47,65 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
         });
     }, [inputProcessor]);
 
-    // Track if restart has been triggered to prevent repeated calls
+    // Refs for callbacks and trigger state
     const triggeredRef = useRef(false);
     const onRestartRef = useRef(onRestart);
+    const onExitRef = useRef(onExit);
     onRestartRef.current = onRestart;
+    onExitRef.current = onExit;
 
-    // Check if cursor is over the button and handle pinch-click
-    const prevHoveringRef = useRef(false);
+    // Track hover states
+    const prevHoverRestartRef = useRef(false);
+    const prevHoverExitRef = useRef(false);
 
+    // Check cursor position and handle pinch-clicks
     useEffect(() => {
-        if (!buttonRef.current) return;
-
-        const rect = buttonRef.current.getBoundingClientRect();
         const cursorScreenX = cursorPos.x * window.innerWidth;
         const cursorScreenY = cursorPos.y * window.innerHeight;
 
-        const isOver = (
-            cursorScreenX >= rect.left &&
-            cursorScreenX <= rect.right &&
-            cursorScreenY >= rect.top &&
-            cursorScreenY <= rect.bottom
-        );
-
-        // Only update state when hovering status changes
-        if (isOver !== prevHoveringRef.current) {
-            prevHoveringRef.current = isOver;
-            setIsHovering(isOver);
+        // Check restart button
+        let isOverRestart = false;
+        if (restartButtonRef.current) {
+            const rect = restartButtonRef.current.getBoundingClientRect();
+            isOverRestart = (
+                cursorScreenX >= rect.left &&
+                cursorScreenX <= rect.right &&
+                cursorScreenY >= rect.top &&
+                cursorScreenY <= rect.bottom
+            );
         }
 
-        // Trigger restart on pinch while hovering (only once)
-        if (isOver && isPinching && !triggeredRef.current) {
-            triggeredRef.current = true;
-            onRestartRef.current();
+        // Check exit button
+        let isOverExit = false;
+        if (exitButtonRef.current) {
+            const rect = exitButtonRef.current.getBoundingClientRect();
+            isOverExit = (
+                cursorScreenX >= rect.left &&
+                cursorScreenX <= rect.right &&
+                cursorScreenY >= rect.top &&
+                cursorScreenY <= rect.bottom
+            );
+        }
+
+        // Only update state when hover changes
+        if (isOverRestart !== prevHoverRestartRef.current) {
+            prevHoverRestartRef.current = isOverRestart;
+            setHoveringRestart(isOverRestart);
+        }
+        if (isOverExit !== prevHoverExitRef.current) {
+            prevHoverExitRef.current = isOverExit;
+            setHoveringExit(isOverExit);
+        }
+
+        // Trigger actions on pinch (only once)
+        if (isPinching && !triggeredRef.current) {
+            if (isOverRestart) {
+                triggeredRef.current = true;
+                onRestartRef.current();
+            } else if (isOverExit) {
+                triggeredRef.current = true;
+                onExitRef.current();
+            }
         }
 
         // Reset trigger when not pinching
@@ -135,26 +166,43 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
                     <div className="text-y2k-red mb-2">&gt; ORBITAL PLATFORM COMPROMISED</div>
                     <div className="text-y2k-white/70">&gt; Hull integrity: 0%</div>
                     <div className="text-y2k-white/70">&gt; Life support: OFFLINE</div>
-                    <div className="text-y2k-yellow animate-pulse">&gt; Awaiting reboot command...</div>
+                    <div className="text-y2k-yellow animate-pulse">&gt; Awaiting command...</div>
                 </div>
 
-                {/* Restart Button - with hover highlight for cursor */}
-                <button
-                    ref={buttonRef}
-                    onClick={onRestart}
-                    className={`w-full py-4 font-display font-bold text-xl uppercase tracking-wider
-                     transition-all duration-100 active:translate-y-0.5
-                     ${isHovering
-                            ? 'bg-y2k-white text-black scale-105 shadow-[0_0_30px_rgba(255,255,0,0.5)]'
-                            : 'bg-y2k-yellow text-black hover:bg-y2k-white'
-                        }`}
-                >
-                    [ REBOOT SYSTEM ]
-                </button>
+                {/* Buttons */}
+                <div className="flex gap-4">
+                    {/* Restart Button */}
+                    <button
+                        ref={restartButtonRef}
+                        onClick={onRestart}
+                        className={`flex-1 py-4 font-display font-bold text-lg uppercase tracking-wider
+                         transition-all duration-100 active:translate-y-0.5
+                         ${hoveringRestart
+                                ? 'bg-y2k-white text-black scale-105 shadow-[0_0_30px_rgba(255,255,0,0.5)]'
+                                : 'bg-y2k-yellow text-black hover:bg-y2k-white'
+                            }`}
+                    >
+                        [ REBOOT SYSTEM ]
+                    </button>
+
+                    {/* Exit Button */}
+                    <button
+                        ref={exitButtonRef}
+                        onClick={onExit}
+                        className={`flex-1 py-4 font-display font-bold text-lg uppercase tracking-wider
+                         transition-all duration-100 active:translate-y-0.5
+                         ${hoveringExit
+                                ? 'bg-y2k-white text-y2k-red scale-105 shadow-[0_0_30px_rgba(255,0,68,0.5)]'
+                                : 'bg-transparent text-y2k-red border-2 border-y2k-red hover:bg-y2k-red hover:text-black'
+                            }`}
+                    >
+                        [ EXIT SYSTEM ]
+                    </button>
+                </div>
 
                 {/* Pinch hint */}
                 <div className="mt-4 text-xs font-mono text-y2k-white/50 uppercase">
-                    Pinch on button to restart
+                    Pinch on button to select
                 </div>
 
                 {/* Corner decorations */}

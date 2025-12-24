@@ -254,7 +254,13 @@ const App: React.FC = () => {
               survivalTimeMs={hudState.elapsedMs}
               inputProcessor={inputProcessor}
               onRestart={() => {
-                // Reset game state and go back to title
+                // Reset game and immediately start new game (skip calibration)
+                combatLoop.reset();
+                setIsGameOver(false);
+                frozenTimeRef.current = null;
+              }}
+              onExit={() => {
+                // Go back to title screen
                 phaseManager.reset();
                 setIsGameOver(false);
               }}
