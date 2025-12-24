@@ -83,7 +83,8 @@ function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
     });
 
     return (
-        <instancedMesh ref={meshRef} args={[undefined, undefined, 1000]}>
+        <instancedMesh ref={meshRef} args={[undefined, undefined, 1000]} frustumCulled={false}>
+            {/* Plasma Bolt Style */}
             <capsuleGeometry args={[0.08, 0.4, 4, 8]} />
             <meshStandardMaterial
                 color="#FFFF00"
@@ -102,8 +103,12 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
     const [version, setVersion] = useState(0);
     const lastEntityCount = useRef(0);
 
-    useFrame(() => {
+    useFrame((state, delta) => {
         if (!combatLoop) return;
+
+        // CRITICAL: Tick the Game Logic (Physics, Spawning, Heat)
+        // Delta is in seconds, convert to ms
+        combatLoop.tick(delta * 1000);
 
         // Only track enemies for React updates now
         const count = combatLoop.activeEnemies.length;

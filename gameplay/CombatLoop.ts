@@ -250,24 +250,20 @@ export class CombatLoop {
         this._isOverheated = true;
       }
 
-      // Fire from below the base (y=1.2) toward cursor aim (x, y)
-      const startX = 0;
-      const startY = 1.2; // Start off-screen
-      const targetX = this._playerX;
-      const targetY = this._playerY; // Use actua logic Y coordinate
+      // console.log("FIRING BULLET", this.activeBullets.length + 1);
 
-      const dx = targetX - startX;
-      // Note: Logic Y is 0 (top) to 1 (base).
-      // We fire from 1.2 UP towards targetY (e.g. 0.5 or 0).
-      // So dy should be negative.
-      const dy = targetY - startY;
-      const validDist = Math.hypot(dx, dy);
 
-      // Normalize and scale by speed
+      // Fire from the Player's position UPWARDS (towards y=0 / depth)
+      const startX = this._playerX;
+      const startY = this._playerY;
+
+      // Fire straight up in logic space (which becomes "forward" in 3D view)
+      // Enemies are at y=0, Player is at y=1. Direction is negative Y.
       const speed = this.options.bulletSpeed;
+
       const velocity = {
-        x: (dx / validDist) * speed,
-        y: (dy / validDist) * speed,
+        x: 0,          // No horizontal spread for now, precise shooting
+        y: -speed,     // Negative Y = Up/Forward
       };
 
       this.bulletId++;
