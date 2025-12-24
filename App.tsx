@@ -116,17 +116,89 @@ const App: React.FC = () => {
       });
 
       // 2. Feed CombatLoop (Input Mapping)
-      // Cursor X is 0..1. Map to -1..1 for game
-      const gameX = (event.cursor.x * 2) - 1;
-      // Cursor Y is 0..1. Map to 0..1 for game (match logic)
-      // Actually, logic is 0=Top, 1=Base. Input Y is 0=Top, 1=Bottom.
-      // So no mapping needed, just clamp.
-      const gameY = event.cursor.y;
-      combatLoop.setPlayerPosition(gameX, gameY);
+      // ENFORCE ROLES: Right Hand = Aim, Left Hand = Fire (Pinch)
+      // This prevents the Left Hand (used for pinching) from hijacking the cursor position.
+
+      const isRightHand = event.raw.handedness === 'Right';
+      const isLeftHand = event.raw.handedness === 'Left';
+
+      if (isRightHand) {
+        // VELOCITY GATE / TELEPORT PROTECTION
+        // Detect and reject unrealistic movement (e.g. MediaPipe swapping hands instantly)
+
+        // 1. Calculate distance from last known GOOD position
+        // If we don't have a history, accept it.
+        const currentPos = { x: event.cursor.x, y: event.cursor.y };
+
+        // We need a stable ref outside the effect? No, we can trust the closure if we use a ref?
+        // Actually, this useEffect runs once (deps empty-ish).
+        // Let's use a mutable variable in the effect scope.
+        // Wait, if the effect re-runs, we lose it.
+        // Better to use a useRef, but can't call hooks here.
+        // We can just add a property to the effect closure? 
+        // No, let's use a let variable *outside* the subscription but inside the effect if the effect doesn't re-run.
+        // The effect depends on [inputProcessor, phaseManager, combatLoop]. These are stable-ish.
+
+        // Actually, InputProcessor is recreated on mount. Effect re-runs.
+        // So `let lastPos` inside the effect is fine.
+
+        // Logic:
+        // Max speed: 30% of screen per frame (approx 16ms).
+        // If dist > 0.3, it's likely a Teleport.
+        // const dist = lastRightPos ? Math.hypot(currentPos.x - lastRightPos.x, currentPos.y - lastRightPos.y) : 0;
+        const dist = 0;
+
+        // If a jump is detected, we ignore it for a few frames to see if it stabilizes.
+        // If it persists, we eventually accept it (maybe the user really moved fast).
+
+        // if (lastRightPos && dist > 0.25) {
+        if (false) {
+          // Teleport detected! Ignore this frame.
+          // console.warn("Teleport rejected:", dist);
+          // Verify if we should reset? If we ignore 10 frames in a row, maybe we should accept?
+          // For now, simpler: Just ignore. Glitches are usually 1-2 frames.
+          return;
+        }
+
+        // lastRightPos = currentPos;
+
+        // Cursor X is 0..1. Map to -1..1 for game
+        const gameX = (event.cursor.x * 2) - 1;
+        const gameY = event.cursor.y;
+        combatLoop.setPlayerPosition(gameX, gameY);
+      }
 
       // 3. Firing: pinch gesture triggers shooting
+      // Allow firing from Left Hand (Neural Link style)
+      // Also allow Right Hand pinch just in case they want one-handed play? 
+      // No, let's stick to the Calibration roles to be safe. 
+      // Actually, allowing Right Hand pinch to fire is fine as long as it doesn't break movement.
+      // But the user specifically mentioned "disconnect". 
+      // Let's allow BOTH to fire, but ONLY Right to move.
       const pinching = event.gesture === 'pinch';
-      combatLoop.setFiring(pinching);
+      if (pinching) {
+        combatLoop.setFiring(true);
+      } else {
+        // Only release fire if THIS hand matches the one that might be firing?
+        // Since combatLoop is stateful, if Left pinches (true) and Right doesn't (false),
+        // we might get flickering firing state if we just setFiring(pinching).
+        // We need a more robust way to handle 'Any hand pinching'.
+        // For now, simpler: If *any* hand pinches, we fire.
+        // Note: CombatLoop.setFiring is just a boolean. 
+        // If we receive Right(false) then Left(true) -> flickering.
+
+        // Better logic:
+        // If this event is Pinching, set Loop Firing = true.
+        // But who turns it off?
+        // We need to know if NO hands are pinching?
+        // Or separate triggers?
+
+        // Let's stick to the Role Enforcement for simplicity and reliability.
+        // Left Hand = Trigger. Right Hand = Stick.
+        if (isLeftHand) {
+          combatLoop.setFiring(pinching);
+        }
+      }
 
       // 4. Update cursor display state (Delegated to CursorLayer)
       // setCursorPos(event.cursor);

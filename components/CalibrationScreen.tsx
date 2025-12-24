@@ -120,23 +120,14 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
         const handleHandEvent = (event: ProcessedHandEvent) => {
             const now = Date.now();
 
-            // Use SMOOTHED landmarks for stable calibration
-            const landmarks = event.smoothedLandmarks;
-            const handedness = event.raw.handedness;
-
-            if (handedness === 'Right') {
-                // Right hand: Pointing (Index Finger)
-                // We don't need Fingerpose anymore, InputProcessor does gesture detecion implicitly? 
-                // Wait, InputProcessor only detects "Pinch" vs "Fist" vs "Palm". It doesn't detect "Point".
-                // But generally, if it's not a Fist and not a Pinch, and index is extended, it's a Point.
-                // For simplicity, let's assume 'Palm' or 'Pinch' (Index extended) is fine for Right Hand.
-                // Actually, let's just track the index tip if the hand is visible.
-
+            // Check Right Hand (Aim) state from Spatial Data
+            if (event.hands.right) {
+                const rightHand = event.hands.right;
                 lastRightPointRef.current = now;
 
                 // Use INDEX FINGERTIP (landmark 8) for aiming
-                const fingertipPos = { x: landmarks[8].x, y: landmarks[8].y };
-                rightWristRef.current = fingertipPos;
+                const fingertipPos = { x: rightHand.landmarks[8].x, y: rightHand.landmarks[8].y };
+                rightWristRef.current = fingertipPos; // Keeping name 'rightWristRef' for minimal diff, effectively tracks aim point
 
                 // POST-CALIBRATION: Update cursor position
                 if (isSuccessRef.current) {
@@ -150,12 +141,13 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                 if (!isSuccessRef.current) {
                     setRightPointDetected(true);
                 }
+            }
 
-            } else if (handedness === 'Left') {
-                // Left Hand: Pinching check
-                // InputProcessor already classifies this!
-                const isPinch = event.gesture === 'pinch';
-                const wrist = landmarks[0];
+            // Check Left Hand (Pinch) state from Spatial Data
+            if (event.hands.left) {
+                const leftHand = event.hands.left;
+                const isPinch = leftHand.gesture === 'pinch';
+                const wrist = leftHand.landmarks[0];
 
                 if (isPinch) {
                     lastLeftPinchRef.current = now;

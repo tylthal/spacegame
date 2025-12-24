@@ -1,11 +1,11 @@
 
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
-import { HandFrame, HandTracker, HandLandmark, Handedness } from '../../input/HandTracker';
+import { HandFrame, HandTracker, HandLandmark, Handedness, FrameResult } from '../../input/HandTracker';
 
 export class BrowserHandTracker implements HandTracker {
   private handLandmarker: HandLandmarker | null = null;
   private video: HTMLVideoElement | null = null;
-  private listeners = new Set<(frame: HandFrame) => void>();
+  private listeners = new Set<(frame: FrameResult) => void>();
   private requestAnimationFrameId: number | null = null;
   private lastVideoTime = -1;
 
@@ -49,11 +49,9 @@ export class BrowserHandTracker implements HandTracker {
       const startTimeMs = performance.now();
 
       const result = this.handLandmarker.detectForVideo(this.video, startTimeMs);
+      const hands: HandFrame[] = [];
 
       if (result.landmarks && result.landmarks.length > 0) {
-        if (import.meta.env.DEV) {
-          // console.log(`DEBUG: HandLandmarker detected ${result.landmarks.length} hands`);
-        }
         // Iterate over all detected hands
         for (let i = 0; i < result.landmarks.length; i++) {
           const landmarks = result.landmarks[i];
@@ -65,30 +63,30 @@ export class BrowserHandTracker implements HandTracker {
             ? (handednessStr === 'Left' ? 'Right' : 'Left')
             : 'Right';
 
-          if (import.meta.env.DEV) {
-            // console.log(`DEBUG: Emitting ${handedness} hand`);
-          }
-
           const frame: HandFrame = {
             timestamp: startTimeMs,
             handedness: handedness,
-            landmarks: landmarks.map(l => ({ x: l.x, y: l.y, z: l.z }))
+            // Invert X because camera is mirrored (CSS transform scaleX(-1))
+            // This ensures that:
+            // - Real Right Hand (Screen Right side) -> x > 0.5
+            // - Real Left Hand (Screen Left side) -> x < 0.5
+            landmarks: landmarks.map(l => ({ x: 1 - l.x, y: l.y, z: l.z }))
           };
-
-          this.emit(frame);
+          hands.push(frame);
         }
-      } else {
-        // console.log('DEBUG: No hands detected');
       }
+
+      // Always emit a frame result, even if empty (for stability checks)
+      this.emit({ timestamp: startTimeMs, hands });
     }
   }
 
-  subscribe(handler: (frame: HandFrame) => void): () => void {
+  subscribe(handler: (frame: FrameResult) => void): () => void {
     this.listeners.add(handler);
     return () => this.listeners.delete(handler);
   }
 
-  private emit(frame: HandFrame) {
+  private emit(frame: FrameResult) {
     this.listeners.forEach(l => l(frame));
   }
 

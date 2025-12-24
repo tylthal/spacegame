@@ -44,7 +44,7 @@ export const INPUT_CONFIG = {
 
         // For InputProcessor gesture classification
         // Higher values = easier to trigger (more forgiving)
-        pinchThreshold: 0.22,  // Increased from 0.18 - very forgiving for rapid tapping
+        pinchThreshold: 0.28,  // Increased from 0.22 - very forgiving to solve 'struggling' recognition
         fistThreshold: 0.20,   // Increased from 0.16
     },
 
@@ -65,7 +65,7 @@ export const INPUT_CONFIG = {
      * Controls coordinate transformations for webcam/screen mapping.
      */
     axes: {
-        invertX: true,   // Webcam is mirrored
+        invertX: false,  // Disabled because BrowserHandTracker now handles the inversion (screen space mapping)
         invertY: false,  // Y=0 at top matches screen
     },
 } as const;
