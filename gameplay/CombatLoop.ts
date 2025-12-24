@@ -101,6 +101,34 @@ export class CombatLoop {
     this._playerY = Math.max(-1, Math.min(2, y)); // Allow some overflow?
   }
 
+  // Reset state for new game
+  public reset(): void {
+    this.enemies.length = 0;
+    this.bullets.length = 0;
+    this.bulletPool.length = 0; // Optional: clear pool or keep it? Keep it for perf.
+
+    // Reset Counters
+    this.hull = this.options.hull;
+    this.elapsedMs = 0;
+    this.enemyId = 0;
+    this.bulletId = 0;
+    this._heat = 0;
+    this._isOverheated = false;
+    this._isFiring = false;
+    this.sinceLastShot = 450;
+
+    // Reset Stats
+    this.kills.drone = 0;
+    this.kills.scout = 0;
+    this.kills.bomber = 0;
+    this.spawns.drone = 0;
+    this.spawns.scout = 0;
+    this.spawns.bomber = 0;
+
+    // Reset Scheduler
+    this.scheduler.reset();
+  }
+
   // Set firing state (true = pinching/firing)
   public setFiring(firing: boolean) {
     this._isFiring = firing;

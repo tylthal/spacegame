@@ -97,7 +97,7 @@ function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
     );
 }
 
-export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
+export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: CombatLoop, isRunning?: boolean }) {
     // Optimization: Only force re-render when the number of enemies changes
     // Bullets are now handled by the InstancedBulletRenderer efficiently inside useFrame
     const [version, setVersion] = useState(0);
@@ -107,8 +107,10 @@ export function GameScene({ combatLoop }: { combatLoop?: CombatLoop }) {
         if (!combatLoop) return;
 
         // CRITICAL: Tick the Game Logic (Physics, Spawning, Heat)
-        // Delta is in seconds, convert to ms
-        combatLoop.tick(delta * 1000);
+        // Only tick if the game is actively running (Phase = PLAYING)
+        if (isRunning) {
+            combatLoop.tick(delta * 1000);
+        }
 
         // Only track enemies for React updates now
         const count = combatLoop.activeEnemies.length;

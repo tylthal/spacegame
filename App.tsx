@@ -54,6 +54,11 @@ const App: React.FC = () => {
       if (event.type === 'transition') {
         setPhase(event.to);
         console.log('[Phase] Transition:', event.from, '->', event.to, 'Reason:', event.reason);
+
+        // Reset Combat Loop on Game Start OR when returning to Title
+        if ((event.to === 'PLAYING' && event.from !== 'PLAYING') || event.to === 'TITLE') {
+          combatLoop.reset();
+        }
       }
     });
   }, [phaseManager]);
@@ -200,7 +205,7 @@ const App: React.FC = () => {
           Actually, we want the starfield to move. The starfield animation is in GameScene/ParticleSystem based on 'delta'.
           useFrame still runs even if combatLoop doesn't tick, so Stars WILL animate. 
           Enemies won't move/spawn, which is perfect for Title Screen (Safety). */}
-      <ThreeRenderer combatLoop={combatLoop} />
+      <ThreeRenderer combatLoop={combatLoop} isRunning={phase === 'PLAYING'} />
 
       {/* FOREGROUND UI LAYERS */}
 

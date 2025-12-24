@@ -6,6 +6,7 @@ import * as THREE from 'three';
 
 interface ThreeRendererProps {
     combatLoop?: CombatLoop;
+    isRunning?: boolean;
 }
 
 function AdaptiveCamera() {
@@ -52,7 +53,8 @@ function AdaptiveCamera() {
     return null;
 }
 
-export function ThreeRenderer({ combatLoop }: ThreeRendererProps) {
+export function ThreeRenderer(props: ThreeRendererProps) {
+    const { combatLoop } = props;
     return (
         <div className="absolute inset-0 z-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
             <Canvas
@@ -67,7 +69,7 @@ export function ThreeRenderer({ combatLoop }: ThreeRendererProps) {
                 <ambientLight intensity={0.5} />
                 <pointLight position={[10, 10, 10]} intensity={1} />
 
-                <GameScene combatLoop={combatLoop} />
+                <GameScene combatLoop={combatLoop} isRunning={!!combatLoop && (props.isRunning ?? true)} />
             </Canvas>
         </div>
     );

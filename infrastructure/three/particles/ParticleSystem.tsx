@@ -22,18 +22,10 @@ export function Starfield({ count = 2000 }) {
 
     useFrame((state, delta) => {
         if (!points.current) return;
-        // Simple trick: Move the entire points object, resets not needed if we just loop texture?
-        // Actually, for points, we need to update positions or move group and reset.
-        // Let's just move the whole group and wrap is harder.
-        // Better: Update positions in shader is best, but here we can just scroll the group?
-        // No, infinite scroll needs wrap. 
-        // Let's stick to static for now to avoid CPU overhead, but make it DEEP.
-        // Or simple rotation
-        points.current.rotation.z += delta * 0.05; // Barrel roll effect
-        points.current.position.z += delta * 10; // Move forward
-        if (points.current.position.z > 50) {
-            points.current.position.z = -50;
-        }
+
+        // Stationary Defense Mode: majestic slow rotation, no forward warping
+        points.current.rotation.z += delta * 0.01; // Very slow drift
+        // points.current.position.z += delta * 10; // Disabled warp speed
     });
 
     return (
