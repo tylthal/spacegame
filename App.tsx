@@ -215,6 +215,8 @@ const App: React.FC = () => {
     elapsedMs: 0,
     heat: 0,
     isOverheated: false,
+    missileReady: true,
+    missileCooldownProgress: 1,
   });
 
   useEffect(() => {
@@ -242,6 +244,8 @@ const App: React.FC = () => {
         elapsedMs: frozenTimeRef.current !== null ? frozenTimeRef.current : summary.elapsedMs,
         heat: summary.heat,
         isOverheated: summary.isOverheated,
+        missileReady: summary.missileReady,
+        missileCooldownProgress: summary.missileCooldownProgress,
       });
     }, 100);
     return () => clearInterval(interval);
