@@ -215,10 +215,8 @@ function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kin
 
     return (
         <group ref={group}>
-            {/* Wrapper group rotated 180° so mesh nose aligns with -Z (lookAt convention) */}
-            <group rotation={[0, Math.PI, 0]}>
-                <EnemyMesh kind={enemy.kind} />
-            </group>
+            {/* Enemy mesh - already oriented with nose at -Z for lookAt */}
+            <EnemyMesh kind={enemy.kind} />
             {/* Debug hitbox visualization */}
             {showHitbox && (
                 <mesh>

@@ -43,6 +43,7 @@ const METAL_GOLD = {
 /**
  * DRONE - Fast, small attack craft
  * Design: Compact fighter with swept-back wings and glowing engine
+ * NOTE: Nose points to -Z (Three.js forward direction for lookAt)
  */
 export function DroneMesh() {
     return (
@@ -53,8 +54,8 @@ export function DroneMesh() {
                 <meshStandardMaterial {...METAL_CHROME} />
             </mesh>
 
-            {/* Red nose cone */}
-            <mesh position={[0, 0, 0.9]} rotation={[Math.PI / 2, 0, 0]} scale={[0.12, 0.25, 0.12]}>
+            {/* Red nose cone - at FRONT (-Z) */}
+            <mesh position={[0, 0, -0.9]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.12, 0.25, 0.12]}>
                 <coneGeometry args={[1, 1, 6]} />
                 <meshStandardMaterial
                     color="#FF3366"
@@ -65,20 +66,20 @@ export function DroneMesh() {
                 />
             </mesh>
 
-            {/* Left swept wing */}
-            <mesh position={[-0.5, 0, -0.2]} rotation={[0, -0.3, 0]} scale={[0.6, 0.04, 0.5]}>
+            {/* Left swept wing - rear position at +Z */}
+            <mesh position={[-0.5, 0, 0.2]} rotation={[0, 0.3, 0]} scale={[0.6, 0.04, 0.5]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Right swept wing */}
-            <mesh position={[0.5, 0, -0.2]} rotation={[0, 0.3, 0]} scale={[0.6, 0.04, 0.5]}>
+            {/* Right swept wing - rear position at +Z */}
+            <mesh position={[0.5, 0, 0.2]} rotation={[0, -0.3, 0]} scale={[0.6, 0.04, 0.5]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
             {/* Left wingtip glow */}
-            <mesh position={[-0.75, 0, -0.35]} scale={[0.1, 0.06, 0.15]}>
+            <mesh position={[-0.75, 0, 0.35]} scale={[0.1, 0.06, 0.15]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
                     color="#FF0044"
@@ -88,7 +89,7 @@ export function DroneMesh() {
             </mesh>
 
             {/* Right wingtip glow */}
-            <mesh position={[0.75, 0, -0.35]} scale={[0.1, 0.06, 0.15]}>
+            <mesh position={[0.75, 0, 0.35]} scale={[0.1, 0.06, 0.15]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
                     color="#FF0044"
@@ -97,14 +98,14 @@ export function DroneMesh() {
                 />
             </mesh>
 
-            {/* Engine housing */}
-            <mesh position={[0, 0, -0.7]} rotation={[Math.PI / 2, 0, 0]} scale={[0.18, 0.25, 0.18]}>
+            {/* Engine housing - at BACK (+Z) */}
+            <mesh position={[0, 0, 0.7]} rotation={[Math.PI / 2, 0, 0]} scale={[0.18, 0.25, 0.18]}>
                 <cylinderGeometry args={[1, 0.8, 1, 8]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Engine glow */}
-            <mesh position={[0, 0, -0.85]} scale={[0.15, 0.15, 0.1]}>
+            {/* Engine glow - at BACK (+Z) */}
+            <mesh position={[0, 0, 0.85]} scale={[0.15, 0.15, 0.1]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#00FFFF"
@@ -119,6 +120,7 @@ export function DroneMesh() {
 /**
  * SCOUT - Medium interceptor with sensor array
  * Design: Angular body with sensor dish and twin engines
+ * NOTE: Nose points to -Z (Three.js forward direction for lookAt)
  */
 export function ScoutMesh() {
     return (
@@ -129,26 +131,26 @@ export function ScoutMesh() {
                 <meshStandardMaterial {...METAL_CHROME} />
             </mesh>
 
-            {/* Copper sensor dish */}
-            <mesh position={[0, 0.25, 0.5]} rotation={[Math.PI / 2, 0, 0]} scale={[0.3, 0.05, 0.3]}>
+            {/* Copper sensor dish - at FRONT (-Z) */}
+            <mesh position={[0, 0.25, -0.5]} rotation={[Math.PI / 2, 0, 0]} scale={[0.3, 0.05, 0.3]}>
                 <cylinderGeometry args={[1, 0.6, 1, 8]} />
                 <meshStandardMaterial {...METAL_COPPER} />
             </mesh>
 
-            {/* Left engine nacelle */}
-            <mesh position={[-0.4, 0, -0.5]} scale={[0.15, 0.15, 0.8]}>
+            {/* Left engine nacelle - at BACK (+Z) */}
+            <mesh position={[-0.4, 0, 0.5]} scale={[0.15, 0.15, 0.8]}>
                 <cylinderGeometry args={[1, 1, 1, 6]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Right engine nacelle */}
-            <mesh position={[0.4, 0, -0.5]} scale={[0.15, 0.15, 0.8]}>
+            {/* Right engine nacelle - at BACK (+Z) */}
+            <mesh position={[0.4, 0, 0.5]} scale={[0.15, 0.15, 0.8]}>
                 <cylinderGeometry args={[1, 1, 1, 6]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Left engine glow */}
-            <mesh position={[-0.4, 0, -0.95]} scale={[0.12, 0.12, 0.05]}>
+            {/* Left engine glow - at BACK (+Z) */}
+            <mesh position={[-0.4, 0, 0.95]} scale={[0.12, 0.12, 0.05]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#FFAA00"
@@ -157,8 +159,8 @@ export function ScoutMesh() {
                 />
             </mesh>
 
-            {/* Right engine glow */}
-            <mesh position={[0.4, 0, -0.95]} scale={[0.12, 0.12, 0.05]}>
+            {/* Right engine glow - at BACK (+Z) */}
+            <mesh position={[0.4, 0, 0.95]} scale={[0.12, 0.12, 0.05]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#FFAA00"
@@ -167,8 +169,8 @@ export function ScoutMesh() {
                 />
             </mesh>
 
-            {/* Cockpit window */}
-            <mesh position={[0, 0.1, 0.8]} scale={[0.2, 0.1, 0.3]}>
+            {/* Cockpit window - at FRONT (-Z) */}
+            <mesh position={[0, 0.1, -0.8]} scale={[0.2, 0.1, 0.3]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#00FFFF"
@@ -185,6 +187,7 @@ export function ScoutMesh() {
 /**
  * BOMBER - Heavy assault craft
  * Design: Bulky armored body with gold accents and triple engines
+ * NOTE: Nose points to -Z (Three.js forward direction for lookAt)
  */
 export function BomberMesh() {
     return (
@@ -213,32 +216,32 @@ export function BomberMesh() {
                 <meshStandardMaterial {...METAL_GOLD} />
             </mesh>
 
-            {/* Chrome nose spike */}
-            <mesh position={[0, 0, 1.4]} scale={[0.15, 0.15, 0.5]}>
+            {/* Chrome nose spike - at FRONT (-Z) */}
+            <mesh position={[0, 0, -1.4]} rotation={[Math.PI, 0, 0]} scale={[0.15, 0.15, 0.5]}>
                 <coneGeometry args={[1, 2, 6]} />
                 <meshStandardMaterial {...METAL_CHROME} />
             </mesh>
 
-            {/* Center engine */}
-            <mesh position={[0, 0, -1.2]} scale={[0.25, 0.25, 0.4]}>
+            {/* Center engine - at BACK (+Z) */}
+            <mesh position={[0, 0, 1.2]} scale={[0.25, 0.25, 0.4]}>
                 <cylinderGeometry args={[1, 0.8, 1, 8]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Left engine */}
-            <mesh position={[-0.35, -0.15, -1.0]} scale={[0.18, 0.18, 0.35]}>
+            {/* Left engine - at BACK (+Z) */}
+            <mesh position={[-0.35, -0.15, 1.0]} scale={[0.18, 0.18, 0.35]}>
                 <cylinderGeometry args={[1, 0.8, 1, 8]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Right engine */}
-            <mesh position={[0.35, -0.15, -1.0]} scale={[0.18, 0.18, 0.35]}>
+            {/* Right engine - at BACK (+Z) */}
+            <mesh position={[0.35, -0.15, 1.0]} scale={[0.18, 0.18, 0.35]}>
                 <cylinderGeometry args={[1, 0.8, 1, 8]} />
                 <meshStandardMaterial {...METAL_GUNMETAL} />
             </mesh>
 
-            {/* Center engine glow */}
-            <mesh position={[0, 0, -1.45]} scale={[0.2, 0.2, 0.1]}>
+            {/* Center engine glow - at BACK (+Z) */}
+            <mesh position={[0, 0, 1.45]} scale={[0.2, 0.2, 0.1]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#9900FF"
@@ -247,8 +250,8 @@ export function BomberMesh() {
                 />
             </mesh>
 
-            {/* Left engine glow */}
-            <mesh position={[-0.35, -0.15, -1.2]} scale={[0.12, 0.12, 0.05]}>
+            {/* Left engine glow - at BACK (+Z) */}
+            <mesh position={[-0.35, -0.15, 1.2]} scale={[0.12, 0.12, 0.05]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#9900FF"
@@ -257,8 +260,8 @@ export function BomberMesh() {
                 />
             </mesh>
 
-            {/* Right engine glow */}
-            <mesh position={[0.35, -0.15, -1.2]} scale={[0.12, 0.12, 0.05]}>
+            {/* Right engine glow - at BACK (+Z) */}
+            <mesh position={[0.35, -0.15, 1.2]} scale={[0.12, 0.12, 0.05]}>
                 <sphereGeometry args={[1, 8, 6]} />
                 <meshStandardMaterial
                     color="#9900FF"
@@ -267,14 +270,14 @@ export function BomberMesh() {
                 />
             </mesh>
 
-            {/* Weapon pod - left */}
-            <mesh position={[-0.5, -0.2, 0.5]} scale={[0.12, 0.12, 0.4]}>
+            {/* Weapon pod - left - at FRONT (-Z) */}
+            <mesh position={[-0.5, -0.2, -0.5]} scale={[0.12, 0.12, 0.4]}>
                 <cylinderGeometry args={[1, 1, 1, 6]} />
                 <meshStandardMaterial {...METAL_CHROME} />
             </mesh>
 
-            {/* Weapon pod - right */}
-            <mesh position={[0.5, -0.2, 0.5]} scale={[0.12, 0.12, 0.4]}>
+            {/* Weapon pod - right - at FRONT (-Z) */}
+            <mesh position={[0.5, -0.2, -0.5]} scale={[0.12, 0.12, 0.4]}>
                 <cylinderGeometry args={[1, 1, 1, 6]} />
                 <meshStandardMaterial {...METAL_CHROME} />
             </mesh>
