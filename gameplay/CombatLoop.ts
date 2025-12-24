@@ -332,8 +332,9 @@ export class CombatLoop {
 
       const speed = this.options.bulletSpeed;
 
-      // ===== TARGETING OVERHAUL =====
-      // Fixed muzzle at VISUAL bottom-center of screen, bullets travel to target point
+      // ===== TARGETING SYSTEM =====
+      // Bullets spawn at muzzle (bottom-center) but travel PARALLEL to camera view ray
+      // This ensures bullets go toward wherever the crosshair is pointing
 
       // Camera properties (must match Three.js camera)
       const VERTICAL_FOV = 60 * (Math.PI / 180); // 60 degrees
@@ -342,38 +343,30 @@ export class CombatLoop {
         : 16 / 9;
 
       // 1. MUZZLE: Fixed at visual BOTTOM-CENTER of screen
-      // At MUZZLE_DISTANCE, the bottom of the screen is at Y = -distance * tan(FOV/2)
-      const MUZZLE_DISTANCE = 5; // Small distance in front of camera
+      const MUZZLE_DISTANCE = 5;
       const muzzleHalfHeight = MUZZLE_DISTANCE * Math.tan(VERTICAL_FOV / 2);
       const MUZZLE_X = 0;
       const MUZZLE_Y = -muzzleHalfHeight;
       const MUZZLE_Z = -MUZZLE_DISTANCE;
 
-      // 2. TARGET: Calculate using inverse projection (camera FOV)
+      // 2. TARGET: Flat plane projection at fixed Z (linear mapping like cursor)
+      // This matches how the crosshair is rendered (linear % of screen)
       const TARGET_DISTANCE = 100;
-
-      // Half-extents of virtual screen at TARGET_DISTANCE
       const halfHeight = TARGET_DISTANCE * Math.tan(VERTICAL_FOV / 2);
       const halfWidth = halfHeight * ASPECT_RATIO;
 
-      // Convert cursor (0..1) to world coordinates
-      // cursorX: 0=left, 1=right -> targetX: -halfWidth to +halfWidth
-      // cursorY: 0=top, 1=bottom -> targetY: +halfHeight to -halfHeight
+      // Convert cursor (0..1) to world coordinates on flat plane
       const targetX = (this._cursorX - 0.5) * 2 * halfWidth;
       const targetY = (0.5 - this._cursorY) * 2 * halfHeight;
-      const targetZ = -TARGET_DISTANCE; // Forward is -Z
+      const targetZ = -TARGET_DISTANCE;
 
-      // 3. BULLET DIRECTION: From muzzle to target (realistic aiming)
-      // Direction is calculated from muzzle position to target
-      // Bullets go exactly where you point the crosshair
-      const dx = targetX - MUZZLE_X;
-      const dy = targetY - MUZZLE_Y;
-      const dz = targetZ - MUZZLE_Z;
-      const dist = Math.hypot(dx, dy, dz);
-
-      const vx = (dx / dist) * speed;
-      const vy = (dy / dist) * speed;
-      const vz = (dz / dist) * speed;
+      // 3. BULLET DIRECTION: From CAMERA ORIGIN (0,0,0) to target
+      // This makes bullets travel PARALLEL to the camera view ray
+      // Even though they spawn at the muzzle, they go toward the crosshair
+      const dist = Math.hypot(targetX, targetY, targetZ);
+      const vx = (targetX / dist) * speed;
+      const vy = (targetY / dist) * speed;
+      const vz = (targetZ / dist) * speed;
 
       // 4. SPAWN: At muzzle with calculated velocity
       this.bulletId++;

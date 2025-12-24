@@ -172,8 +172,15 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
     );
 }
 
+// Hitbox radii must match CombatLoop's enemyRadius values
+const HITBOX_RADIUS: Record<string, number> = {
+    drone: 1.5,
+    scout: 2.0,
+    bomber: 2.5,
+};
+
 // Sub-component to handle per-enemy updates efficiently
-function EnemyRenderer({ enemy }: { enemy: { id: number, kind: string, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number } } }) {
+function EnemyRenderer({ enemy, showHitbox = true }: { enemy: { id: number, kind: string, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number } }, showHitbox?: boolean }) {
     const group = useRef<Group>(null);
     const velocityVec = useRef(new Vector3());
     const targetPos = useRef(new Vector3());
@@ -204,9 +211,24 @@ function EnemyRenderer({ enemy }: { enemy: { id: number, kind: string, position:
         group.current.rotateX(Math.PI / 2);
     });
 
+    const hitboxRadius = HITBOX_RADIUS[enemy.kind] || 1.5;
+
     return (
         <group ref={group}>
             <AssetMesh id={enemy.kind as AssetId} />
+            {/* Debug hitbox visualization */}
+            {showHitbox && (
+                <mesh>
+                    <sphereGeometry args={[hitboxRadius, 16, 12]} />
+                    <meshBasicMaterial
+                        color="#00ff00"
+                        wireframe={true}
+                        transparent={true}
+                        opacity={0.5}
+                    />
+                </mesh>
+            )}
         </group>
     );
 }
+
