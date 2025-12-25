@@ -78,10 +78,33 @@ export const GAME_CONFIG = {
         scout: 200,
         bomber: 500,
     },
+
+    // Difficulty settings
+    difficulty: {
+        easy: {
+            speedMultiplier: 0.6,
+            label: 'EASY',
+            description: 'Slower enemies for beginners',
+        },
+        normal: {
+            speedMultiplier: 1.0,
+            label: 'NORMAL',
+            description: 'Standard challenge',
+        },
+        hard: {
+            speedMultiplier: 1.4,
+            label: 'HARD',
+            description: 'Fast enemies for veterans',
+        },
+    },
 } as const;
+
+// Difficulty type
+export type Difficulty = 'easy' | 'normal' | 'hard';
 
 // Type exports for consumers
 export type GameConfig = typeof GAME_CONFIG;
 export type CombatConfig = typeof GAME_CONFIG.combat;
 export type HeatConfig = typeof GAME_CONFIG.heat;
 export type MissileConfig = typeof GAME_CONFIG.missile;
+export type DifficultyConfig = typeof GAME_CONFIG.difficulty;

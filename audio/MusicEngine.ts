@@ -38,7 +38,7 @@ class MusicEngineClass {
     private isPlaying = false;
     private scheduledNodes: (OscillatorNode | AudioBufferSourceNode)[] = [];
     private loopTimeoutId: number | null = null;
-    private _volume = 0.25; // Lower default for background music
+    private _volume = 0.12; // Quieter background music
     private _muted = false;
 
     /** Initialize audio context */

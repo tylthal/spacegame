@@ -12,6 +12,23 @@ vi.mock('../../infrastructure/mediapipe/BrowserHandTracker', () => ({
   }
 }));
 
+// Mock the audio module since it requires AudioContext
+vi.mock('../../audio', () => ({
+  SoundEngine: {
+    play: vi.fn(),
+    init: vi.fn(),
+    setVolume: vi.fn(),
+    setMuted: vi.fn(),
+  },
+  MusicEngine: {
+    play: vi.fn(),
+    stop: vi.fn(),
+    fadeOut: vi.fn(() => Promise.resolve()),
+    setMuted: vi.fn(),
+    muted: false,
+  },
+}));
+
 afterEach(() => {
   cleanup();
 });

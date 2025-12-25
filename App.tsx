@@ -10,6 +10,7 @@ import { SpawnScheduler } from './gameplay/SpawnScheduler';
 import { SeededRng } from './gameplay/Rng';
 import { TitleScreen } from './components/TitleScreen';
 import { CalibrationScreen } from './components/CalibrationScreen';
+import { DifficultyScreen } from './components/DifficultyScreen';
 import { WebcamPreview } from './components/WebcamPreview';
 import { CRTOverlay } from './components/CRTOverlay';
 import { InputProcessor } from './input/InputProcessor';
@@ -23,6 +24,7 @@ import { HandCursor } from './components/HandCursor';
 import { CursorLayer } from './components/CursorLayer';
 import { HandWireframe } from './components/HandWireframe';
 import { HandLandmark } from './input/HandTracker';
+import { GAME_CONFIG, Difficulty } from './config/gameConfig';
 
 const USE_REAL_INPUT = import.meta.env.VITE_USE_REAL_INPUT === '1' || import.meta.env.VITE_USE_REAL_INPUT === 'true';
 
@@ -319,7 +321,20 @@ const App: React.FC = () => {
             if (inputProcessor) {
               inputProcessor.setCalibration(offset);
             }
-            // Go directly to gameplay
+            // Go to difficulty selection
+            setPhase('READY');
+          }}
+        />
+      )}
+
+      {phase === 'READY' && (
+        <DifficultyScreen
+          inputProcessor={inputProcessor}
+          onSelect={(difficulty: Difficulty) => {
+            // Apply difficulty speed multiplier
+            const multiplier = GAME_CONFIG.difficulty[difficulty].speedMultiplier;
+            combatLoop.setSpeedMultiplier(multiplier);
+            // Start the game
             setPhase('PLAYING');
           }}
         />

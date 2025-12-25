@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { InputProcessor } from '../input/InputProcessor';
 import { HandCursor } from './HandCursor';
 import { useFullscreen } from '../hooks';
-import { SoundEngine } from '../audio';
+import { SoundEngine, MusicEngine } from '../audio';
 
 const HOLD_DURATION_MS = 1000; // 1 second to select
 
@@ -24,16 +24,22 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
     const resumeButtonRef = useRef<HTMLButtonElement>(null);
     const exitButtonRef = useRef<HTMLButtonElement>(null);
     const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
+    const musicButtonRef = useRef<HTMLButtonElement>(null);
     const [cursorPos, setCursorPos] = useState({ x: 0.5, y: 0.5 });
     const [isPinching, setIsPinching] = useState(false);
     const [hoveringResume, setHoveringResume] = useState(false);
     const [hoveringExit, setHoveringExit] = useState(false);
     const [hoveringFullscreen, setHoveringFullscreen] = useState(false);
+    const [hoveringMusic, setHoveringMusic] = useState(false);
 
     // Hold progress state (0-1) for visual feedback
     const [resumeProgress, setResumeProgress] = useState(0);
     const [exitProgress, setExitProgress] = useState(0);
     const [fullscreenProgress, setFullscreenProgress] = useState(0);
+    const [musicProgress, setMusicProgress] = useState(0);
+
+    // Music muted state
+    const [musicMuted, setMusicMuted] = useState(MusicEngine.muted);
 
     // Fullscreen state and controls - extracted to reusable hook
     const { isFullscreen, toggle: toggleFullscreen, showHint: showIOSHint, isIOS, isSupported: fullscreenSupported } = useFullscreen();
@@ -58,12 +64,14 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
     const resumeHoldStart = useRef<number | null>(null);
     const exitHoldStart = useRef<number | null>(null);
     const fullscreenHoldStart = useRef<number | null>(null);
+    const musicHoldStart = useRef<number | null>(null);
     const triggeredRef = useRef(false);
 
     // Track hover states
     const prevHoverResumeRef = useRef(false);
     const prevHoverExitRef = useRef(false);
     const prevHoverFullscreenRef = useRef(false);
+    const prevHoverMusicRef = useRef(false);
 
     // Check cursor position and handle hold-to-select
     useEffect(() => {
@@ -106,6 +114,18 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
             );
         }
 
+        // Check music button
+        let isOverMusic = false;
+        if (musicButtonRef.current) {
+            const rect = musicButtonRef.current.getBoundingClientRect();
+            isOverMusic = (
+                cursorScreenX >= rect.left &&
+                cursorScreenX <= rect.right &&
+                cursorScreenY >= rect.top &&
+                cursorScreenY <= rect.bottom
+            );
+        }
+
         // Update hover states and play sounds
         if (isOverResume !== prevHoverResumeRef.current) {
             prevHoverResumeRef.current = isOverResume;
@@ -121,6 +141,11 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
             prevHoverFullscreenRef.current = isOverFullscreen;
             if (isOverFullscreen) SoundEngine.play('menuHover');
             setHoveringFullscreen(isOverFullscreen);
+        }
+        if (isOverMusic !== prevHoverMusicRef.current) {
+            prevHoverMusicRef.current = isOverMusic;
+            if (isOverMusic) SoundEngine.play('menuHover');
+            setHoveringMusic(isOverMusic);
         }
 
         // Hold-to-select logic for Resume button
@@ -172,6 +197,25 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
         } else {
             fullscreenHoldStart.current = null;
             setFullscreenProgress(0);
+        }
+
+        // Hold-to-select logic for Music toggle button
+        if (isOverMusic && isPinching && !triggeredRef.current) {
+            if (musicHoldStart.current === null) {
+                musicHoldStart.current = Date.now();
+            }
+            const progress = Math.min(1, (Date.now() - musicHoldStart.current) / HOLD_DURATION_MS);
+            setMusicProgress(progress);
+            if (progress >= 1) {
+                triggeredRef.current = true;
+                SoundEngine.play('buttonPress');
+                const newMuted = !MusicEngine.muted;
+                MusicEngine.setMuted(newMuted);
+                setMusicMuted(newMuted);
+            }
+        } else {
+            musicHoldStart.current = null;
+            setMusicProgress(0);
         }
 
         // Reset trigger when not pinching
@@ -285,6 +329,28 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
                             />
                         )}
                         <span className="relative z-10">[ ABORT ]</span>
+                    </button>
+
+                    {/* Music Toggle Button */}
+                    <button
+                        ref={musicButtonRef}
+                        className={`relative w-full py-1.5 tall:py-2 md:py-3 font-display font-bold text-xs tall:text-base md:text-lg uppercase tracking-wider
+                         transition-all duration-100 active:translate-y-0.5 overflow-hidden
+                         ${hoveringMusic
+                                ? 'bg-y2k-white text-y2k-cyan scale-105 shadow-[0_0_20px_rgba(0,255,255,0.5)]'
+                                : 'bg-transparent text-y2k-cyan border border-y2k-cyan tall:border-2 hover:bg-y2k-cyan hover:text-black'
+                            }`}
+                    >
+                        {/* Progress bar overlay */}
+                        {musicProgress > 0 && (
+                            <div
+                                className="absolute inset-0 bg-cyan-400/50 transition-none"
+                                style={{ width: `${musicProgress * 100}%` }}
+                            />
+                        )}
+                        <span className="relative z-10">
+                            {musicMuted ? '[ MUSIC: OFF ]' : '[ MUSIC: ON ]'}
+                        </span>
                     </button>
                 </div>
 

@@ -129,6 +129,13 @@ export class CombatLoop {
   public get heat(): number { return this._heat; }
   public get isOverheated(): boolean { return this._isOverheated; }
 
+  // Difficulty speed multiplier
+  private _speedMultiplier = 1.0;
+  public setSpeedMultiplier(multiplier: number): void {
+    this._speedMultiplier = multiplier;
+  }
+  public get speedMultiplier(): number { return this._speedMultiplier; }
+
   private hull: number;
   private elapsedMs = 0;
   private enemyId = 0;
@@ -347,11 +354,12 @@ export class CombatLoop {
   }
 
   private advanceEnemies(deltaMs: number): void {
+    const adjustedDelta = deltaMs * this._speedMultiplier;
     for (const enemy of this.enemies) {
-      // Base movement
-      enemy.position.x += enemy.velocity.x * deltaMs;
-      enemy.position.y += enemy.velocity.y * deltaMs;
-      enemy.position.z += enemy.velocity.z * deltaMs;
+      // Base movement (scaled by difficulty)
+      enemy.position.x += enemy.velocity.x * adjustedDelta;
+      enemy.position.y += enemy.velocity.y * adjustedDelta;
+      enemy.position.z += enemy.velocity.z * adjustedDelta;
 
       // Weaver corkscrew movement (spirals around trajectory line)
       if (enemy.kind === 'weaver' && enemy.wavePhase !== undefined &&
