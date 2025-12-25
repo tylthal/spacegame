@@ -26,24 +26,77 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
     const [hoveringExit, setHoveringExit] = useState(false);
     const [hoveringFullscreen, setHoveringFullscreen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showIOSHint, setShowIOSHint] = useState(false);
+
+    // Detect iOS (Safari doesn't support Fullscreen API except for video)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // Check if Fullscreen API is supported
+    const fullscreenSupported = document.fullscreenEnabled ||
+        (document as any).webkitFullscreenEnabled ||
+        (document as any).mozFullScreenEnabled ||
+        (document as any).msFullscreenEnabled;
 
     // Track fullscreen state
     useEffect(() => {
         const handleFullscreenChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
+            setIsFullscreen(!!(
+                document.fullscreenElement ||
+                (document as any).webkitFullscreenElement ||
+                (document as any).mozFullScreenElement ||
+                (document as any).msFullscreenElement
+            ));
         };
         document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
         // Initial check
-        setIsFullscreen(!!document.fullscreenElement);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        handleFullscreenChange();
+
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+        };
     }, []);
 
-    // Toggle fullscreen
-    const toggleFullscreen = () => {
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        } else {
-            document.documentElement.requestFullscreen();
+    // Toggle fullscreen with cross-browser support
+    const toggleFullscreen = async () => {
+        // On iOS, show hint about Add to Home Screen
+        if (isIOS || !fullscreenSupported) {
+            setShowIOSHint(true);
+            setTimeout(() => setShowIOSHint(false), 3000);
+            return;
+        }
+
+        try {
+            if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                } else if ((document as any).webkitExitFullscreen) {
+                    await (document as any).webkitExitFullscreen();
+                }
+            } else {
+                const elem = document.documentElement;
+                if (elem.requestFullscreen) {
+                    await elem.requestFullscreen();
+                } else if ((elem as any).webkitRequestFullscreen) {
+                    await (elem as any).webkitRequestFullscreen();
+                } else if ((elem as any).mozRequestFullScreen) {
+                    await (elem as any).mozRequestFullScreen();
+                } else if ((elem as any).msRequestFullscreen) {
+                    await (elem as any).msRequestFullscreen();
+                }
+            }
+        } catch (err) {
+            console.warn('Fullscreen request failed:', err);
+            // Show hint if fullscreen fails
+            setShowIOSHint(true);
+            setTimeout(() => setShowIOSHint(false), 3000);
         }
     };
 
@@ -162,7 +215,9 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
                             ? 'bg-y2k-white text-black scale-110 shadow-[0_0_15px_rgba(0,255,255,0.5)]'
                             : 'bg-transparent text-y2k-cyan border border-y2k-cyan hover:bg-y2k-cyan hover:text-black'
                         }`}
-                    title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                    title={isIOS || !fullscreenSupported
+                        ? 'Add to Home Screen for fullscreen'
+                        : (isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen')}
                 >
                     {isFullscreen ? (
                         /* Contract/Exit fullscreen icon - arrows pointing inward */
@@ -176,6 +231,16 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
                         </svg>
                     )}
                 </button>
+
+                {/* iOS Hint Tooltip */}
+                {showIOSHint && (
+                    <div className="absolute top-10 tall:top-12 md:top-14 right-1 tall:right-2 md:right-3 
+                        bg-black/95 border border-y2k-cyan text-y2k-cyan px-2 py-1.5 text-[8px] tall:text-[10px] md:text-xs 
+                        font-mono max-w-[180px] tall:max-w-[220px] md:max-w-[280px] z-50 animate-pulse">
+                        <div className="font-bold mb-0.5">📱 For fullscreen:</div>
+                        <div>Tap Share → "Add to Home Screen" then launch from there</div>
+                    </div>
+                )}
 
                 {/* Pause Header - compact */}
                 <div className="relative mb-3 tall:mb-4 md:mb-8">
