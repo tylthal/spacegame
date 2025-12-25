@@ -65,7 +65,7 @@ export function WebcamPreview({ onStreamReady, onError }: WebcamPreviewProps) {
             {/* Mirror the video for natural interaction */}
             <video
                 ref={videoRef}
-                className="w-full h-full object-cover scale-x-[-1]"
+                className="w-full h-full object-cover scale-x-[-1] contrast-[1.3] brightness-110 saturate-[1.2]"
                 playsInline
                 muted
             />
