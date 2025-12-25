@@ -312,7 +312,7 @@ export class CombatLoop {
 
     if (kind === 'weaver') {
       wavePhase = this.rng.next() * Math.PI * 2; // Random starting angle
-      waveAmplitude = 1.5 + this.rng.next() * 2.5; // 1.5-4 units radius (tighter spiral)
+      waveAmplitude = 0.5 + this.rng.next() * 1.5; // 0.5-2 units radius (very tight spiral)
       waveFrequency = 0.0005 + this.rng.next() * 0.001; // 0.0005-0.0015 cycles/ms (slower spin)
     }
 
