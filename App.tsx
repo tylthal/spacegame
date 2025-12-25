@@ -351,19 +351,20 @@ const App: React.FC = () => {
         >
           <WebcamPreview onStreamReady={handleStreamReady} onError={() => { }} />
 
+          <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,40,60,0.2)_50%)] bg-[length:100%_4px] pointer-events-none" />
+
           {/* Minimal Overlay - Enhanced LIVE indicator */}
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex flex-col items-end">
               <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
-                <span className="text-[10px] sm:text-xs md:text-sm text-red-500 font-mono font-bold tracking-wider drop-shadow-[0_0_4px_rgba(239,68,68,0.6)]">
+                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-[#FF0000] rounded-full animate-pulse shadow-[0_0_8px_rgba(255,0,0,0.8)]" />
+                <span className="text-[10px] sm:text-xs md:text-sm text-[#FF0000] font-mono font-bold tracking-wider drop-shadow-[0_0_4px_rgba(255,0,0,0.6)]">
                   LIVE
                 </span>
               </div>
               <LiveDateTime />
             </div>
           </div>
-          <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,40,60,0.2)_50%)] bg-[length:100%_4px] pointer-events-none" />
         </div>
       )}
 
