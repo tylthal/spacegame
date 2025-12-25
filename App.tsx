@@ -22,6 +22,32 @@ import { CursorLayer } from './components/CursorLayer';
 
 const USE_REAL_INPUT = import.meta.env.VITE_USE_REAL_INPUT === '1' || import.meta.env.VITE_USE_REAL_INPUT === 'true';
 
+// Live datetime display for webcam overlay
+function LiveDateTime() {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatted = time.toLocaleString('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+
+  return (
+    <span className="text-[7px] sm:text-[9px] md:text-xs text-red-400/80 font-mono tabular-nums">
+      {formatted}
+    </span>
+  );
+}
+
 const App: React.FC = () => {
   // Core Systems
   const phaseManager = useMemo(() => new PhaseManager(), []);
@@ -374,11 +400,16 @@ const App: React.FC = () => {
         >
           <WebcamPreview onStreamReady={handleStreamReady} onError={() => { }} />
 
-          {/* Minimal Overlay */}
+          {/* Minimal Overlay - Enhanced LIVE indicator */}
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex space-x-1">
-              <div className="w-1 h-1 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-[8px] sm:text-[10px] text-red-500 font-mono">LIVE</span>
+            <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex flex-col items-end">
+              <div className="flex items-center space-x-1">
+                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+                <span className="text-[10px] sm:text-xs md:text-sm text-red-500 font-mono font-bold tracking-wider drop-shadow-[0_0_4px_rgba(239,68,68,0.6)]">
+                  LIVE
+                </span>
+              </div>
+              <LiveDateTime />
             </div>
           </div>
           <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,40,60,0.2)_50%)] bg-[length:100%_4px] pointer-events-none" />
