@@ -39,20 +39,20 @@ export const HandCursor: React.FC<HandCursorProps> = ({
             {/* Outer ring */}
             <div
                 className={`w-12 h-12 rounded-full border-4 transition-all duration-100 flex items-center justify-center ${isPinching
-                        ? 'border-y2k-red bg-y2k-red/30 scale-75'
-                        : 'border-y2k-yellow bg-y2k-yellow/20'
+                    ? 'border-y2k-red bg-y2k-red/30 scale-75'
+                    : 'border-orange-500 bg-orange-500/20'
                     }`}
             >
                 {/* Center dot */}
                 <div
-                    className={`w-2 h-2 rounded-full ${isPinching ? 'bg-y2k-red' : 'bg-y2k-yellow'
+                    className={`w-2 h-2 rounded-full ${isPinching ? 'bg-y2k-red' : 'bg-orange-500'
                         }`}
                 />
             </div>
 
             {/* Crosshair lines */}
-            <div className="absolute top-1/2 left-0 w-full h-px bg-y2k-yellow/50 -translate-y-1/2" />
-            <div className="absolute left-1/2 top-0 h-full w-px bg-y2k-yellow/50 -translate-x-1/2" />
+            <div className="absolute top-1/2 left-0 w-full h-px bg-orange-500/50 -translate-y-1/2" />
+            <div className="absolute left-1/2 top-0 h-full w-px bg-orange-500/50 -translate-x-1/2" />
         </div>
     );
 };
