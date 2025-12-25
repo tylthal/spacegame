@@ -21,6 +21,8 @@ import { PauseScreen } from './components/PauseScreen';
 import { SoundEngine } from './audio';
 import { HandCursor } from './components/HandCursor';
 import { CursorLayer } from './components/CursorLayer';
+import { HandWireframe } from './components/HandWireframe';
+import { HandLandmark } from './input/HandTracker';
 
 const USE_REAL_INPUT = import.meta.env.VITE_USE_REAL_INPUT === '1' || import.meta.env.VITE_USE_REAL_INPUT === 'true';
 
@@ -83,6 +85,13 @@ const App: React.FC = () => {
   const [damageFlash, setDamageFlash] = useState(false);
   const lastHullRef = useRef(100);
 
+  // Wireframe debug overlay
+  const [showWireframe, setShowWireframe] = useState(false);
+  const [wireframeData, setWireframeData] = useState<{
+    allHands?: { landmarks: HandLandmark[]; matched: boolean; score: number; role?: 'left' | 'right' }[];
+    signatureScores?: { left?: number; right?: number };
+  }>({});
+
   // Sync Phase Manager -> React State (extracted to hook)
   usePhaseSync(phaseManager, combatLoop, setPhase);
 
@@ -127,6 +136,17 @@ const App: React.FC = () => {
     phase === 'PLAYING' && !isGameOver && !isPaused,
     () => setIsPaused(true)
   );
+
+  // Wireframe toggle keyboard shortcut (W key)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'w' || e.key === 'W') {
+        setShowWireframe(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
 
   // Initialize HandTracker & InputProcessor
@@ -176,8 +196,16 @@ const App: React.FC = () => {
       // 4. Missiles - left hand fist gesture
       const leftHandFist = event.hands.left?.gesture === 'fist';
       combatLoop.setFiringMissile(leftHandFist || false);
+
+      // 5. Update wireframe debug data (only when visible to save performance)
+      if (showWireframe) {
+        setWireframeData({
+          allHands: event.allHands,
+          signatureScores: event.signatureScores,
+        });
+      }
     });
-  }, [inputProcessor, phaseManager, combatLoop]);
+  }, [inputProcessor, phaseManager, combatLoop, showWireframe]);
 
 
   const handleStreamReady = useCallback((video: HTMLVideoElement) => {
@@ -388,6 +416,25 @@ const App: React.FC = () => {
         className={`pointer-events-none fixed inset-0 z-50 border-[4px] md:border-[8px] border-red-600/60 shadow-[inset_0_0_15px_rgba(220,38,38,0.4)] transition-opacity duration-75 ${damageFlash ? 'opacity-100' : 'opacity-0'
           }`}
       />
+
+      {/* Hand Wireframe Debug Overlay (toggle with W key) */}
+      {showWireframe && wireframeData.allHands && (
+        <>
+          <HandWireframe
+            leftLandmarks={wireframeData.allHands.find(h => h.role === 'left')?.landmarks}
+            rightLandmarks={wireframeData.allHands.find(h => h.role === 'right')?.landmarks}
+            leftMatched={wireframeData.allHands.find(h => h.role === 'left')?.matched ?? true}
+            rightMatched={wireframeData.allHands.find(h => h.role === 'right')?.matched ?? true}
+            showScore
+            leftScore={wireframeData.signatureScores?.left}
+            rightScore={wireframeData.signatureScores?.right}
+          />
+          {/* Toggle hint */}
+          <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 bg-black/80 px-3 py-1 rounded text-xs text-green-400 font-mono pointer-events-none">
+            WIREFRAME DEBUG (W to toggle) | Signature Lock: {inputProcessor?.isSignatureLockEnabled() ? 'ON' : 'OFF'}
+          </div>
+        </>
+      )}
 
     </div>
   );

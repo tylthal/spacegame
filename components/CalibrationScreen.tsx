@@ -1,9 +1,14 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { HandFrame } from '../input/HandTracker';
+import { HandFrame, HandLandmark } from '../input/HandTracker';
 import { InputProcessor, ProcessedHandEvent } from '../input/InputProcessor';
 import { INPUT_CONFIG } from '../input/inputConfig';
 import { CursorMapper } from '../input/CursorMapper';
 import { HandCursor } from './HandCursor';
+import {
+    HandSignature,
+    computeHandSignature,
+    averageSignatures,
+} from '../input/HandSignature';
 
 interface CalibrationScreenProps {
     inputProcessor: InputProcessor | null;
@@ -37,6 +42,10 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
     // Calibration Data Collection
     const positionBufferRef = useRef<{ x: number; y: number }[]>([]);
     const finalCalibrationOffsetRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
+
+    // Hand signature collection for player lock-in
+    const leftLandmarksBufferRef = useRef<HandLandmark[][]>([]);
+    const rightLandmarksBufferRef = useRef<HandLandmark[][]>([]);
 
     // POST-CALIBRATION: Cursor tracking state
     const [cursorPos, setCursorPos] = useState<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
@@ -116,6 +125,8 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
         setFailureReason(null);
         setCursorPos({ x: 0.5, y: 0.5 });
         setIsPinching(false);
+        leftLandmarksBufferRef.current = [];
+        rightLandmarksBufferRef.current = [];
 
         const handleHandEvent = (event: ProcessedHandEvent) => {
             const now = Date.now();
@@ -169,6 +180,16 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                     if (isSuccessRef.current) {
                         setIsPinching(false);
                     }
+                }
+            }
+
+            // Collect landmarks during active calibration for signature computation
+            if (calibrationStartTimeRef.current && !isSuccessRef.current) {
+                // Only collect if we have both hands (required for calibration)
+                if (event.hands.left && event.hands.right) {
+                    // Store a copy of landmarks (they may be smoothed)
+                    leftLandmarksBufferRef.current.push([...event.hands.left.landmarks]);
+                    rightLandmarksBufferRef.current.push([...event.hands.right.landmarks]);
                 }
             }
         };
@@ -236,6 +257,8 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                     if (!calibrationStartTimeRef.current) {
                         calibrationStartTimeRef.current = now;
                         positionBufferRef.current = [];
+                        leftLandmarksBufferRef.current = [];
+                        rightLandmarksBufferRef.current = [];
                     }
 
                     positionBufferRef.current.push(currentPos);
@@ -249,6 +272,33 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                         const sumY = positionBufferRef.current.reduce((a, b) => a + b.y, 0);
                         const len = positionBufferRef.current.length;
                         finalCalibrationOffsetRef.current = { x: sumX / len, y: sumY / len };
+
+                        // Compute hand signatures from collected landmarks
+                        const lockedSignatures: { left?: HandSignature; right?: HandSignature } = {};
+
+                        if (leftLandmarksBufferRef.current.length > 0) {
+                            try {
+                                const leftSigs = leftLandmarksBufferRef.current.map(lm => computeHandSignature(lm));
+                                lockedSignatures.left = averageSignatures(leftSigs);
+                            } catch (e) {
+                                console.warn('Failed to compute left hand signature:', e);
+                            }
+                        }
+
+                        if (rightLandmarksBufferRef.current.length > 0) {
+                            try {
+                                const rightSigs = rightLandmarksBufferRef.current.map(lm => computeHandSignature(lm));
+                                lockedSignatures.right = averageSignatures(rightSigs);
+                            } catch (e) {
+                                console.warn('Failed to compute right hand signature:', e);
+                            }
+                        }
+
+                        // Lock the signatures in InputProcessor
+                        if (inputProcessor && (lockedSignatures.left || lockedSignatures.right)) {
+                            inputProcessor.setLockedSignatures(lockedSignatures);
+                            console.log('Hand signatures locked:', lockedSignatures);
+                        }
 
                         // CRITICAL: Set lastPinchTimeRef to now to prevent the held pinch
                         // from immediately triggering a click on the START GAME button

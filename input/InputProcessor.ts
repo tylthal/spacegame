@@ -2,6 +2,12 @@ import { HandFrame, HandLandmark, HandTracker, FrameResult } from './HandTracker
 import { OneEuroConfig, OneEuroFilter } from './OneEuroFilter';
 import { INPUT_CONFIG } from './inputConfig';
 import { CursorMapper } from './CursorMapper';
+import {
+  HandSignature,
+  computeHandSignature,
+  matchSignature,
+  SIGNATURE_MATCH_THRESHOLD,
+} from './HandSignature';
 
 // Gestures: pinch (shooting), fist (gripping), palm (stop/pause), point (default/aiming)
 type Gesture = 'pinch' | 'fist' | 'palm' | 'point';
@@ -39,6 +45,20 @@ export interface ProcessedHandEvent {
     left?: ProcessedHandData;
     right?: ProcessedHandData;
   };
+
+  // Signature match info for debugging
+  signatureScores?: {
+    left?: number;
+    right?: number;
+  };
+
+  // All detected hands (including rejected ones) for wireframe
+  allHands?: {
+    landmarks: HandLandmark[];
+    matched: boolean;
+    score: number;
+    role?: 'left' | 'right';
+  }[];
 
   // Deprecated fields to maintain some compat if needed, or remove them
   raw?: HandFrame;
@@ -78,6 +98,12 @@ export class InputProcessor {
   // Maintain separate mappers to preserve state (deadzones/smoothing) per hand
   private readonly cursorMappers = new Map<string, CursorMapper>();
 
+  // Hand signature lock-in
+  private lockedSignatures: { left?: HandSignature; right?: HandSignature } = {};
+  private signatureLockEnabled = false;
+  private lastHandPositions: { left?: { x: number; y: number }; right?: { x: number; y: number } } = {};
+  private readonly positionContinuityThreshold = 0.25; // Max hand jump before rejection
+
   constructor(
     tracker: HandTracker,
     options?: Partial<{ gesture: Partial<GestureConfig>; virtualPad: Partial<VirtualMousepadConfig> }>,
@@ -109,6 +135,35 @@ export class InputProcessor {
     this.cursorMappers.forEach(mapper => mapper.setCalibration(offset));
   }
 
+  /**
+   * Lock hand signatures for player identification.
+   * Call during calibration to capture the player's unique hand proportions.
+   * After locking, hands that don't match will be filtered out.
+   */
+  setLockedSignatures(signatures: { left?: HandSignature; right?: HandSignature }): void {
+    this.lockedSignatures = { ...signatures };
+    this.signatureLockEnabled = !!(signatures.left || signatures.right);
+    // Reset position tracking when re-locking
+    this.lastHandPositions = {};
+  }
+
+  /** Get current locked signatures (for debugging) */
+  getLockedSignatures(): { left?: HandSignature; right?: HandSignature } {
+    return { ...this.lockedSignatures };
+  }
+
+  /** Check if signature locking is active */
+  isSignatureLockEnabled(): boolean {
+    return this.signatureLockEnabled;
+  }
+
+  /** Disable signature locking (accept all hands) */
+  clearSignatureLock(): void {
+    this.lockedSignatures = {};
+    this.signatureLockEnabled = false;
+    this.lastHandPositions = {};
+  }
+
   dispose(): void {
     this.unsubscribeTracker?.();
     this.listeners.clear();
@@ -132,6 +187,97 @@ export class InputProcessor {
       return ax - bx;
     });
 
+    // Track all hands for wireframe visualization
+    const allHandsInfo: {
+      landmarks: HandLandmark[];
+      matched: boolean;
+      score: number;
+      role?: 'left' | 'right';
+    }[] = [];
+
+    // Score and filter hands by signature if lock is enabled
+    const signatureScores: { left?: number; right?: number } = {};
+    let filteredHands = sortedHands;
+
+    if (this.signatureLockEnabled) {
+      filteredHands = [];
+
+      for (const hand of sortedHands) {
+        const wristX = hand.landmarks[0].x;
+        const role: 'left' | 'right' = wristX < 0.5 ? 'left' : 'right';
+        const lockedSig = this.lockedSignatures[role];
+
+        let matched = false;
+        let score = 0;
+
+        if (lockedSig) {
+          try {
+            const candidateSig = computeHandSignature(hand.landmarks);
+            score = matchSignature(candidateSig, lockedSig);
+            matched = score >= SIGNATURE_MATCH_THRESHOLD;
+          } catch {
+            // Hand doesn't have enough landmarks
+            matched = false;
+          }
+
+          // Position continuity check (prevent hand "teleporting")
+          if (matched && this.lastHandPositions[role]) {
+            const lastPos = this.lastHandPositions[role]!;
+            const currentPos = { x: hand.landmarks[0].x, y: hand.landmarks[0].y };
+            const jumpDistance = Math.hypot(
+              currentPos.x - lastPos.x,
+              currentPos.y - lastPos.y
+            );
+            if (jumpDistance > this.positionContinuityThreshold) {
+              // Hand jumped too far - likely a different person
+              matched = false;
+            }
+          }
+
+          signatureScores[role] = score;
+        } else {
+          // No locked signature for this role - accept any hand
+          matched = true;
+          score = 1;
+        }
+
+        // Store for wireframe
+        const smoothed = hand.landmarks.map((l, i) =>
+          this.smoothLandmark(hand, i, l, role === 'right' ? 'Right' : 'Left')
+        );
+        allHandsInfo.push({
+          landmarks: smoothed,
+          matched,
+          score,
+          role,
+        });
+
+        if (matched) {
+          filteredHands.push(hand);
+          // Update position tracking for continuity
+          this.lastHandPositions[role] = {
+            x: hand.landmarks[0].x,
+            y: hand.landmarks[0].y,
+          };
+        }
+      }
+    } else {
+      // No lock - accept all hands, mark all as matched
+      for (const hand of sortedHands) {
+        const wristX = hand.landmarks[0].x;
+        const role: 'left' | 'right' = wristX < 0.5 ? 'left' : 'right';
+        const smoothed = hand.landmarks.map((l, i) =>
+          this.smoothLandmark(hand, i, l, role === 'right' ? 'Right' : 'Left')
+        );
+        allHandsInfo.push({
+          landmarks: smoothed,
+          matched: true,
+          score: 1,
+          role,
+        });
+      }
+    }
+
     // Define handData strictly before usage
     const handData: { left?: ProcessedHandData; right?: ProcessedHandData } = {};
 
@@ -154,9 +300,9 @@ export class InputProcessor {
     let aimHand: HandFrame | null = null;
     let fireHand: HandFrame | null = null;
 
-    // Assign roles
-    if (sortedHands.length === 1) {
-      const h = sortedHands[0];
+    // Assign roles (using filtered hands - only those that match locked signature)
+    if (filteredHands.length === 1) {
+      const h = filteredHands[0];
       const x = h.landmarks[0].x;
       if (x < 0.4) {
         handData.left = processHand(h, 'left');
@@ -166,11 +312,11 @@ export class InputProcessor {
         aimHand = h;
         fireHand = h; // Allow aim hand to fire if only one hand
       }
-    } else if (sortedHands.length >= 2) {
-      handData.left = processHand(sortedHands[0], 'left');
-      handData.right = processHand(sortedHands[sortedHands.length - 1], 'right');
-      fireHand = sortedHands[0];
-      aimHand = sortedHands[sortedHands.length - 1];
+    } else if (filteredHands.length >= 2) {
+      handData.left = processHand(filteredHands[0], 'left');
+      handData.right = processHand(filteredHands[filteredHands.length - 1], 'right');
+      fireHand = filteredHands[0];
+      aimHand = filteredHands[filteredHands.length - 1];
     }
 
     // Determine Game State Aggregates
@@ -189,9 +335,9 @@ export class InputProcessor {
     let stable = true;
     if (primaryHand) {
       // Re-find key frame for raw cursor
-      const rawFrame = sortedHands.find(h =>
-        (primaryHand.id === 'right' && h === sortedHands[sortedHands.length - 1]) ||
-        (primaryHand.id === 'left' && h === sortedHands[0])
+      const rawFrame = filteredHands.find(h =>
+        (primaryHand.id === 'right' && h === filteredHands[filteredHands.length - 1]) ||
+        (primaryHand.id === 'left' && h === filteredHands[0])
       );
 
       if (rawFrame) {
@@ -209,7 +355,9 @@ export class InputProcessor {
       smoothedLandmarks: [], // Deprecated
       cursor,
       stable,
-      hands: handData
+      hands: handData,
+      signatureScores,
+      allHands: allHandsInfo,
     };
 
     this.listeners.forEach(listener => listener(event));
