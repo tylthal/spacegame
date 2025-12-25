@@ -19,10 +19,33 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
 }) => {
     const resumeButtonRef = useRef<HTMLButtonElement>(null);
     const exitButtonRef = useRef<HTMLButtonElement>(null);
+    const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
     const [cursorPos, setCursorPos] = useState({ x: 0.5, y: 0.5 });
     const [isPinching, setIsPinching] = useState(false);
     const [hoveringResume, setHoveringResume] = useState(false);
     const [hoveringExit, setHoveringExit] = useState(false);
+    const [hoveringFullscreen, setHoveringFullscreen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    // Track fullscreen state
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        // Initial check
+        setIsFullscreen(!!document.fullscreenElement);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    // Toggle fullscreen
+    const toggleFullscreen = () => {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            document.documentElement.requestFullscreen();
+        }
+    };
 
     // Subscribe to input for cursor position and pinch detection
     useEffect(() => {
@@ -44,6 +67,7 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
     // Track hover states
     const prevHoverResumeRef = useRef(false);
     const prevHoverExitRef = useRef(false);
+    const prevHoverFullscreenRef = useRef(false);
 
     // Check cursor position and handle pinch-clicks
     useEffect(() => {
@@ -74,6 +98,18 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
             );
         }
 
+        // Check fullscreen button
+        let isOverFullscreen = false;
+        if (fullscreenButtonRef.current) {
+            const rect = fullscreenButtonRef.current.getBoundingClientRect();
+            isOverFullscreen = (
+                cursorScreenX >= rect.left &&
+                cursorScreenX <= rect.right &&
+                cursorScreenY >= rect.top &&
+                cursorScreenY <= rect.bottom
+            );
+        }
+
         // Only update state when hover changes
         if (isOverResume !== prevHoverResumeRef.current) {
             prevHoverResumeRef.current = isOverResume;
@@ -82,6 +118,10 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
         if (isOverExit !== prevHoverExitRef.current) {
             prevHoverExitRef.current = isOverExit;
             setHoveringExit(isOverExit);
+        }
+        if (isOverFullscreen !== prevHoverFullscreenRef.current) {
+            prevHoverFullscreenRef.current = isOverFullscreen;
+            setHoveringFullscreen(isOverFullscreen);
         }
 
         // Trigger actions on pinch (only once)
@@ -92,6 +132,9 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
             } else if (isOverExit) {
                 triggeredRef.current = true;
                 onExitRef.current();
+            } else if (isOverFullscreen) {
+                triggeredRef.current = true;
+                toggleFullscreen();
             }
         }
 
@@ -108,6 +151,31 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
 
             {/* Content - compact for landscape */}
             <div className="relative bg-black border-2 tall:border-4 border-y2k-yellow p-3 tall:p-4 md:p-8 max-w-md w-full mx-2 tall:mx-4 text-center">
+
+                {/* Fullscreen Toggle Button - top right */}
+                <button
+                    ref={fullscreenButtonRef}
+                    onClick={toggleFullscreen}
+                    className={`absolute top-1 right-1 tall:top-2 tall:right-2 md:top-3 md:right-3 p-1.5 tall:p-2 md:p-2.5
+                     transition-all duration-100 active:scale-90
+                     ${hoveringFullscreen
+                            ? 'bg-y2k-white text-black scale-110 shadow-[0_0_15px_rgba(0,255,255,0.5)]'
+                            : 'bg-transparent text-y2k-cyan border border-y2k-cyan hover:bg-y2k-cyan hover:text-black'
+                        }`}
+                    title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                >
+                    {isFullscreen ? (
+                        /* Contract/Exit fullscreen icon - arrows pointing inward */
+                        <svg className="w-4 h-4 tall:w-5 tall:h-5 md:w-6 md:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
+                        </svg>
+                    ) : (
+                        /* Expand/Enter fullscreen icon - arrows pointing outward */
+                        <svg className="w-4 h-4 tall:w-5 tall:h-5 md:w-6 md:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                        </svg>
+                    )}
+                </button>
 
                 {/* Pause Header - compact */}
                 <div className="relative mb-3 tall:mb-4 md:mb-8">
