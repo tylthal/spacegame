@@ -56,8 +56,12 @@ const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   maxEnemies: 6, // Limit enemies on screen
 };
 
-// Weaver spawn limits
-const MAX_WEAVERS = 2;
+// Enemy Type Limits & Progression
+const MAX_DRONES_EARLY = 6;
+const MAX_DRONES_LATE = 7; // After 120s
+const MAX_WEAVERS_EARLY = 2; // After 30s
+const MAX_WEAVERS_LATE = 3; // After 150s
+
 const WEAVER_SPAWN_COOLDOWN_MS = 3000; // 3 seconds between weaver spawns
 
 export interface CombatTickResult {
@@ -191,21 +195,35 @@ export class CombatLoop {
       this.weaverSpawnCooldown = Math.max(0, this.weaverSpawnCooldown - deltaMs);
     }
 
-    // Spawn Logic - respect max enemies and weaver limits
+    // Spawn Logic - check specific caps for each enemy type
     const spawnEvents = this.scheduler.step(deltaMs);
     const spawned: EnemyInstance[] = [];
-    for (const event of spawnEvents) {
-      if (this.enemies.length >= this.options.maxEnemies) break;
 
-      // Weaver spawn limits: max 2 at a time, staggered spawns
+    // Limits based on elapsed time
+    const maxDrones = this.elapsedMs > 120000 ? MAX_DRONES_LATE : MAX_DRONES_EARLY; // Bump at 2m
+    const maxWeavers = this.elapsedMs > 150000 ? MAX_WEAVERS_LATE : MAX_WEAVERS_EARLY; // Bump at 2m30s
+    // Note: Weavers only start spawning at 30s based on SpawnScheduler, 
+    // but the cap is logically 0 before 30s if we wanted to enforce it here too.
+
+    for (const event of spawnEvents) {
+      // 1. Check Global Limit (Safety Cap)
+      if (this.enemies.length >= 12) break;
+
+      // 2. Check Specific Caps
+      if (event.kind === 'drone') {
+        const currentDrones = this.enemies.filter(e => e.kind === 'drone').length;
+        if (currentDrones >= maxDrones) continue;
+      }
+
       if (event.kind === 'weaver') {
         const currentWeavers = this.enemies.filter(e => e.kind === 'weaver').length;
-        if (currentWeavers >= MAX_WEAVERS || this.weaverSpawnCooldown > 0) {
-          continue; // Skip this weaver spawn
+        if (currentWeavers >= maxWeavers || this.weaverSpawnCooldown > 0) {
+          continue;
         }
         this.weaverSpawnCooldown = WEAVER_SPAWN_COOLDOWN_MS;
       }
 
+      // 3. Spawn
       const enemy = this.createEnemy(event.kind);
       this.enemies.push(enemy);
       spawned.push(enemy);

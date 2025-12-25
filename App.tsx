@@ -108,7 +108,7 @@ const App: React.FC = () => {
       if (result.hull < lastHullRef.current) {
         setDamageFlash(true);
         // Clear flash after short duration
-        setTimeout(() => setDamageFlash(false), 150);
+        setTimeout(() => setDamageFlash(false), 80);
       }
       lastHullRef.current = result.hull;
 
@@ -383,7 +383,7 @@ const App: React.FC = () => {
 
       {/* Damage Flash Overlay */}
       <div
-        className={`pointer-events-none fixed inset-0 z-50 border-[20px] md:border-[30px] border-red-600/60 shadow-[inset_0_0_50px_rgba(220,38,38,0.5)] transition-opacity duration-100 ${damageFlash ? 'opacity-100' : 'opacity-0'
+        className={`pointer-events-none fixed inset-0 z-50 border-[10px] md:border-[15px] border-red-600/60 shadow-[inset_0_0_30px_rgba(220,38,38,0.4)] transition-opacity duration-100 ${damageFlash ? 'opacity-100' : 'opacity-0'
           }`}
       />
 
