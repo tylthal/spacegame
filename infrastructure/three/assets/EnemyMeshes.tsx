@@ -329,7 +329,7 @@ function BomberMesh() {
  * 
  * When adding new enemy types, place nose at +Z and engine at -Z.
  */
-export function EnemyMesh({ kind }: { kind: string }) {
+export const EnemyMesh = React.memo(function EnemyMesh({ kind }: { kind: string }) {
     // Scale factor to make enemies more visible (1.5 = 50% larger)
     const ENEMY_SCALE = 1.5;
 
@@ -341,4 +341,4 @@ export function EnemyMesh({ kind }: { kind: string }) {
             {!['drone', 'scout', 'bomber'].includes(kind) && <DroneMesh />}
         </group>
     );
-}
+});

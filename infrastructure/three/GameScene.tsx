@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Group, Mesh, Vector3, Object3D, InstancedMesh, PerspectiveCamera } from 'three';
 import { CombatLoop } from '../../gameplay/CombatLoop';
@@ -369,8 +369,8 @@ const HITBOX_RADIUS: Record<string, number> = {
     bomber: 2.5,
 };
 
-// Sub-component to handle per-enemy updates efficiently
-function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kind: string, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number } }, showHitbox?: boolean }) {
+// Sub-component to handle per-enemy updates efficiently - memoized
+const EnemyRenderer = React.memo(function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kind: string, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number } }, showHitbox?: boolean }) {
     const group = useRef<Group>(null);
     const velocityVec = useRef(new Vector3());
     const targetPos = useRef(new Vector3());
@@ -432,5 +432,5 @@ function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kin
             )}
         </group>
     );
-}
+});
 

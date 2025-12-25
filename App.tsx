@@ -22,8 +22,8 @@ import { CursorLayer } from './components/CursorLayer';
 
 const USE_REAL_INPUT = import.meta.env.VITE_USE_REAL_INPUT === '1' || import.meta.env.VITE_USE_REAL_INPUT === 'true';
 
-// Live datetime display for webcam overlay
-function LiveDateTime() {
+// Live datetime display for webcam overlay - memoized to prevent re-renders
+const LiveDateTime = React.memo(function LiveDateTime() {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -46,7 +46,7 @@ function LiveDateTime() {
       {formatted}
     </span>
   );
-}
+});
 
 const App: React.FC = () => {
   // Core Systems
