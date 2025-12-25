@@ -174,21 +174,23 @@ export const DifficultyScreen: React.FC<DifficultyScreenProps> = ({
                             key={key}
                             ref={ref}
                             className={`
-                                relative group px-8 py-6 md:px-12 md:py-8
+                                relative group px-8 py-6 md:px-12 md:py-8 overflow-hidden
                                 border-2 transition-all duration-100
                                 ${hovering
-                                    ? isEasy ? 'border-green-400 bg-green-400/20'
-                                        : isHard ? 'border-red-400 bg-red-400/20'
-                                            : 'border-y2k-yellow bg-y2k-yellow/20'
+                                    ? isEasy ? 'border-green-400 bg-green-400/20 scale-105 shadow-[0_0_20px_rgba(74,222,128,0.5)]'
+                                        : isHard ? 'border-red-400 bg-red-400/20 scale-105 shadow-[0_0_20px_rgba(248,113,113,0.5)]'
+                                            : 'border-y2k-yellow bg-y2k-yellow/20 scale-105 shadow-[0_0_20px_rgba(255,238,0,0.5)]'
                                     : 'border-y2k-silver/50 bg-transparent'}
                             `}
                         >
-                            {/* Progress fill */}
-                            <div
-                                className={`absolute inset-0 transition-all duration-75 ${isEasy ? 'bg-green-400/40' : isHard ? 'bg-red-400/40' : 'bg-y2k-yellow/40'
-                                    }`}
-                                style={{ width: `${progress * 100}%` }}
-                            />
+                            {/* Progress fill - only show when actively selecting */}
+                            {progress > 0 && (
+                                <div
+                                    className={`absolute inset-0 transition-none ${isEasy ? 'bg-green-400/50' : isHard ? 'bg-red-400/50' : 'bg-y2k-yellow/50'
+                                        }`}
+                                    style={{ width: `${progress * 100}%` }}
+                                />
+                            )}
 
                             {/* Content */}
                             <div className="relative z-10 flex flex-col items-center">
