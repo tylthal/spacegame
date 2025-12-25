@@ -25,11 +25,11 @@ describe('App shell', () => {
     expect(screen.getAllByText(/DEFENSE/i).length).toBeGreaterThan(0);
   });
 
-  it('has an initialize button', () => {
+  it('has a start button', () => {
     render(<App />);
 
-    // Check that the INITIALIZE_SYSTEM button exists (may be multiple due to React strict mode)
-    const buttons = screen.getAllByRole('button', { name: /INITIALIZE_SYSTEM/i });
+    // Check that the START button exists (may be multiple due to React strict mode)
+    const buttons = screen.getAllByRole('button', { name: /START/i });
     expect(buttons.length).toBeGreaterThan(0);
   });
 });
