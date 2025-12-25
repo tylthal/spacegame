@@ -12,7 +12,9 @@ export type SoundType =
     | 'explosion'
     | 'missileLaunch'
     | 'missileDetonate'
-    | 'playerHit';
+    | 'playerHit'
+    | 'calibrationTick'
+    | 'calibrationSuccess';
 
 class SoundEngineClass {
     private audioContext: AudioContext | null = null;
@@ -68,6 +70,12 @@ class SoundEngineClass {
                 break;
             case 'playerHit':
                 this.playPlayerHit(ctx, now);
+                break;
+            case 'calibrationTick':
+                this.playCalibrationTick(ctx, now);
+                break;
+            case 'calibrationSuccess':
+                this.playCalibrationSuccess(ctx, now);
                 break;
         }
     }
@@ -304,6 +312,51 @@ class SoundEngineClass {
 
         osc.start(now);
         osc.stop(now + 0.15);
+    }
+
+    /** Short ascending blip for calibration progress */
+    private playCalibrationTick(ctx: AudioContext, now: number): void {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.linearRampToValueAtTime(900, now + 0.08);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain!);
+
+        osc.start(now);
+        osc.stop(now + 0.1);
+    }
+
+    /** Triumphant success arpeggio for calibration complete */
+    private playCalibrationSuccess(ctx: AudioContext, now: number): void {
+        // Play a quick ascending arpeggio C-E-G-C
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        const spacing = 0.08;
+
+        notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = 'square';
+            osc.frequency.value = freq;
+
+            const startTime = now + i * spacing;
+            gain.gain.setValueAtTime(0, startTime);
+            gain.gain.linearRampToValueAtTime(0.2, startTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2);
+
+            osc.connect(gain);
+            gain.connect(this.masterGain!);
+
+            osc.start(startTime);
+            osc.stop(startTime + 0.25);
+        });
     }
 
     /** Set master volume (0-1) */

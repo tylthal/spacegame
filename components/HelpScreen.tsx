@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import { SoundEngine } from '../audio';
 import { GAME_CONFIG } from '../config/gameConfig';
+import { EnemyMesh } from '../infrastructure/three/assets/EnemyMeshes';
+import type { EnemyKind } from '../rendering/EnemyFactory';
 
 interface HelpScreenProps {
     onBack: () => void;
@@ -227,34 +231,53 @@ function ControlCard({ title, gesture, gestureColor, description }: {
     );
 }
 
+/** Spinning 3D Enemy Preview */
+function SpinningEnemy({ kind }: { kind: EnemyKind }) {
+    const groupRef = useRef<THREE.Group>(null);
+
+    useFrame((_, delta) => {
+        if (groupRef.current) {
+            groupRef.current.rotation.y += delta * 1.5; // Spin speed
+        }
+    });
+
+    return (
+        <group ref={groupRef} scale={0.8}>
+            <EnemyMesh kind={kind} />
+        </group>
+    );
+}
+
 /** Enemies Tab */
 function EnemiesTab() {
-    const enemies = [
-        {
-            name: 'DRONE',
-            points: GAME_CONFIG.scoring.drone,
-            color: '#00FF88',
-            description: 'Standard attack drone. Fast and numerous, but fragile. The backbone of the NEXUS swarm.',
-            threat: 'LOW',
-            threatColor: 'text-green-400',
-        },
-        {
-            name: 'SCOUT',
-            points: GAME_CONFIG.scoring.scout,
-            color: '#00FFFF',
-            description: 'Reconnaissance unit with enhanced sensors. More durable than standard drones.',
-            threat: 'MEDIUM',
-            threatColor: 'text-y2k-cyan',
-        },
-        {
-            name: 'BOMBER',
-            points: GAME_CONFIG.scoring.bomber,
-            color: '#FF4444',
-            description: 'Heavy assault craft. Slow but extremely dangerous. Deals massive hull damage on impact.',
-            threat: 'HIGH',
-            threatColor: 'text-y2k-red',
-        },
-    ];
+    // Only active enemies in the current spawn curve
+    const enemies: {
+        kind: EnemyKind;
+        name: string;
+        points: number;
+        description: string;
+        threat: string;
+        threatColor: string;
+        unlockInfo?: string;
+    }[] = [
+            {
+                kind: 'drone',
+                name: 'DRONE',
+                points: GAME_CONFIG.scoring.drone,
+                description: 'Standard attack drone. Fast and numerous, but fragile. The backbone of the NEXUS swarm. Flies straight toward the station.',
+                threat: 'LOW',
+                threatColor: 'text-green-400',
+            },
+            {
+                kind: 'weaver',
+                name: 'WEAVER',
+                points: GAME_CONFIG.scoring.drone, // Same as drone for now
+                description: 'Evasive disc craft with spinning blades. Weaves left and right in a sine-wave pattern, making it harder to hit.',
+                threat: 'MEDIUM',
+                threatColor: 'text-y2k-cyan',
+                unlockInfo: 'Appears after 30 seconds',
+            },
+        ];
 
     return (
         <div className="space-y-4 tall:space-y-6 md:space-y-8">
@@ -263,51 +286,56 @@ function EnemiesTab() {
                     HOSTILE UNITS
                 </h2>
                 <p className="text-xs tall:text-sm md:text-base font-body text-y2k-silver mb-3 tall:mb-4 md:mb-6">
-                    NEXUS-7 deploys various drone types. Learn their patterns to survive longer.
+                    NEXUS-7 deploys hostile drone types. Learn their patterns to survive longer.
                 </p>
             </section>
 
-            <div className="space-y-3 tall:space-y-4 md:space-y-6">
+            <div className="space-y-4 tall:space-y-6">
                 {enemies.map(enemy => (
                     <div
-                        key={enemy.name}
+                        key={enemy.kind}
                         className="bg-y2k-silver/5 border border-y2k-silver/30 p-3 tall:p-4 md:p-6"
                     >
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2 tall:mb-3">
-                            <div className="flex items-center gap-2 tall:gap-3">
-                                <div
-                                    className="w-3 h-3 tall:w-4 tall:h-4 md:w-5 md:h-5 rounded-full"
-                                    style={{ backgroundColor: enemy.color, boxShadow: `0 0 10px ${enemy.color}` }}
-                                />
-                                <h3 className="text-base tall:text-lg md:text-xl font-display font-bold text-y2k-white">
-                                    {enemy.name}
-                                </h3>
+                        <div className="flex items-start gap-3 tall:gap-4 md:gap-6">
+                            {/* 3D Model Preview */}
+                            <div className="flex-shrink-0 w-16 h-16 tall:w-20 tall:h-20 md:w-28 md:h-28 bg-black/50 border border-y2k-silver/30 rounded">
+                                <Canvas
+                                    camera={{ position: [0, 0, 4], fov: 50 }}
+                                    style={{ background: 'transparent' }}
+                                >
+                                    <ambientLight intensity={0.5} />
+                                    <directionalLight position={[5, 5, 5]} intensity={1} />
+                                    <SpinningEnemy kind={enemy.kind} />
+                                </Canvas>
                             </div>
-                            <div className="flex items-center gap-3 tall:gap-4 md:gap-6">
-                                <span className={`text-[10px] tall:text-xs md:text-sm font-mono ${enemy.threatColor}`}>
-                                    THREAT: {enemy.threat}
-                                </span>
-                                <span className="text-sm tall:text-base md:text-lg font-display font-bold text-y2k-yellow">
-                                    +{enemy.points} PTS
-                                </span>
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 tall:gap-3 mb-1 tall:mb-2">
+                                    <h3 className="text-base tall:text-lg md:text-xl font-display font-bold text-y2k-white">
+                                        {enemy.name}
+                                    </h3>
+                                    <span className={`text-[10px] tall:text-xs md:text-sm font-mono ${enemy.threatColor}`}>
+                                        THREAT: {enemy.threat}
+                                    </span>
+                                    <span className="text-sm tall:text-base md:text-lg font-display font-bold text-y2k-yellow">
+                                        +{enemy.points} PTS
+                                    </span>
+                                </div>
+                                <p className="text-[10px] tall:text-xs md:text-sm font-body text-y2k-silver mb-1">
+                                    {enemy.description}
+                                </p>
+                                {enemy.unlockInfo && (
+                                    <p className="text-[9px] tall:text-[10px] md:text-xs font-mono text-y2k-yellow/70">
+                                        ⚡ {enemy.unlockInfo}
+                                    </p>
+                                )}
                             </div>
                         </div>
-                        <p className="text-[10px] tall:text-xs md:text-sm font-body text-y2k-silver">
-                            {enemy.description}
-                        </p>
                     </div>
                 ))}
             </div>
-
-            <section className="bg-y2k-yellow/10 border border-y2k-yellow/50 p-3 tall:p-4 md:p-6">
-                <h3 className="text-sm tall:text-base md:text-lg font-display font-bold text-y2k-yellow mb-2">
-                    SCORING MULTIPLIER
-                </h3>
-                <p className="text-[10px] tall:text-xs md:text-sm font-body text-y2k-silver">
-                    Chain kills quickly to build your multiplier! The longer you survive, the more enemies
-                    spawn — and the higher your potential score.
-                </p>
-            </section>
         </div>
     );
 }
+

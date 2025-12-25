@@ -4,6 +4,7 @@ import { InputProcessor, ProcessedHandEvent } from '../input/InputProcessor';
 import { INPUT_CONFIG } from '../input/inputConfig';
 import { CursorMapper } from '../input/CursorMapper';
 import { HandCursor } from './HandCursor';
+import { SoundEngine } from '../audio';
 import {
     HandSignature,
     computeHandSignature,
@@ -52,6 +53,7 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
     const [isPinching, setIsPinching] = useState(false);
     const lastPinchTimeRef = useRef<number>(0);
     const buttonRef = useRef<HTMLButtonElement>(null);
+    const lastTickTimeRef = useRef<number>(0); // For calibration progress sounds
 
     // Config from centralized source
     const {
@@ -267,7 +269,16 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                     const p = Math.min(elapsed / STABILITY_REQUIRED_MS, 1);
                     setProgress(p);
 
+                    // Play tick sound every 500ms during calibration
+                    if (now - lastTickTimeRef.current >= 500) {
+                        SoundEngine.play('calibrationTick');
+                        lastTickTimeRef.current = now;
+                    }
+
                     if (elapsed >= STABILITY_REQUIRED_MS) {
+                        // Play success sound!
+                        SoundEngine.play('calibrationSuccess');
+
                         const sumX = positionBufferRef.current.reduce((a, b) => a + b.x, 0);
                         const sumY = positionBufferRef.current.reduce((a, b) => a + b.y, 0);
                         const len = positionBufferRef.current.length;
@@ -353,9 +364,24 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
                         <h2 className="text-2xl tall:text-3xl md:text-5xl font-display font-bold text-y2k-yellow tracking-tighter uppercase">
                             {isSuccess ? 'LOCKED IN' : 'CALIBRATION'}
                         </h2>
-                        <p className="text-y2k-silver font-mono text-[8px] tall:text-xs md:text-sm mt-0.5 tall:mt-1 md:mt-2">
-                            {isSuccess ? 'Aim at START GAME and pinch' : 'Hold both gestures steady for 4s'}
-                        </p>
+                        {!isSuccess ? (
+                            <div className="mt-1 tall:mt-2 md:mt-3 space-y-0.5 tall:space-y-1">
+                                <p className="text-y2k-white font-body text-[10px] tall:text-sm md:text-base">
+                                    Hold both hands in front of the camera:
+                                </p>
+                                <p className="text-y2k-silver font-mono text-[9px] tall:text-xs md:text-sm">
+                                    <span className="text-y2k-cyan">LEFT:</span> Pinch thumb + index together &nbsp;|&nbsp;
+                                    <span className="text-y2k-yellow">RIGHT:</span> Point with fingers open
+                                </p>
+                                <p className="text-y2k-silver/70 font-mono text-[8px] tall:text-[10px] md:text-xs">
+                                    Keep both hands steady for 4 seconds to lock in
+                                </p>
+                            </div>
+                        ) : (
+                            <p className="text-y2k-silver font-mono text-[8px] tall:text-xs md:text-sm mt-0.5 tall:mt-1 md:mt-2">
+                                Aim at START GAME and pinch to continue
+                            </p>
+                        )}
                     </div>
 
                     {!isSuccess ? (
