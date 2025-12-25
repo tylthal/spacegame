@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { SoundEngine } from '../audio';
+import React, { useState, useEffect, useRef } from 'react';
+import { SoundEngine, MusicEngine } from '../audio';
 
 interface TitleScreenProps {
     onStart: () => void;
@@ -7,6 +7,25 @@ interface TitleScreenProps {
 
 export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
     const [isHovering, setIsHovering] = useState(false);
+    const musicStartedRef = useRef(false);
+
+    // Start title music on first user interaction (click/touch anywhere)
+    useEffect(() => {
+        const startMusic = () => {
+            if (!musicStartedRef.current) {
+                musicStartedRef.current = true;
+                MusicEngine.play('title');
+            }
+        };
+
+        // Listen for first click/touch/keypress to unlock audio and start music
+        const events = ['click', 'touchstart', 'keydown'];
+        events.forEach(event => window.addEventListener(event, startMusic, { once: true }));
+
+        return () => {
+            events.forEach(event => window.removeEventListener(event, startMusic));
+        };
+    }, []);
 
     const handleMouseEnter = () => {
         if (!isHovering) {

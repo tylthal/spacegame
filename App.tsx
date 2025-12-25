@@ -18,7 +18,7 @@ import { usePhaseSync, usePauseGesture } from './hooks';
 import { GameHUD } from './components/GameHUD';
 import { GameOverScreen } from './components/GameOverScreen';
 import { PauseScreen } from './components/PauseScreen';
-import { SoundEngine } from './audio';
+import { SoundEngine, MusicEngine } from './audio';
 import { HandCursor } from './components/HandCursor';
 import { CursorLayer } from './components/CursorLayer';
 import { HandWireframe } from './components/HandWireframe';
@@ -94,6 +94,21 @@ const App: React.FC = () => {
 
   // Sync Phase Manager -> React State (extracted to hook)
   usePhaseSync(phaseManager, combatLoop, setPhase);
+
+  // Music based on game phase
+  useEffect(() => {
+    if (phase === 'TITLE') {
+      MusicEngine.play('title');
+    } else if (phase === 'PLAYING' && !isPaused && !isGameOver) {
+      MusicEngine.play('battle');
+    } else if (isPaused || isGameOver) {
+      // Fade out during pause/game over for dramatic effect
+      MusicEngine.fadeOut(500);
+    } else {
+      // Calibrating or other states - no music
+      MusicEngine.stop();
+    }
+  }, [phase, isPaused, isGameOver]);
 
   // Tick the loop only when PLAYING and not game over and not paused
   useEffect(() => {

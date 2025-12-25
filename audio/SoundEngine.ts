@@ -147,7 +147,7 @@ class SoundEngineClass {
         noise.buffer = buffer;
 
         const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.5, now);
+        noiseGain.gain.setValueAtTime(0.75, now);
         noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
 
         // Low rumble
@@ -157,7 +157,7 @@ class SoundEngineClass {
         osc.frequency.exponentialRampToValueAtTime(50, now + 0.2);
 
         const oscGain = ctx.createGain();
-        oscGain.gain.setValueAtTime(0.45, now);
+        oscGain.gain.setValueAtTime(0.65, now);
         oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
 
         noise.connect(noiseGain);
@@ -181,8 +181,8 @@ class SoundEngineClass {
         bassOsc.frequency.exponentialRampToValueAtTime(35, now + 0.5);
 
         const bassGain = ctx.createGain();
-        bassGain.gain.setValueAtTime(0.35, now);
-        bassGain.gain.linearRampToValueAtTime(0.4, now + 0.15);
+        bassGain.gain.setValueAtTime(0.55, now);
+        bassGain.gain.linearRampToValueAtTime(0.6, now + 0.15);
         bassGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
 
         // Low-pass filter to make it rumbly
@@ -214,8 +214,8 @@ class SoundEngineClass {
         noiseFilter.Q.value = 1;
 
         const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.15, now);
-        noiseGain.gain.linearRampToValueAtTime(0.2, now + 0.1);
+        noiseGain.gain.setValueAtTime(0.3, now);
+        noiseGain.gain.linearRampToValueAtTime(0.35, now + 0.1);
         noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
 
         noise.connect(noiseFilter);
@@ -229,7 +229,7 @@ class SoundEngineClass {
         subOsc.frequency.exponentialRampToValueAtTime(25, now + 0.15);
 
         const subGain = ctx.createGain();
-        subGain.gain.setValueAtTime(0.4, now);
+        subGain.gain.setValueAtTime(0.6, now);
         subGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
 
         subOsc.connect(subGain);
@@ -262,7 +262,7 @@ class SoundEngineClass {
         noiseFilter.frequency.exponentialRampToValueAtTime(100, now + 0.4);
 
         const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.55, now);
+        noiseGain.gain.setValueAtTime(0.75, now);
         noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
 
         // Deep bass rumble
@@ -272,7 +272,7 @@ class SoundEngineClass {
         osc.frequency.exponentialRampToValueAtTime(30, now + 0.4);
 
         const oscGain = ctx.createGain();
-        oscGain.gain.setValueAtTime(0.5, now);
+        oscGain.gain.setValueAtTime(0.7, now);
         oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
 
         noise.connect(noiseFilter);
