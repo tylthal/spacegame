@@ -80,9 +80,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         : `linear-gradient(to right, #00FFFF 0%, #FFFF00 ${Math.min(heatPercent * 1.2, 100)}%, #FF0044 100%)`;
 
     return (
-        <div className="fixed inset-0 pointer-events-none z-40">
+        <div className="fixed inset-0 pointer-events-none z-40 hud-container">
             {/* Top Bar - responsive padding and flex-wrap for mobile */}
-            <div className="absolute top-0 left-0 right-0 flex flex-wrap justify-between items-start p-2 sm:p-4 gap-2">
+            <div className="hud-top-bar absolute top-0 left-0 right-0 flex flex-wrap justify-between items-start p-1 sm:p-4 gap-1 sm:gap-2">
 
                 {/* Left: Hull Integrity - responsive sizing */}
                 <div className="bg-black/80 border-2 border-y2k-yellow p-2 sm:p-3 min-w-[120px] sm:min-w-[200px]">
@@ -154,7 +154,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             </div>
 
             {/* Bottom Center: Heat Gauge - responsive width */}
-            <div className="absolute bottom-12 sm:bottom-4 left-1/2 -translate-x-1/2 w-48 sm:w-80">
+            <div className="hud-bottom absolute bottom-12 sm:bottom-4 left-1/2 -translate-x-1/2 w-36 sm:w-80">
                 <div className={`bg-black/80 border-2 p-2 sm:p-3 transition-colors ${isOverheated ? 'border-y2k-red' : 'border-y2k-yellow/50'
                     }`}>
                     <div className="flex justify-between items-center mb-1">
@@ -184,7 +184,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             </div>
 
             {/* Bottom Left: Missile Status - responsive width and position */}
-            <div className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 w-32 sm:w-48">
+            <div className="hud-bottom-left absolute bottom-2 sm:bottom-4 left-1 sm:left-4 w-24 sm:w-48">
                 <div className={`bg-black/80 border-2 p-2 sm:p-3 transition-colors ${missileReady ? 'border-y2k-yellow' : 'border-y2k-yellow/50'
                     }`}>
                     <div className="flex justify-between items-center mb-1">
