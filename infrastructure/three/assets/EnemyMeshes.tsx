@@ -24,18 +24,18 @@ import React from 'react';
 
 // Shared metallic material presets with emissive glow for space visibility
 const METAL_CHROME = {
-    color: '#C0C0C0',
-    emissive: '#404050',
+    color: '#E0E0E0', // Lighter chrome
+    emissive: '#505060',
     emissiveIntensity: 0.8,
     metalness: 0.9,
-    roughness: 0.2,
+    roughness: 0.1, // Smoother for more reflection
 };
 
 const METAL_GUNMETAL = {
-    color: '#4A4A5A',
-    emissive: '#303040',
+    color: '#808090', // Lighter, more visible gunmetal
+    emissive: '#404050',
     emissiveIntensity: 0.6,
-    metalness: 0.9,
+    metalness: 0.8,
     roughness: 0.3,
 };
 
@@ -97,9 +97,9 @@ function DroneMesh() {
             <mesh position={[-0.75, 0, -0.35]} scale={[0.1, 0.06, 0.15]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
-                    color="#FF0044"
+                    color="#FF0066" // Brighter pink/red
                     emissive="#FF0044"
-                    emissiveIntensity={2.0}
+                    emissiveIntensity={4.0} // Double intensity
                 />
             </mesh>
 
@@ -107,9 +107,9 @@ function DroneMesh() {
             <mesh position={[0.75, 0, -0.35]} scale={[0.1, 0.06, 0.15]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
-                    color="#FF0044"
+                    color="#FF0066" // Brighter pink/red
                     emissive="#FF0044"
-                    emissiveIntensity={2.0}
+                    emissiveIntensity={4.0} // Double intensity
                 />
             </mesh>
 
@@ -339,9 +339,9 @@ function WeaverMesh() {
             <mesh position={[0, 0.1, 0]} scale={[0.5, 0.25, 0.5]}>
                 <sphereGeometry args={[0.5, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
                 <meshStandardMaterial
-                    color="#222233"
-                    emissive="#FF4400"
-                    emissiveIntensity={0.8}
+                    color="#FFDD00" // Bright yellow dome
+                    emissive="#FF8800"
+                    emissiveIntensity={2.0}
                     metalness={0.3}
                     roughness={0.1}
                 />
@@ -351,9 +351,9 @@ function WeaverMesh() {
             <mesh position={[0.5, 0, 0.5]} rotation={[0, Math.PI / 4, 0]} scale={[0.8, 0.04, 0.15]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
-                    color="#FF2200"
-                    emissive="#FF0000"
-                    emissiveIntensity={1.5}
+                    color="#FF4400" // Vibrant Red/Orange
+                    emissive="#FF2200"
+                    emissiveIntensity={3.0} // Super bright blades
                     metalness={0.9}
                     roughness={0.1}
                 />
@@ -363,9 +363,9 @@ function WeaverMesh() {
             <mesh position={[0.5, 0, -0.5]} rotation={[0, -Math.PI / 4, 0]} scale={[0.8, 0.04, 0.15]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
-                    color="#FF2200"
-                    emissive="#FF0000"
-                    emissiveIntensity={1.5}
+                    color="#FF4400" // Vibrant Red/Orange
+                    emissive="#FF2200"
+                    emissiveIntensity={3.0} // Super bright blades
                     metalness={0.9}
                     roughness={0.1}
                 />
@@ -375,9 +375,9 @@ function WeaverMesh() {
             <mesh position={[-0.5, 0, 0.5]} rotation={[0, -Math.PI / 4, 0]} scale={[0.8, 0.04, 0.15]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
-                    color="#FF2200"
-                    emissive="#FF0000"
-                    emissiveIntensity={1.5}
+                    color="#FF4400" // Vibrant Red/Orange
+                    emissive="#FF2200"
+                    emissiveIntensity={3.0} // Super bright blades
                     metalness={0.9}
                     roughness={0.1}
                 />
@@ -387,9 +387,9 @@ function WeaverMesh() {
             <mesh position={[-0.5, 0, -0.5]} rotation={[0, Math.PI / 4, 0]} scale={[0.8, 0.04, 0.15]}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial
-                    color="#FF2200"
-                    emissive="#FF0000"
-                    emissiveIntensity={1.5}
+                    color="#FF4400" // Vibrant Red/Orange
+                    emissive="#FF2200"
+                    emissiveIntensity={3.0} // Super bright blades
                     metalness={0.9}
                     roughness={0.1}
                 />
@@ -399,9 +399,9 @@ function WeaverMesh() {
             <mesh position={[0, -0.1, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[0.3, 0.1, 0.3]}>
                 <cylinderGeometry args={[1, 0.8, 1, 8]} />
                 <meshStandardMaterial
-                    color="#FF6600"
-                    emissive="#FF4400"
-                    emissiveIntensity={2.5}
+                    color="#FF8822" // Brighter orange
+                    emissive="#FF5500"
+                    emissiveIntensity={4.5} // Boost engine
                     metalness={0.5}
                     roughness={0.2}
                 />
