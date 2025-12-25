@@ -31,6 +31,7 @@ export default {
           red: '#FF003C', // System Error
           white: '#F0F0F0', // Static
           silver: '#C0C0C0', // Old hardware
+          cyan: '#00FFFF', // Cyber Blue
         }
       },
       animation: {

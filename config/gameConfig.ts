@@ -79,6 +79,7 @@ export const GAME_CONFIG = {
         drone: 100,
         scout: 200,
         bomber: 500,
+        weaver: 300,
     },
 
     // Difficulty settings

@@ -270,7 +270,12 @@ const App: React.FC = () => {
     const interval = setInterval(() => {
       const summary = combatLoop.summary();
       const totalKills = summary.kills.drone + summary.kills.scout + summary.kills.bomber + summary.kills.weaver;
-      const score = summary.kills.drone * 100 + summary.kills.scout * 200 + summary.kills.bomber * 500 + summary.kills.weaver * 300;
+      const score = (
+        summary.kills.drone * GAME_CONFIG.scoring.drone +
+        summary.kills.scout * GAME_CONFIG.scoring.scout +
+        summary.kills.bomber * GAME_CONFIG.scoring.bomber +
+        summary.kills.weaver * GAME_CONFIG.scoring.weaver
+      );
 
       // Check for game over - freeze the timer (only once)
       if (summary.hull <= 0 && frozenTimeRef.current === null) {

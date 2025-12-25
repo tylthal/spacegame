@@ -271,7 +271,7 @@ function EnemiesTab() {
             {
                 kind: 'weaver',
                 name: 'WEAVER',
-                points: GAME_CONFIG.scoring.drone, // Same as drone for now
+                points: GAME_CONFIG.scoring.weaver,
                 description: 'Evasive disc craft with spinning blades. Weaves left and right in a sine-wave pattern, making it harder to hit.',
                 threat: 'MEDIUM',
                 threatColor: 'text-y2k-cyan',

@@ -114,7 +114,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onHelp }) => 
                             onClick={handleHelpClick}
                             onMouseEnter={handleHelpEnter}
                             onMouseLeave={handleHelpLeave}
-                            className="group relative px-4 tall:px-6 md:px-10 py-2 tall:py-3 md:py-5 bg-transparent border-2 border-y2k-cyan hover:bg-y2k-cyan text-y2k-cyan hover:text-black transition-all duration-0 font-display font-bold text-sm tall:text-base md:text-2xl tracking-widest uppercase"
+                            className="group relative px-4 tall:px-6 md:px-10 py-2 tall:py-3 md:py-5 bg-transparent border-2 border-[#00FFFF] hover:bg-[#00FFFF] text-[#00FFFF] hover:text-black transition-all duration-0 font-display font-bold text-sm tall:text-base md:text-2xl tracking-widest uppercase"
                         >
                             <span className="relative z-10 group-hover:animate-twitch">HELP</span>
 
