@@ -108,7 +108,7 @@ const App: React.FC = () => {
       if (result.hull < lastHullRef.current) {
         setDamageFlash(true);
         // Clear flash after short duration
-        setTimeout(() => setDamageFlash(false), 80);
+        setTimeout(() => setDamageFlash(false), 50);
       }
       lastHullRef.current = result.hull;
 
@@ -218,8 +218,8 @@ const App: React.FC = () => {
 
     const interval = setInterval(() => {
       const summary = combatLoop.summary();
-      const totalKills = summary.kills.drone + summary.kills.scout + summary.kills.bomber;
-      const score = summary.kills.drone * 100 + summary.kills.scout * 200 + summary.kills.bomber * 500;
+      const totalKills = summary.kills.drone + summary.kills.scout + summary.kills.bomber + summary.kills.weaver;
+      const score = summary.kills.drone * 100 + summary.kills.scout * 200 + summary.kills.bomber * 500 + summary.kills.weaver * 300;
 
       // Check for game over - freeze the timer (only once)
       if (summary.hull <= 0 && frozenTimeRef.current === null) {
@@ -383,7 +383,7 @@ const App: React.FC = () => {
 
       {/* Damage Flash Overlay */}
       <div
-        className={`pointer-events-none fixed inset-0 z-50 border-[10px] md:border-[15px] border-red-600/60 shadow-[inset_0_0_30px_rgba(220,38,38,0.4)] transition-opacity duration-100 ${damageFlash ? 'opacity-100' : 'opacity-0'
+        className={`pointer-events-none fixed inset-0 z-50 border-[4px] md:border-[8px] border-red-600/60 shadow-[inset_0_0_15px_rgba(220,38,38,0.4)] transition-opacity duration-75 ${damageFlash ? 'opacity-100' : 'opacity-0'
           }`}
       />
 
