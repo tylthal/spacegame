@@ -330,10 +330,15 @@ function BomberMesh() {
  * When adding new enemy types, place nose at +Z and engine at -Z.
  */
 export function EnemyMesh({ kind }: { kind: string }) {
-    switch (kind) {
-        case 'drone': return <DroneMesh />;
-        case 'scout': return <ScoutMesh />;
-        case 'bomber': return <BomberMesh />;
-        default: return <DroneMesh />;
-    }
+    // Scale factor to make enemies more visible (1.5 = 50% larger)
+    const ENEMY_SCALE = 1.5;
+
+    return (
+        <group scale={ENEMY_SCALE}>
+            {kind === 'drone' && <DroneMesh />}
+            {kind === 'scout' && <ScoutMesh />}
+            {kind === 'bomber' && <BomberMesh />}
+            {!['drone', 'scout', 'bomber'].includes(kind) && <DroneMesh />}
+        </group>
+    );
 }
