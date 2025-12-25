@@ -11,6 +11,7 @@ import { SeededRng } from './gameplay/Rng';
 import { TitleScreen } from './components/TitleScreen';
 import { CalibrationScreen } from './components/CalibrationScreen';
 import { DifficultyScreen } from './components/DifficultyScreen';
+import { HelpScreen } from './components/HelpScreen';
 import { WebcamPreview } from './components/WebcamPreview';
 import { CRTOverlay } from './components/CRTOverlay';
 import { InputProcessor } from './input/InputProcessor';
@@ -62,6 +63,9 @@ const App: React.FC = () => {
   const [tracker, setTracker] = useState<HandTracker | null>(null);
   const [inputProcessor, setInputProcessor] = useState<InputProcessor | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+
+  // Help screen state (overlay on title)
+  const [showHelp, setShowHelp] = useState(false);
 
   // Cursor state moved to CursorLayer
 
@@ -308,7 +312,15 @@ const App: React.FC = () => {
 
       {/* PHASE RENDERING SWITCH */}
       {phase === 'TITLE' && (
-        <TitleScreen onStart={() => phaseManager.startSession()} />
+        <>
+          <TitleScreen
+            onStart={() => phaseManager.startSession()}
+            onHelp={() => setShowHelp(true)}
+          />
+          {showHelp && (
+            <HelpScreen onBack={() => setShowHelp(false)} />
+          )}
+        </>
       )}
 
       {/* Override Phase Rendering */}

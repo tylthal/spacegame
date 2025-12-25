@@ -3,10 +3,12 @@ import { SoundEngine, MusicEngine } from '../audio';
 
 interface TitleScreenProps {
     onStart: () => void;
+    onHelp?: () => void;
 }
 
-export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
+export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onHelp }) => {
     const [isHovering, setIsHovering] = useState(false);
+    const [isHoveringHelp, setIsHoveringHelp] = useState(false);
     const musicStartedRef = useRef(false);
 
     // Start title music on first user interaction (click/touch anywhere)
@@ -43,6 +45,22 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
         onStart();
     };
 
+    const handleHelpEnter = () => {
+        if (!isHoveringHelp) {
+            SoundEngine.play('menuHover');
+            setIsHoveringHelp(true);
+        }
+    };
+
+    const handleHelpLeave = () => {
+        setIsHoveringHelp(false);
+    };
+
+    const handleHelpClick = () => {
+        SoundEngine.play('buttonPress');
+        onHelp?.();
+    };
+
     return (
         <div className="fixed inset-0 flex flex-col items-center justify-center z-50 pointer-events-none">
 
@@ -77,8 +95,8 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
                     </p>
                 </div>
 
-                {/* BUTTON - Compact for landscape */}
-                <div className="pt-3 tall:pt-4 md:pt-12">
+                {/* BUTTONS - Compact for landscape */}
+                <div className="pt-3 tall:pt-4 md:pt-12 flex gap-3 tall:gap-4 md:gap-6">
                     <button
                         onClick={handleClick}
                         onMouseEnter={handleMouseEnter}
@@ -90,6 +108,20 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
                         {/* Hard Shadow/Offset */}
                         <div className="absolute top-0.5 left-0.5 tall:top-1 tall:left-1 md:top-2 md:left-2 w-full h-full border-2 border-y2k-red -z-10 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform" />
                     </button>
+
+                    {onHelp && (
+                        <button
+                            onClick={handleHelpClick}
+                            onMouseEnter={handleHelpEnter}
+                            onMouseLeave={handleHelpLeave}
+                            className="group relative px-4 tall:px-6 md:px-10 py-2 tall:py-3 md:py-5 bg-transparent border-2 border-y2k-cyan hover:bg-y2k-cyan text-y2k-cyan hover:text-y2k-black transition-all duration-0 font-display font-bold text-sm tall:text-base md:text-2xl tracking-widest uppercase"
+                        >
+                            <span className="relative z-10 group-hover:animate-twitch">HELP</span>
+
+                            {/* Hard Shadow/Offset */}
+                            <div className="absolute top-0.5 left-0.5 tall:top-1 tall:left-1 md:top-2 md:left-2 w-full h-full border-2 border-y2k-silver -z-10 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform" />
+                        </button>
+                    )}
                 </div>
 
             </div>
