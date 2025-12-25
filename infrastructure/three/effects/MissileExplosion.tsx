@@ -27,7 +27,7 @@ interface MissileExplosionProps {
     onComplete: (id: number) => void;
 }
 
-const PARTICLES_PER_COLOR = 40; // ~120 total for performance
+const PARTICLES_PER_COLOR = 80; // ~240 total for bigger explosions
 const EXPLOSION_DURATION = 600;
 
 // Multiple explosion colors

@@ -3,6 +3,7 @@ import { segmentHitsSphere, type Vector3 } from './Collision';
 import { SpawnScheduler } from './SpawnScheduler';
 import type { RandomSource } from './Rng';
 import { SoundEngine } from '../audio';
+import { GAME_CONFIG } from '../config/gameConfig';
 
 export interface EnemyInstance {
   id: number;
@@ -27,6 +28,7 @@ export interface Missile {
   position: Vector3;
   velocity: Vector3;
   active: boolean;
+  detonationTriggeredAt?: number; // Timestamp when something entered trigger radius
 }
 
 /**
@@ -626,9 +628,12 @@ export class CombatLoop {
 
   /**
    * Advance missiles and check for proximity detonation with area damage
+   * Uses delayed detonation: trigger proximity starts countdown, explosion after delay
    */
   private advanceMissiles(deltaMs: number): EnemyInstance[] {
     const destroyed: EnemyInstance[] = [];
+    const now = Date.now();
+    const detonationDelay = GAME_CONFIG.missile.detonationDelayMs;
 
     for (let i = this.missiles.length - 1; i >= 0; i--) {
       const missile = this.missiles[i];
@@ -639,8 +644,38 @@ export class CombatLoop {
       missile.position.y += missile.velocity.y * deltaMs;
       missile.position.z += missile.velocity.z * deltaMs;
 
-      // Check proximity to any enemy
-      let detonated = false;
+      // Check if detonation was already triggered
+      if (missile.detonationTriggeredAt !== undefined) {
+        // Check if delay has elapsed
+        if (now - missile.detonationTriggeredAt >= detonationDelay) {
+          // EXPLODE - apply area damage
+          for (let j = this.enemies.length - 1; j >= 0; j--) {
+            const enemy = this.enemies[j];
+            const dx = missile.position.x - enemy.position.x;
+            const dy = missile.position.y - enemy.position.y;
+            const dz = missile.position.z - enemy.position.z;
+            const dist = Math.hypot(dx, dy, dz);
+
+            if (dist <= this.missileBlastRadius) {
+              destroyed.push(enemy);
+              this.enemies.splice(j, 1);
+              this.kills[enemy.kind] += 1;
+            }
+          }
+
+          // Remove missile
+          missile.active = false;
+          missile.detonationTriggeredAt = undefined;
+          this.missilePool.push(missile);
+          this.missiles.splice(i, 1);
+          SoundEngine.play('missileDetonate');
+          continue;
+        }
+        // Still waiting for detonation
+        continue;
+      }
+
+      // Check proximity to any enemy to trigger detonation countdown
       for (const enemy of this.enemies) {
         const dx = missile.position.x - enemy.position.x;
         const dy = missile.position.y - enemy.position.y;
@@ -648,40 +683,17 @@ export class CombatLoop {
         const dist = Math.hypot(dx, dy, dz);
 
         if (dist <= this.missileProximityRadius) {
-          // DETONATE - area damage
-          detonated = true;
+          // Start detonation countdown!
+          missile.detonationTriggeredAt = now;
           break;
         }
-      }
-
-      if (detonated) {
-        // Apply area damage to all enemies in blast radius
-        for (let j = this.enemies.length - 1; j >= 0; j--) {
-          const enemy = this.enemies[j];
-          const dx = missile.position.x - enemy.position.x;
-          const dy = missile.position.y - enemy.position.y;
-          const dz = missile.position.z - enemy.position.z;
-          const dist = Math.hypot(dx, dy, dz);
-
-          if (dist <= this.missileBlastRadius) {
-            destroyed.push(enemy);
-            this.enemies.splice(j, 1);
-            this.kills[enemy.kind] += 1;
-          }
-        }
-
-        // Remove missile
-        missile.active = false;
-        this.missilePool.push(missile);
-        this.missiles.splice(i, 1);
-        SoundEngine.play('missileDetonate');
-        continue;
       }
 
       // Despawn if too far
       const distSq = missile.position.x ** 2 + missile.position.y ** 2 + missile.position.z ** 2;
       if (distSq > (this.options.spawnRadius * 1.5) ** 2) {
         missile.active = false;
+        missile.detonationTriggeredAt = undefined;
         this.missilePool.push(missile);
         this.missiles.splice(i, 1);
       }

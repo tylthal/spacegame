@@ -58,10 +58,12 @@ export const GAME_CONFIG = {
         cooldownMs: 3000,
         /** Missile speed multiplier per millisecond */
         speed: 0.08,
-        /** Proximity distance to trigger detonation */
-        detonationProximity: 8,
-        /** Blast radius for area damage */
-        blastRadius: 15,
+        /** Proximity distance to trigger detonation (larger = easier to hit) */
+        detonationProximity: 14,
+        /** Delay in ms after triggering before explosion */
+        detonationDelayMs: 500,
+        /** Blast radius for area damage (larger = more enemies hit) */
+        blastRadius: 30,
     },
 
     // Pause gesture detection
