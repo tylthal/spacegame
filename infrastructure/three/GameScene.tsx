@@ -45,13 +45,16 @@ function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
             dummy.current.position.set(x, y, z);
 
             // Orient bullet along velocity (trajectory)
-            // Bullet velocity is normalized-ish direction
-            // We can lookAt the next position: pos + vel
+            // lookAt makes -Z point at target, but capsule geometry is along Y axis
             dummy.current.lookAt(
                 x + bullet.velocity.x,
                 y + bullet.velocity.y,
                 z + bullet.velocity.z
             );
+
+            // Capsule geometry is oriented along Y axis by default
+            // Rotate to align capsule's long axis with the forward direction (-Z after lookAt)
+            dummy.current.rotateX(Math.PI / 2);
 
             dummy.current.updateMatrix();
             meshRef.current.setMatrixAt(i, dummy.current.matrix);
