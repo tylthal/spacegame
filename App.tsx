@@ -13,7 +13,8 @@ import { CalibrationScreen } from './components/CalibrationScreen';
 import { WebcamPreview } from './components/WebcamPreview';
 import { CRTOverlay } from './components/CRTOverlay';
 import { InputProcessor } from './input/InputProcessor';
-import { PhaseManager, Phase, PhaseEvent } from './phase/PhaseManager';
+import { PhaseManager, Phase } from './phase/PhaseManager';
+import { usePhaseSync, usePauseGesture } from './hooks';
 import { GameHUD } from './components/GameHUD';
 import { GameOverScreen } from './components/GameOverScreen';
 import { PauseScreen } from './components/PauseScreen';
@@ -74,31 +75,11 @@ const App: React.FC = () => {
   const [isGameOver, setIsGameOver] = useState(false);
   const frozenTimeRef = useRef<number | null>(null);
 
-  // Pause state - strict detection to avoid false positives
+  // Pause state
   const [isPaused, setIsPaused] = useState(false);
-  const palmHoldStartRef = useRef<number | null>(null);
-  const palmConsecutiveFramesRef = useRef(0); // Track consecutive palm frames
-  const PAUSE_HOLD_MS = 600; // Hold BOTH palms for 0.6 seconds
-  const PAUSE_MIN_FRAMES = 5; // Require at least 5 consecutive palm frames
 
-  // Sync Phase Manager -> React State
-  useEffect(() => {
-    // Initial sync
-    setPhase(phaseManager.phase);
-
-    // Subscribe to changes
-    return phaseManager.subscribe((event: PhaseEvent) => {
-      if (event.type === 'transition') {
-        setPhase(event.to);
-        console.log('[Phase] Transition:', event.from, '->', event.to, 'Reason:', event.reason);
-
-        // Reset Combat Loop on Game Start OR when returning to Title
-        if ((event.to === 'PLAYING' && event.from !== 'PLAYING') || event.to === 'TITLE') {
-          combatLoop.reset();
-        }
-      }
-    });
-  }, [phaseManager]);
+  // Sync Phase Manager -> React State (extracted to hook)
+  usePhaseSync(phaseManager, combatLoop, setPhase);
 
   // Tick the loop only when PLAYING and not game over and not paused
   useEffect(() => {
@@ -124,43 +105,13 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(frameId);
   }, [phase, combatLoop, isGameOver, isPaused]);
 
-  // Pause gesture detection - BOTH hands palm for 1.2s (very intentional)
+  // Pause gesture detection - extracted to hook
   // Resume must be done via the Resume button, not by gesture
-  useEffect(() => {
-    if (!inputProcessor || phase !== 'PLAYING' || isGameOver || isPaused) return;
-
-    return inputProcessor.subscribe(event => {
-      const rightHand = event.hands.right;
-      const leftHand = event.hands.left;
-
-      // Require BOTH hands to be showing palm
-      const bothHandsPalm = (
-        rightHand?.gesture === 'palm' &&
-        leftHand?.gesture === 'palm'
-      );
-
-      if (bothHandsPalm) {
-        palmConsecutiveFramesRef.current++;
-
-        // Start timer on first palm frame
-        if (!palmHoldStartRef.current) {
-          palmHoldStartRef.current = Date.now();
-        }
-
-        // Only trigger if BOTH time AND frame count requirements are met
-        const heldMs = Date.now() - palmHoldStartRef.current;
-        if (heldMs >= PAUSE_HOLD_MS && palmConsecutiveFramesRef.current >= PAUSE_MIN_FRAMES) {
-          setIsPaused(true);
-          palmHoldStartRef.current = null;
-          palmConsecutiveFramesRef.current = 0;
-        }
-      } else {
-        // Not both palms = reset
-        palmHoldStartRef.current = null;
-        palmConsecutiveFramesRef.current = 0;
-      }
-    });
-  }, [inputProcessor, phase, isGameOver, isPaused]);
+  const pauseGesture = usePauseGesture(
+    inputProcessor,
+    phase === 'PLAYING' && !isGameOver && !isPaused,
+    () => setIsPaused(true)
+  );
 
 
   // Initialize HandTracker & InputProcessor

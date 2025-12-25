@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { InputProcessor } from '../input/InputProcessor';
 import { HandCursor } from './HandCursor';
 
+const HOLD_DURATION_MS = 1000; // 1 second to select
+
 export interface GameOverScreenProps {
     score: number;
     kills: number;
@@ -20,7 +22,7 @@ const formatTime = (ms: number): string => {
 
 /**
  * GameOverScreen - Y2K themed game over with stats and restart/exit options
- * Supports pinch-click on buttons via hand tracking
+ * Hold pinch for 1 second to select buttons
  */
 export const GameOverScreen: React.FC<GameOverScreenProps> = ({
     score,
@@ -37,6 +39,10 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
     const [hoveringRestart, setHoveringRestart] = useState(false);
     const [hoveringExit, setHoveringExit] = useState(false);
 
+    // Hold progress state (0-1) for visual feedback
+    const [restartProgress, setRestartProgress] = useState(0);
+    const [exitProgress, setExitProgress] = useState(0);
+
     // Subscribe to input for cursor position and pinch detection
     useEffect(() => {
         if (!inputProcessor) return;
@@ -47,18 +53,22 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
         });
     }, [inputProcessor]);
 
-    // Refs for callbacks and trigger state
-    const triggeredRef = useRef(false);
+    // Refs for callbacks and hold tracking
     const onRestartRef = useRef(onRestart);
     const onExitRef = useRef(onExit);
     onRestartRef.current = onRestart;
     onExitRef.current = onExit;
 
+    // Hold start timestamps for each button
+    const restartHoldStart = useRef<number | null>(null);
+    const exitHoldStart = useRef<number | null>(null);
+    const triggeredRef = useRef(false);
+
     // Track hover states
     const prevHoverRestartRef = useRef(false);
     const prevHoverExitRef = useRef(false);
 
-    // Check cursor position and handle pinch-clicks
+    // Check cursor position and handle hold-to-select
     useEffect(() => {
         const cursorScreenX = cursorPos.x * window.innerWidth;
         const cursorScreenY = cursorPos.y * window.innerHeight;
@@ -87,7 +97,7 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
             );
         }
 
-        // Only update state when hover changes
+        // Update hover states
         if (isOverRestart !== prevHoverRestartRef.current) {
             prevHoverRestartRef.current = isOverRestart;
             setHoveringRestart(isOverRestart);
@@ -97,15 +107,36 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
             setHoveringExit(isOverExit);
         }
 
-        // Trigger actions on pinch (only once)
-        if (isPinching && !triggeredRef.current) {
-            if (isOverRestart) {
+        // Hold-to-select logic for Restart button
+        if (isOverRestart && isPinching && !triggeredRef.current) {
+            if (restartHoldStart.current === null) {
+                restartHoldStart.current = Date.now();
+            }
+            const progress = Math.min(1, (Date.now() - restartHoldStart.current) / HOLD_DURATION_MS);
+            setRestartProgress(progress);
+            if (progress >= 1) {
                 triggeredRef.current = true;
                 onRestartRef.current();
-            } else if (isOverExit) {
+            }
+        } else {
+            restartHoldStart.current = null;
+            setRestartProgress(0);
+        }
+
+        // Hold-to-select logic for Exit button
+        if (isOverExit && isPinching && !triggeredRef.current) {
+            if (exitHoldStart.current === null) {
+                exitHoldStart.current = Date.now();
+            }
+            const progress = Math.min(1, (Date.now() - exitHoldStart.current) / HOLD_DURATION_MS);
+            setExitProgress(progress);
+            if (progress >= 1) {
                 triggeredRef.current = true;
                 onExitRef.current();
             }
+        } else {
+            exitHoldStart.current = null;
+            setExitProgress(0);
         }
 
         // Reset trigger when not pinching
@@ -171,38 +202,52 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
 
                 {/* Buttons - compact */}
                 <div className="flex gap-2 tall:gap-3 md:gap-4">
-                    {/* Restart Button */}
+                    {/* Restart Button with progress overlay */}
                     <button
                         ref={restartButtonRef}
                         onClick={onRestart}
-                        className={`flex-1 py-2 tall:py-3 md:py-4 font-display font-bold text-xs tall:text-base md:text-lg uppercase tracking-wider
-                         transition-all duration-100 active:translate-y-0.5
+                        className={`relative flex-1 py-2 tall:py-3 md:py-4 font-display font-bold text-xs tall:text-base md:text-lg uppercase tracking-wider
+                         transition-all duration-100 active:translate-y-0.5 overflow-hidden
                          ${hoveringRestart
                                 ? 'bg-y2k-white text-black scale-105 shadow-[0_0_30px_rgba(255,255,0,0.5)]'
                                 : 'bg-y2k-yellow text-black hover:bg-y2k-white'
                             }`}
                     >
-                        [ RESTART ]
+                        {/* Progress bar overlay */}
+                        {restartProgress > 0 && (
+                            <div
+                                className="absolute inset-0 bg-green-400/50 transition-none"
+                                style={{ width: `${restartProgress * 100}%` }}
+                            />
+                        )}
+                        <span className="relative z-10">[ RESTART ]</span>
                     </button>
 
-                    {/* Exit Button */}
+                    {/* Exit Button with progress overlay */}
                     <button
                         ref={exitButtonRef}
                         onClick={onExit}
-                        className={`flex-1 py-2 tall:py-3 md:py-4 font-display font-bold text-xs tall:text-base md:text-lg uppercase tracking-wider
-                         transition-all duration-100 active:translate-y-0.5
+                        className={`relative flex-1 py-2 tall:py-3 md:py-4 font-display font-bold text-xs tall:text-base md:text-lg uppercase tracking-wider
+                         transition-all duration-100 active:translate-y-0.5 overflow-hidden
                          ${hoveringExit
                                 ? 'bg-y2k-white text-y2k-red scale-105 shadow-[0_0_30px_rgba(255,0,68,0.5)]'
                                 : 'bg-transparent text-y2k-red border border-y2k-red tall:border-2 hover:bg-y2k-red hover:text-black'
                             }`}
                     >
-                        [ EXIT ]
+                        {/* Progress bar overlay */}
+                        {exitProgress > 0 && (
+                            <div
+                                className="absolute inset-0 bg-red-500/50 transition-none"
+                                style={{ width: `${exitProgress * 100}%` }}
+                            />
+                        )}
+                        <span className="relative z-10">[ EXIT ]</span>
                     </button>
                 </div>
 
                 {/* Pinch hint - hidden on landscape */}
                 <div className="hidden tall:block mt-2 tall:mt-3 md:mt-4 text-[8px] tall:text-[10px] md:text-xs font-mono text-y2k-white/50 uppercase">
-                    Pinch on button to select
+                    Hold pinch for 1 second to select
                 </div>
 
                 {/* Corner decorations - smaller on landscape */}

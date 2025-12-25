@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { InputProcessor } from '../input/InputProcessor';
 import { HandCursor } from './HandCursor';
+import { useFullscreen } from '../hooks';
+
+const HOLD_DURATION_MS = 1000; // 1 second to select
 
 export interface PauseScreenProps {
     onResume: () => void;
@@ -10,7 +13,7 @@ export interface PauseScreenProps {
 
 /**
  * PauseScreen - Y2K themed pause overlay
- * Resume with pinch gesture, exit to return to title
+ * Hold pinch for 1 second to select buttons
  */
 export const PauseScreen: React.FC<PauseScreenProps> = ({
     onResume,
@@ -25,80 +28,14 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
     const [hoveringResume, setHoveringResume] = useState(false);
     const [hoveringExit, setHoveringExit] = useState(false);
     const [hoveringFullscreen, setHoveringFullscreen] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [showIOSHint, setShowIOSHint] = useState(false);
 
-    // Detect iOS (Safari doesn't support Fullscreen API except for video)
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    // Hold progress state (0-1) for visual feedback
+    const [resumeProgress, setResumeProgress] = useState(0);
+    const [exitProgress, setExitProgress] = useState(0);
+    const [fullscreenProgress, setFullscreenProgress] = useState(0);
 
-    // Check if Fullscreen API is supported
-    const fullscreenSupported = document.fullscreenEnabled ||
-        (document as any).webkitFullscreenEnabled ||
-        (document as any).mozFullScreenEnabled ||
-        (document as any).msFullscreenEnabled;
-
-    // Track fullscreen state
-    useEffect(() => {
-        const handleFullscreenChange = () => {
-            setIsFullscreen(!!(
-                document.fullscreenElement ||
-                (document as any).webkitFullscreenElement ||
-                (document as any).mozFullScreenElement ||
-                (document as any).msFullscreenElement
-            ));
-        };
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-
-        // Initial check
-        handleFullscreenChange();
-
-        return () => {
-            document.removeEventListener('fullscreenchange', handleFullscreenChange);
-            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-            document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-        };
-    }, []);
-
-    // Toggle fullscreen with cross-browser support
-    const toggleFullscreen = async () => {
-        // On iOS, show hint about Add to Home Screen
-        if (isIOS || !fullscreenSupported) {
-            setShowIOSHint(true);
-            setTimeout(() => setShowIOSHint(false), 3000);
-            return;
-        }
-
-        try {
-            if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
-                if (document.exitFullscreen) {
-                    await document.exitFullscreen();
-                } else if ((document as any).webkitExitFullscreen) {
-                    await (document as any).webkitExitFullscreen();
-                }
-            } else {
-                const elem = document.documentElement;
-                if (elem.requestFullscreen) {
-                    await elem.requestFullscreen();
-                } else if ((elem as any).webkitRequestFullscreen) {
-                    await (elem as any).webkitRequestFullscreen();
-                } else if ((elem as any).mozRequestFullScreen) {
-                    await (elem as any).mozRequestFullScreen();
-                } else if ((elem as any).msRequestFullscreen) {
-                    await (elem as any).msRequestFullscreen();
-                }
-            }
-        } catch (err) {
-            console.warn('Fullscreen request failed:', err);
-            // Show hint if fullscreen fails
-            setShowIOSHint(true);
-            setTimeout(() => setShowIOSHint(false), 3000);
-        }
-    };
+    // Fullscreen state and controls - extracted to reusable hook
+    const { isFullscreen, toggle: toggleFullscreen, showHint: showIOSHint, isIOS, isSupported: fullscreenSupported } = useFullscreen();
 
     // Subscribe to input for cursor position and pinch detection
     useEffect(() => {
@@ -110,19 +47,24 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
         });
     }, [inputProcessor]);
 
-    // Refs for callbacks and trigger state
-    const triggeredRef = useRef(false);
+    // Refs for callbacks and hold tracking
     const onResumeRef = useRef(onResume);
     const onExitRef = useRef(onExit);
     onResumeRef.current = onResume;
     onExitRef.current = onExit;
+
+    // Hold start timestamps for each button
+    const resumeHoldStart = useRef<number | null>(null);
+    const exitHoldStart = useRef<number | null>(null);
+    const fullscreenHoldStart = useRef<number | null>(null);
+    const triggeredRef = useRef(false);
 
     // Track hover states
     const prevHoverResumeRef = useRef(false);
     const prevHoverExitRef = useRef(false);
     const prevHoverFullscreenRef = useRef(false);
 
-    // Check cursor position and handle pinch-clicks
+    // Check cursor position and handle hold-to-select
     useEffect(() => {
         const cursorScreenX = cursorPos.x * window.innerWidth;
         const cursorScreenY = cursorPos.y * window.innerHeight;
@@ -163,7 +105,7 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
             );
         }
 
-        // Only update state when hover changes
+        // Update hover states
         if (isOverResume !== prevHoverResumeRef.current) {
             prevHoverResumeRef.current = isOverResume;
             setHoveringResume(isOverResume);
@@ -177,25 +119,59 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
             setHoveringFullscreen(isOverFullscreen);
         }
 
-        // Trigger actions on pinch (only once)
-        if (isPinching && !triggeredRef.current) {
-            if (isOverResume) {
+        // Hold-to-select logic for Resume button
+        if (isOverResume && isPinching && !triggeredRef.current) {
+            if (resumeHoldStart.current === null) {
+                resumeHoldStart.current = Date.now();
+            }
+            const progress = Math.min(1, (Date.now() - resumeHoldStart.current) / HOLD_DURATION_MS);
+            setResumeProgress(progress);
+            if (progress >= 1) {
                 triggeredRef.current = true;
                 onResumeRef.current();
-            } else if (isOverExit) {
+            }
+        } else {
+            resumeHoldStart.current = null;
+            setResumeProgress(0);
+        }
+
+        // Hold-to-select logic for Exit button
+        if (isOverExit && isPinching && !triggeredRef.current) {
+            if (exitHoldStart.current === null) {
+                exitHoldStart.current = Date.now();
+            }
+            const progress = Math.min(1, (Date.now() - exitHoldStart.current) / HOLD_DURATION_MS);
+            setExitProgress(progress);
+            if (progress >= 1) {
                 triggeredRef.current = true;
                 onExitRef.current();
-            } else if (isOverFullscreen) {
+            }
+        } else {
+            exitHoldStart.current = null;
+            setExitProgress(0);
+        }
+
+        // Hold-to-select logic for Fullscreen button
+        if (isOverFullscreen && isPinching && !triggeredRef.current) {
+            if (fullscreenHoldStart.current === null) {
+                fullscreenHoldStart.current = Date.now();
+            }
+            const progress = Math.min(1, (Date.now() - fullscreenHoldStart.current) / HOLD_DURATION_MS);
+            setFullscreenProgress(progress);
+            if (progress >= 1) {
                 triggeredRef.current = true;
                 toggleFullscreen();
             }
+        } else {
+            fullscreenHoldStart.current = null;
+            setFullscreenProgress(0);
         }
 
         // Reset trigger when not pinching
         if (!isPinching) {
             triggeredRef.current = false;
         }
-    }, [cursorPos, isPinching]);
+    }, [cursorPos, isPinching, toggleFullscreen]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -262,38 +238,52 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
 
                 {/* Buttons - compact */}
                 <div className="flex flex-col gap-2 tall:gap-3 md:gap-4">
-                    {/* Resume Button */}
+                    {/* Resume Button with progress overlay */}
                     <button
                         ref={resumeButtonRef}
                         onClick={onResume}
-                        className={`w-full py-2 tall:py-3 md:py-4 font-display font-bold text-sm tall:text-lg md:text-xl uppercase tracking-wider
-                         transition-all duration-100 active:translate-y-0.5
+                        className={`relative w-full py-2 tall:py-3 md:py-4 font-display font-bold text-sm tall:text-lg md:text-xl uppercase tracking-wider
+                         transition-all duration-100 active:translate-y-0.5 overflow-hidden
                          ${hoveringResume
                                 ? 'bg-y2k-white text-black scale-105 shadow-[0_0_30px_rgba(255,255,0,0.5)]'
                                 : 'bg-y2k-yellow text-black hover:bg-y2k-white'
                             }`}
                     >
-                        [ RESUME ]
+                        {/* Progress bar overlay */}
+                        {resumeProgress > 0 && (
+                            <div
+                                className="absolute inset-0 bg-green-400/50 transition-none"
+                                style={{ width: `${resumeProgress * 100}%` }}
+                            />
+                        )}
+                        <span className="relative z-10">[ RESUME ]</span>
                     </button>
 
-                    {/* Exit Button */}
+                    {/* Exit Button with progress overlay */}
                     <button
                         ref={exitButtonRef}
                         onClick={onExit}
-                        className={`w-full py-1.5 tall:py-2 md:py-3 font-display font-bold text-xs tall:text-base md:text-lg uppercase tracking-wider
-                         transition-all duration-100 active:translate-y-0.5
+                        className={`relative w-full py-1.5 tall:py-2 md:py-3 font-display font-bold text-xs tall:text-base md:text-lg uppercase tracking-wider
+                         transition-all duration-100 active:translate-y-0.5 overflow-hidden
                          ${hoveringExit
                                 ? 'bg-y2k-white text-y2k-red scale-105 shadow-[0_0_20px_rgba(255,0,68,0.5)]'
                                 : 'bg-transparent text-y2k-red border border-y2k-red tall:border-2 hover:bg-y2k-red hover:text-black'
                             }`}
                     >
-                        [ ABORT ]
+                        {/* Progress bar overlay */}
+                        {exitProgress > 0 && (
+                            <div
+                                className="absolute inset-0 bg-red-500/50 transition-none"
+                                style={{ width: `${exitProgress * 100}%` }}
+                            />
+                        )}
+                        <span className="relative z-10">[ ABORT ]</span>
                     </button>
                 </div>
 
                 {/* Instructions - hidden on landscape */}
                 <div className="hidden tall:block mt-3 tall:mt-4 md:mt-6 text-[8px] tall:text-[10px] md:text-xs font-mono text-y2k-white/50 uppercase space-y-1">
-                    <div>Point at button and pinch to select</div>
+                    <div>Point at button and hold pinch for 1 second</div>
                 </div>
 
                 {/* Corner decorations - smaller on landscape */}
