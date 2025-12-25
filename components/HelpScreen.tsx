@@ -208,6 +208,7 @@ function ControlCard({ title, gesture, gestureColor, description }: {
     title: string;
     gesture: string;
     gestureColor: 'cyan' | 'green' | 'red' | 'yellow';
+    description: string;
 }) {
     const colorClasses = {
         cyan: 'border-y2k-cyan text-y2k-cyan',

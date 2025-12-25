@@ -220,7 +220,7 @@ export const DifficultyScreen: React.FC<DifficultyScreenProps> = ({
             {/* Hand cursor */}
             <HandCursor
                 position={cursorPos}
-                gesture={isPinching ? 'pinch' : 'point'}
+                isPinching={isPinching}
                 visible={true}
             />
         </div>
