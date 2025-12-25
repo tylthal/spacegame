@@ -78,6 +78,10 @@ const App: React.FC = () => {
   // Pause state
   const [isPaused, setIsPaused] = useState(false);
 
+  // FX State
+  const [damageFlash, setDamageFlash] = useState(false);
+  const lastHullRef = useRef(100);
+
   // Sync Phase Manager -> React State (extracted to hook)
   usePhaseSync(phaseManager, combatLoop, setPhase);
 
@@ -98,7 +102,16 @@ const App: React.FC = () => {
 
       const delta = Math.max(0, time - lastTime); // Clamp to non-negative
       lastTime = time;
-      combatLoop.tick(delta);
+      const result = combatLoop.tick(delta);
+
+      // Check for damage
+      if (result.hull < lastHullRef.current) {
+        setDamageFlash(true);
+        // Clear flash after short duration
+        setTimeout(() => setDamageFlash(false), 150);
+      }
+      lastHullRef.current = result.hull;
+
       frameId = requestAnimationFrame(tick);
     };
     frameId = requestAnimationFrame(tick);
@@ -367,6 +380,12 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Damage Flash Overlay */}
+      <div
+        className={`pointer-events-none fixed inset-0 z-50 border-[20px] md:border-[30px] border-red-600/60 shadow-[inset_0_0_50px_rgba(220,38,38,0.5)] transition-opacity duration-100 ${damageFlash ? 'opacity-100' : 'opacity-0'
+          }`}
+      />
 
     </div>
   );
