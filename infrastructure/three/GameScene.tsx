@@ -367,6 +367,7 @@ const HITBOX_RADIUS: Record<string, number> = {
     drone: 1.5,
     scout: 2.0,
     bomber: 2.5,
+    weaver: 1.8,
 };
 
 // Sub-component to handle per-enemy updates efficiently - memoized

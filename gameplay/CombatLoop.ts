@@ -8,6 +8,10 @@ export interface EnemyInstance {
   kind: EnemyKind;
   position: Vector3;
   velocity: Vector3;
+  // Weaver corkscrew movement parameters (randomized per enemy)
+  wavePhase?: number;
+  waveAmplitude?: number; // How far it spirals from trajectory
+  waveFrequency?: number; // How fast it spirals
 }
 
 export interface Bullet {
@@ -44,13 +48,17 @@ export interface CombatOptions {
 const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   hull: 100,
   fireIntervalMs: 125,
-  enemyRadius: { drone: 1.5, scout: 2.0, bomber: 2.5 }, // Increased for 3D scale
-  enemySpeedPerMs: { drone: 0.02, scout: 0.015, bomber: 0.01 }, // Faster to cover distance
-  enemyDamage: { drone: 5, scout: 8, bomber: 15 },
+  enemyRadius: { drone: 1.5, scout: 2.0, bomber: 2.5, weaver: 1.8 }, // Weaver is medium-sized
+  enemySpeedPerMs: { drone: 0.02, scout: 0.015, bomber: 0.01, weaver: 0.012 }, // Weaver moves slower
+  enemyDamage: { drone: 5, scout: 8, bomber: 15, weaver: 7 }, // Medium damage
   spawnRadius: 400, // Enemies spawn far in the distance
   bulletSpeed: 0.18, // Faster bullets = less lead required when aiming
   maxEnemies: 6, // Limit enemies on screen
 };
+
+// Weaver spawn limits
+const MAX_WEAVERS = 2;
+const WEAVER_SPAWN_COOLDOWN_MS = 3000; // 3 seconds between weaver spawns
 
 export interface CombatTickResult {
   timestamp: number;
@@ -63,8 +71,8 @@ export class CombatLoop {
   private readonly enemies: EnemyInstance[] = [];
   private readonly bullets: Bullet[] = [];
   private readonly missiles: Missile[] = [];
-  private readonly kills: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0 };
-  private readonly spawns: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0 };
+  private readonly kills: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0, weaver: 0 };
+  private readonly spawns: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0, weaver: 0 };
 
   // Public access for renderer
   public get activeEnemies(): ReadonlyArray<EnemyInstance> { return this.enemies; }
@@ -120,6 +128,7 @@ export class CombatLoop {
   private elapsedMs = 0;
   private enemyId = 0;
   private bulletId = 0;
+  private weaverSpawnCooldown = 0; // Stagger weaver spawns
 
   constructor(
     private readonly scheduler: SpawnScheduler,
@@ -156,9 +165,12 @@ export class CombatLoop {
     this.kills.drone = 0;
     this.kills.scout = 0;
     this.kills.bomber = 0;
+    this.kills.weaver = 0;
     this.spawns.drone = 0;
     this.spawns.scout = 0;
     this.spawns.bomber = 0;
+    this.spawns.weaver = 0;
+    this.weaverSpawnCooldown = 0;
     this.scheduler.reset();
   }
 
@@ -174,11 +186,26 @@ export class CombatLoop {
     if (deltaMs < 0) throw new Error('deltaMs must be non-negative');
     this.elapsedMs += deltaMs;
 
-    // Spawn Logic - respect max enemies limit
+    // Update weaver spawn cooldown
+    if (this.weaverSpawnCooldown > 0) {
+      this.weaverSpawnCooldown = Math.max(0, this.weaverSpawnCooldown - deltaMs);
+    }
+
+    // Spawn Logic - respect max enemies and weaver limits
     const spawnEvents = this.scheduler.step(deltaMs);
     const spawned: EnemyInstance[] = [];
     for (const event of spawnEvents) {
       if (this.enemies.length >= this.options.maxEnemies) break;
+
+      // Weaver spawn limits: max 2 at a time, staggered spawns
+      if (event.kind === 'weaver') {
+        const currentWeavers = this.enemies.filter(e => e.kind === 'weaver').length;
+        if (currentWeavers >= MAX_WEAVERS || this.weaverSpawnCooldown > 0) {
+          continue; // Skip this weaver spawn
+        }
+        this.weaverSpawnCooldown = WEAVER_SPAWN_COOLDOWN_MS;
+      }
+
       const enemy = this.createEnemy(event.kind);
       this.enemies.push(enemy);
       spawned.push(enemy);
@@ -278,19 +305,49 @@ export class CombatLoop {
     const vy = (dy / dist) * speed;
     const vz = (dz / dist) * speed;
 
+    // Initialize weaver corkscrew parameters (randomized per enemy)
+    let wavePhase: number | undefined;
+    let waveAmplitude: number | undefined;
+    let waveFrequency: number | undefined;
+
+    if (kind === 'weaver') {
+      wavePhase = this.rng.next() * Math.PI * 2; // Random starting angle
+      waveAmplitude = 4 + this.rng.next() * 8; // 4-12 units radius
+      waveFrequency = 0.002 + this.rng.next() * 0.003; // 0.002-0.005 cycles/ms
+    }
+
     return {
       id: this.enemyId,
       kind,
       position: { x, y, z },
       velocity: { x: vx, y: vy, z: vz },
+      wavePhase,
+      waveAmplitude,
+      waveFrequency,
     };
   }
 
   private advanceEnemies(deltaMs: number): void {
     for (const enemy of this.enemies) {
+      // Base movement
       enemy.position.x += enemy.velocity.x * deltaMs;
       enemy.position.y += enemy.velocity.y * deltaMs;
       enemy.position.z += enemy.velocity.z * deltaMs;
+
+      // Weaver corkscrew movement (spirals around trajectory line)
+      if (enemy.kind === 'weaver' && enemy.wavePhase !== undefined &&
+        enemy.waveAmplitude !== undefined && enemy.waveFrequency !== undefined) {
+        // Update phase based on time
+        enemy.wavePhase += enemy.waveFrequency * deltaMs;
+
+        // Calculate corkscrew offset (perpendicular to velocity in both X and Y)
+        // This creates a helical spiral around the forward trajectory
+        const spiralX = Math.cos(enemy.wavePhase) * enemy.waveAmplitude * 0.008 * deltaMs;
+        const spiralY = Math.sin(enemy.wavePhase) * enemy.waveAmplitude * 0.008 * deltaMs;
+
+        enemy.position.x += spiralX;
+        enemy.position.y += spiralY;
+      }
     }
   }
 

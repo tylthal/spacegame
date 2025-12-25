@@ -321,6 +321,108 @@ function BomberMesh() {
 }
 
 /**
+ * WEAVER - Evasive disc craft with spinning blades
+ * Design: Flat disc-shaped body with menacing blade-like wings
+ * Behavior: Weaves left/right in sine-wave pattern - harder to hit
+ * Orientation: Nose at +Z, Engine at -Z
+ */
+function WeaverMesh() {
+    return (
+        <group>
+            {/* Central disc body */}
+            <mesh scale={[1.2, 0.15, 1.2]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.6, 0.6, 0.3, 16]} />
+                <meshStandardMaterial {...METAL_GUNMETAL} />
+            </mesh>
+
+            {/* Upper dome (cockpit) */}
+            <mesh position={[0, 0.1, 0]} scale={[0.5, 0.25, 0.5]}>
+                <sphereGeometry args={[0.5, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                <meshStandardMaterial
+                    color="#222233"
+                    emissive="#FF4400"
+                    emissiveIntensity={0.8}
+                    metalness={0.3}
+                    roughness={0.1}
+                />
+            </mesh>
+
+            {/* Blade 1 - Front right */}
+            <mesh position={[0.5, 0, 0.5]} rotation={[0, Math.PI / 4, 0]} scale={[0.8, 0.04, 0.15]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial
+                    color="#FF2200"
+                    emissive="#FF0000"
+                    emissiveIntensity={1.5}
+                    metalness={0.9}
+                    roughness={0.1}
+                />
+            </mesh>
+
+            {/* Blade 2 - Back right */}
+            <mesh position={[0.5, 0, -0.5]} rotation={[0, -Math.PI / 4, 0]} scale={[0.8, 0.04, 0.15]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial
+                    color="#FF2200"
+                    emissive="#FF0000"
+                    emissiveIntensity={1.5}
+                    metalness={0.9}
+                    roughness={0.1}
+                />
+            </mesh>
+
+            {/* Blade 3 - Front left */}
+            <mesh position={[-0.5, 0, 0.5]} rotation={[0, -Math.PI / 4, 0]} scale={[0.8, 0.04, 0.15]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial
+                    color="#FF2200"
+                    emissive="#FF0000"
+                    emissiveIntensity={1.5}
+                    metalness={0.9}
+                    roughness={0.1}
+                />
+            </mesh>
+
+            {/* Blade 4 - Back left */}
+            <mesh position={[-0.5, 0, -0.5]} rotation={[0, Math.PI / 4, 0]} scale={[0.8, 0.04, 0.15]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial
+                    color="#FF2200"
+                    emissive="#FF0000"
+                    emissiveIntensity={1.5}
+                    metalness={0.9}
+                    roughness={0.1}
+                />
+            </mesh>
+
+            {/* Center engine glow */}
+            <mesh position={[0, -0.1, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[0.3, 0.1, 0.3]}>
+                <cylinderGeometry args={[1, 0.8, 1, 8]} />
+                <meshStandardMaterial
+                    color="#FF6600"
+                    emissive="#FF4400"
+                    emissiveIntensity={2.5}
+                    metalness={0.5}
+                    roughness={0.2}
+                />
+            </mesh>
+
+            {/* Front sensor/nose - FRONT (+Z) */}
+            <mesh position={[0, 0, 0.7]} rotation={[Math.PI / 2, 0, 0]} scale={[0.1, 0.15, 0.1]}>
+                <coneGeometry args={[1, 1, 6]} />
+                <meshStandardMaterial
+                    color="#FFAA00"
+                    emissive="#FF8800"
+                    emissiveIntensity={2.0}
+                    metalness={0.8}
+                    roughness={0.2}
+                />
+            </mesh>
+        </group>
+    );
+}
+
+/**
  * Select and render the appropriate mesh for an enemy type.
  * 
  * MESH CONVENTION: 
@@ -338,7 +440,8 @@ export const EnemyMesh = React.memo(function EnemyMesh({ kind }: { kind: string 
             {kind === 'drone' && <DroneMesh />}
             {kind === 'scout' && <ScoutMesh />}
             {kind === 'bomber' && <BomberMesh />}
-            {!['drone', 'scout', 'bomber'].includes(kind) && <DroneMesh />}
+            {kind === 'weaver' && <WeaverMesh />}
+            {!['drone', 'scout', 'bomber', 'weaver'].includes(kind) && <DroneMesh />}
         </group>
     );
 });

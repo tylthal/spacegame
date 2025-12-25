@@ -1,7 +1,7 @@
 import { AssetManager } from './AssetManager';
 import { SceneNode } from './SceneGraph';
 
-export type EnemyKind = 'drone' | 'scout' | 'bomber';
+export type EnemyKind = 'drone' | 'scout' | 'bomber' | 'weaver';
 
 export class EnemyMesh extends SceneNode {
   constructor(public readonly kind: EnemyKind, id: number) {
@@ -14,9 +14,10 @@ export class EnemyFactory {
     drone: 0,
     scout: 0,
     bomber: 0,
+    weaver: 0,
   };
 
-  constructor(private readonly assets: AssetManager) {}
+  constructor(private readonly assets: AssetManager) { }
 
   spawnEnemy(kind: EnemyKind, parent: SceneNode): EnemyMesh {
     const mesh = this.assets.acquire(kind, () => this.createMesh(kind));
