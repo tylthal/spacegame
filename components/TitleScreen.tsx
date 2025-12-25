@@ -1,10 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { SoundEngine } from '../audio';
 
 interface TitleScreenProps {
     onStart: () => void;
 }
 
 export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
+    const [isHovering, setIsHovering] = useState(false);
+
+    const handleMouseEnter = () => {
+        if (!isHovering) {
+            SoundEngine.play('menuHover');
+            setIsHovering(true);
+        }
+    };
+
+    const handleMouseLeave = () => {
+        setIsHovering(false);
+    };
+
+    const handleClick = () => {
+        SoundEngine.play('buttonPress');
+        onStart();
+    };
+
     return (
         <div className="fixed inset-0 flex flex-col items-center justify-center z-50 pointer-events-none">
 
@@ -42,7 +61,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
                 {/* BUTTON - Compact for landscape */}
                 <div className="pt-3 tall:pt-4 md:pt-12">
                     <button
-                        onClick={onStart}
+                        onClick={handleClick}
+                        onMouseEnter={handleMouseEnter}
+                        onMouseLeave={handleMouseLeave}
                         className="group relative px-4 tall:px-6 md:px-10 py-2 tall:py-3 md:py-5 bg-transparent border-2 border-y2k-yellow hover:bg-y2k-yellow text-y2k-yellow hover:text-y2k-black transition-all duration-0 font-display font-bold text-sm tall:text-base md:text-2xl tracking-widest uppercase"
                     >
                         <span className="relative z-10 group-hover:animate-twitch">START</span>

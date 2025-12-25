@@ -2,6 +2,7 @@ import type { EnemyKind } from '../rendering/EnemyFactory';
 import { segmentHitsSphere, type Vector3 } from './Collision';
 import { SpawnScheduler } from './SpawnScheduler';
 import type { RandomSource } from './Rng';
+import { SoundEngine } from '../audio';
 
 export interface EnemyInstance {
   id: number;
@@ -430,6 +431,7 @@ export class CombatLoop {
           destroyed.push(enemy);
           this.enemies.splice(j, 1);
           this.kills[enemy.kind] += 1;
+          SoundEngine.play('explosion');
           hit = true;
           break;
         }
@@ -519,6 +521,7 @@ export class CombatLoop {
         bullet.active = true;
       }
       this.bullets.push(bullet);
+      SoundEngine.play('laser');
 
       if (this._isOverheated) break;
     }
@@ -610,6 +613,7 @@ export class CombatLoop {
       missile.active = true;
     }
     this.missiles.push(missile);
+    SoundEngine.play('missileLaunch');
   }
 
   /**
@@ -662,6 +666,7 @@ export class CombatLoop {
         missile.active = false;
         this.missilePool.push(missile);
         this.missiles.splice(i, 1);
+        SoundEngine.play('missileDetonate');
         continue;
       }
 

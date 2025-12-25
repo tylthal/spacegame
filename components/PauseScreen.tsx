@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { InputProcessor } from '../input/InputProcessor';
 import { HandCursor } from './HandCursor';
 import { useFullscreen } from '../hooks';
+import { SoundEngine } from '../audio';
 
 const HOLD_DURATION_MS = 1000; // 1 second to select
 
@@ -105,17 +106,20 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
             );
         }
 
-        // Update hover states
+        // Update hover states and play sounds
         if (isOverResume !== prevHoverResumeRef.current) {
             prevHoverResumeRef.current = isOverResume;
+            if (isOverResume) SoundEngine.play('menuHover');
             setHoveringResume(isOverResume);
         }
         if (isOverExit !== prevHoverExitRef.current) {
             prevHoverExitRef.current = isOverExit;
+            if (isOverExit) SoundEngine.play('menuHover');
             setHoveringExit(isOverExit);
         }
         if (isOverFullscreen !== prevHoverFullscreenRef.current) {
             prevHoverFullscreenRef.current = isOverFullscreen;
+            if (isOverFullscreen) SoundEngine.play('menuHover');
             setHoveringFullscreen(isOverFullscreen);
         }
 
@@ -128,6 +132,7 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
             setResumeProgress(progress);
             if (progress >= 1) {
                 triggeredRef.current = true;
+                SoundEngine.play('buttonPress');
                 onResumeRef.current();
             }
         } else {
@@ -144,6 +149,7 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
             setExitProgress(progress);
             if (progress >= 1) {
                 triggeredRef.current = true;
+                SoundEngine.play('buttonPress');
                 onExitRef.current();
             }
         } else {
@@ -160,6 +166,7 @@ export const PauseScreen: React.FC<PauseScreenProps> = ({
             setFullscreenProgress(progress);
             if (progress >= 1) {
                 triggeredRef.current = true;
+                SoundEngine.play('buttonPress');
                 toggleFullscreen();
             }
         } else {

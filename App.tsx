@@ -18,6 +18,7 @@ import { usePhaseSync, usePauseGesture } from './hooks';
 import { GameHUD } from './components/GameHUD';
 import { GameOverScreen } from './components/GameOverScreen';
 import { PauseScreen } from './components/PauseScreen';
+import { SoundEngine } from './audio';
 import { HandCursor } from './components/HandCursor';
 import { CursorLayer } from './components/CursorLayer';
 
@@ -107,6 +108,7 @@ const App: React.FC = () => {
       // Check for damage
       if (result.hull < lastHullRef.current) {
         setDamageFlash(true);
+        SoundEngine.play('playerHit');
         // Clear flash after short duration
         setTimeout(() => setDamageFlash(false), 50);
       }
