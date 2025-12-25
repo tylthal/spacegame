@@ -102,7 +102,7 @@ export class InputProcessor {
   private lockedSignatures: { left?: HandSignature; right?: HandSignature } = {};
   private signatureLockEnabled = false;
   private lastHandPositions: { left?: { x: number; y: number }; right?: { x: number; y: number } } = {};
-  private readonly positionContinuityThreshold = 0.25; // Max hand jump before rejection
+  private readonly positionContinuityThreshold = 0.45; // Max hand jump - very relaxed
 
   constructor(
     tracker: HandTracker,

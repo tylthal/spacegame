@@ -177,7 +177,7 @@ export function matchSignature(candidate: HandSignature, locked: HandSignature):
 }
 
 /**
- * Default match threshold - lower now since we use stable palm measurements
- * Finger gun pose should still match calibration pose
+ * Default match threshold - very low for gesture flexibility
+ * Palm forward gesture dramatically changes hand perspective
  */
-export const SIGNATURE_MATCH_THRESHOLD = 0.60; // 60% similarity required (was 75%)
+export const SIGNATURE_MATCH_THRESHOLD = 0.40; // 40% similarity (very forgiving)

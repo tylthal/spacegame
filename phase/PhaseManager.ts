@@ -114,19 +114,9 @@ export class PhaseManager {
     }
 
     if (this.state === 'PLAYING') {
-      if (sample.gesture && this.guards.pauseGestures.includes(sample.gesture)) {
-        if (stable) {
-          this.pauseHoldStartedAt ??= timestamp;
-          if (timestamp - this.pauseHoldStartedAt >= this.guards.pauseHoldMs) {
-            this.pauseHoldStartedAt = undefined;
-            return this.transition('PAUSED', 'help-requested', timestamp);
-          }
-        } else {
-          this.pauseHoldStartedAt = undefined;
-        }
-      } else {
-        this.pauseHoldStartedAt = undefined;
-      }
+      // NOTE: Pause detection is handled by usePauseGesture hook in App.tsx
+      // to avoid conflicting with React's isPaused state.
+      // PhaseManager only handles READY→PLAYING and time limit→GAMEOVER
       return this.state;
     }
 

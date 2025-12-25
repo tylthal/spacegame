@@ -123,7 +123,7 @@ class SoundEngineClass {
         osc.frequency.setValueAtTime(1000, now);
         osc.frequency.exponentialRampToValueAtTime(200, now + 0.08);
 
-        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.setValueAtTime(0.12, now);
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
 
         osc.connect(gain);
@@ -147,7 +147,7 @@ class SoundEngineClass {
         noise.buffer = buffer;
 
         const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.3, now);
+        noiseGain.gain.setValueAtTime(0.5, now);
         noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
 
         // Low rumble
@@ -157,7 +157,7 @@ class SoundEngineClass {
         osc.frequency.exponentialRampToValueAtTime(50, now + 0.2);
 
         const oscGain = ctx.createGain();
-        oscGain.gain.setValueAtTime(0.25, now);
+        oscGain.gain.setValueAtTime(0.45, now);
         oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
 
         noise.connect(noiseGain);
@@ -171,25 +171,76 @@ class SoundEngineClass {
         osc.stop(now + 0.2);
     }
 
-    /** Ascending whoosh for missile launch */
+    /** Deep rocket launch with bass rumble and filtered noise */
     private playMissileLaunch(ctx: AudioContext, now: number): void {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+        // Deep bass rumble (the core rocket sound)
+        const bassOsc = ctx.createOscillator();
+        bassOsc.type = 'sawtooth';
+        bassOsc.frequency.setValueAtTime(40, now);
+        bassOsc.frequency.exponentialRampToValueAtTime(60, now + 0.2);
+        bassOsc.frequency.exponentialRampToValueAtTime(35, now + 0.5);
 
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(100, now);
-        osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
-        osc.frequency.exponentialRampToValueAtTime(200, now + 0.3);
+        const bassGain = ctx.createGain();
+        bassGain.gain.setValueAtTime(0.35, now);
+        bassGain.gain.linearRampToValueAtTime(0.4, now + 0.15);
+        bassGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
 
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.linearRampToValueAtTime(0.25, now + 0.15);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        // Low-pass filter to make it rumbly
+        const bassFilter = ctx.createBiquadFilter();
+        bassFilter.type = 'lowpass';
+        bassFilter.frequency.value = 120;
+        bassFilter.Q.value = 2;
 
-        osc.connect(gain);
-        gain.connect(this.masterGain!);
+        bassOsc.connect(bassFilter);
+        bassFilter.connect(bassGain);
+        bassGain.connect(this.masterGain!);
 
-        osc.start(now);
-        osc.stop(now + 0.3);
+        // Noise layer for rocket exhaust hiss
+        const bufferSize = ctx.sampleRate * 0.5;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.setValueAtTime(200, now);
+        noiseFilter.frequency.exponentialRampToValueAtTime(400, now + 0.2);
+        noiseFilter.frequency.exponentialRampToValueAtTime(100, now + 0.5);
+        noiseFilter.Q.value = 1;
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.15, now);
+        noiseGain.gain.linearRampToValueAtTime(0.2, now + 0.1);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(this.masterGain!);
+
+        // Sub-bass thump for initial ignition
+        const subOsc = ctx.createOscillator();
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(50, now);
+        subOsc.frequency.exponentialRampToValueAtTime(25, now + 0.15);
+
+        const subGain = ctx.createGain();
+        subGain.gain.setValueAtTime(0.4, now);
+        subGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+        subOsc.connect(subGain);
+        subGain.connect(this.masterGain!);
+
+        bassOsc.start(now);
+        noise.start(now);
+        subOsc.start(now);
+        bassOsc.stop(now + 0.5);
+        noise.stop(now + 0.5);
+        subOsc.stop(now + 0.15);
     }
 
     /** Big boom for missile detonation */
@@ -211,7 +262,7 @@ class SoundEngineClass {
         noiseFilter.frequency.exponentialRampToValueAtTime(100, now + 0.4);
 
         const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.4, now);
+        noiseGain.gain.setValueAtTime(0.55, now);
         noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
 
         // Deep bass rumble
@@ -221,7 +272,7 @@ class SoundEngineClass {
         osc.frequency.exponentialRampToValueAtTime(30, now + 0.4);
 
         const oscGain = ctx.createGain();
-        oscGain.gain.setValueAtTime(0.35, now);
+        oscGain.gain.setValueAtTime(0.5, now);
         oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
 
         noise.connect(noiseFilter);
