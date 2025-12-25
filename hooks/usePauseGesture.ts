@@ -4,8 +4,8 @@ import { InputProcessor } from '../input/InputProcessor';
 /**
  * usePauseGesture - Detect when both hands show palm gesture for pause
  * 
- * Requires BOTH hands to show palm for 0.6s with 5 consecutive frames
- * to prevent accidental pauses.
+ * Requires BOTH hands to show palm for 0.6s with 8 consecutive frames
+ * AND hands must be sufficiently separated to prevent single-hand false positives.
  */
 export function usePauseGesture(
     inputProcessor: InputProcessor | null,
@@ -16,7 +16,8 @@ export function usePauseGesture(
     const palmConsecutiveFramesRef = useRef(0);
 
     const PAUSE_HOLD_MS = 600; // Hold BOTH palms for 0.6 seconds
-    const PAUSE_MIN_FRAMES = 5; // Require at least 5 consecutive palm frames
+    const PAUSE_MIN_FRAMES = 8; // Require at least 8 consecutive palm frames (increased from 5)
+    const MIN_HAND_SEPARATION = 0.25; // Minimum horizontal separation between hands (25% of screen)
 
     useEffect(() => {
         if (!inputProcessor || !enabled) return;
@@ -31,7 +32,15 @@ export function usePauseGesture(
                 leftHand?.gesture === 'palm'
             );
 
-            if (bothHandsPalm) {
+            // Additional check: hands must be separated horizontally
+            // This prevents a single hand near the center being detected as both
+            let handsSeparated = false;
+            if (bothHandsPalm && rightHand && leftHand) {
+                const separation = Math.abs(rightHand.cursor.x - leftHand.cursor.x);
+                handsSeparated = separation >= MIN_HAND_SEPARATION;
+            }
+
+            if (bothHandsPalm && handsSeparated) {
                 palmConsecutiveFramesRef.current++;
 
                 // Start timer on first palm frame
@@ -47,7 +56,7 @@ export function usePauseGesture(
                     palmConsecutiveFramesRef.current = 0;
                 }
             } else {
-                // Not both palms = reset
+                // Not both palms OR hands not separated = reset
                 palmHoldStartRef.current = null;
                 palmConsecutiveFramesRef.current = 0;
             }
