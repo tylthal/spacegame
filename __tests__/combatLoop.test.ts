@@ -23,11 +23,14 @@ describe('CombatLoop integration', () => {
     // With max enemies limit (6), spawns are capped by active enemy count
     // Enemies spawn and get destroyed/fly past, so total spawns depend on turnover
     expect(summary.spawns.drone).toBeGreaterThan(0);
+    // After 30s, weavers start spawning
+    expect(summary.spawns.weaver).toBeGreaterThan(0);
+
     // Current curve doesn't spawn scouts or bombers
     expect(summary.spawns.scout).toBe(0);
     expect(summary.spawns.bomber).toBe(0);
-    // Max active enemies should never exceed the limit
-    expect(summary.active).toBeLessThanOrEqual(6);
+    // Max active enemies should never exceed the limit (6 drones + 2 weavers = 8)
+    expect(summary.active).toBeLessThanOrEqual(8);
     // Enemies that reach the player are destroyed (not counted as kills)
     expect(summary.hull).toBeLessThanOrEqual(100);
     expect(summary.hull).toBeGreaterThanOrEqual(0);
