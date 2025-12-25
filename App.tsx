@@ -377,20 +377,21 @@ const App: React.FC = () => {
       */}
 
       {/* GLOBAL WEBCAM PREVIEW - ALWAYS VISIBLE */}
-      {/* Fixed Bottom Right Window */}
-      {/* Using inline styles to guarantee positioning */}
+      {/* Fixed Bottom Right Window - Responsive sizing */}
       {USE_REAL_INPUT && (
         <div
-          className="fixed w-64 aspect-video bg-black rounded-lg overflow-hidden border border-slate-700 shadow-2xl z-50 pointer-events-none animate-in fade-in duration-1000 slide-in-from-bottom-4"
-          style={{ position: 'fixed', bottom: '2rem', right: '2rem', width: '300px', height: '170px', zIndex: 100 }}
+          className="fixed bg-black rounded-lg overflow-hidden border border-slate-700 shadow-2xl z-50 pointer-events-none animate-in fade-in duration-1000 slide-in-from-bottom-4
+                     w-[120px] h-[68px] bottom-1 right-1
+                     sm:w-[200px] sm:h-[113px] sm:bottom-2 sm:right-2
+                     md:w-[300px] md:h-[170px] md:bottom-4 md:right-4"
         >
           <WebcamPreview onStreamReady={handleStreamReady} onError={() => { }} />
 
           {/* Minimal Overlay */}
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-2 right-2 flex space-x-1">
+            <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex space-x-1">
               <div className="w-1 h-1 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-[10px] text-red-500 font-mono">LIVE</span>
+              <span className="text-[8px] sm:text-[10px] text-red-500 font-mono">LIVE</span>
             </div>
           </div>
           <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,40,60,0.2)_50%)] bg-[length:100%_4px] pointer-events-none" />
