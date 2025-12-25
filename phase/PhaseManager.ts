@@ -35,7 +35,8 @@ export const DEFAULT_PHASE_GUARDS: PhaseGuards = {
   requiredCalibrationStableMs: 1200,
   maxUnstableBeforeStartMs: 750,
   pauseHoldMs: 800,
-  maxPlayTimeMs: 120000,
+  pauseHoldMs: 800,
+  maxPlayTimeMs: Infinity, // No time limit
   startGestures: ['pinch', 'fist'],
   pauseGestures: ['palm'],
   resumeGestures: ['pinch', 'fist'],
