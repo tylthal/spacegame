@@ -99,34 +99,3 @@ body {
 #root {
   min-height: 100vh;
 }
-
-/* Mobile Landscape HUD Scaling - reduce size by ~50% when in landscape on small screens */
-@media (max-width: 767px) and (orientation: landscape) {
-  .hud-container {
-    transform: scale(0.6);
-    transform-origin: top left;
-  }
-  
-  .hud-top-bar {
-    transform: scale(0.6);
-    transform-origin: top center;
-  }
-  
-  .hud-bottom {
-    transform: scale(0.6);
-    transform-origin: bottom center;
-  }
-  
-  .hud-bottom-left {
-    transform: scale(0.6);
-    transform-origin: bottom left;
-  }
-}
-
-/* Portrait mode - slight reduction */
-@media (max-width: 767px) and (orientation: portrait) {
-  .hud-container {
-    transform: scale(0.85);
-    transform-origin: top left;
-  }
-}
