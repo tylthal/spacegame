@@ -303,7 +303,7 @@ const App: React.FC = () => {
               inputProcessor={inputProcessor}
               onResume={() => {
                 setIsPaused(false);
-                palmHoldStartRef.current = null;
+                pauseGesture.reset();
               }}
               onExit={() => {
                 // Go back to title screen
