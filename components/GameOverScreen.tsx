@@ -119,97 +119,97 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
             {/* Dark overlay */}
             <div className="absolute inset-0 bg-black/90" />
 
-            {/* Content */}
-            <div className="relative bg-black border-4 border-y2k-red p-8 max-w-lg w-full mx-4 text-center">
+            {/* Content - compact for landscape */}
+            <div className="relative bg-black border-2 tall:border-4 border-y2k-red p-3 tall:p-4 md:p-8 max-w-lg w-full mx-2 tall:mx-4 text-center">
 
-                {/* Glitch Header */}
-                <div className="relative mb-8">
-                    <h1 className="text-6xl font-display font-bold text-y2k-red uppercase tracking-tighter animate-twitch">
+                {/* Glitch Header - compact */}
+                <div className="relative mb-3 tall:mb-4 md:mb-8">
+                    <h1 className="text-2xl tall:text-4xl md:text-6xl font-display font-bold text-y2k-red uppercase tracking-tighter animate-twitch">
                         SYSTEM
                     </h1>
-                    <h1 className="text-6xl font-display font-bold text-y2k-red uppercase tracking-tighter animate-twitch" style={{ animationDelay: '0.1s' }}>
+                    <h1 className="text-2xl tall:text-4xl md:text-6xl font-display font-bold text-y2k-red uppercase tracking-tighter animate-twitch" style={{ animationDelay: '0.1s' }}>
                         FAILURE
                     </h1>
                     <div className="absolute inset-0 bg-y2k-red/20 animate-pulse" />
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-3 gap-4 mb-8 border-t-2 border-b-2 border-y2k-white/20 py-6">
+                {/* Stats Grid - compact */}
+                <div className="grid grid-cols-3 gap-2 tall:gap-3 md:gap-4 mb-3 tall:mb-4 md:mb-8 border-t border-b tall:border-t-2 tall:border-b-2 border-y2k-white/20 py-2 tall:py-4 md:py-6">
                     <div>
-                        <div className="text-xs font-mono text-y2k-white/50 uppercase mb-1">
-                            Final Score
+                        <div className="text-[7px] tall:text-[9px] md:text-xs font-mono text-y2k-white/50 uppercase mb-0.5">
+                            Score
                         </div>
-                        <div className="text-3xl font-display font-bold text-y2k-yellow">
+                        <div className="text-lg tall:text-2xl md:text-3xl font-display font-bold text-y2k-yellow">
                             {score.toLocaleString()}
                         </div>
                     </div>
                     <div>
-                        <div className="text-xs font-mono text-y2k-white/50 uppercase mb-1">
-                            Enemies Destroyed
+                        <div className="text-[7px] tall:text-[9px] md:text-xs font-mono text-y2k-white/50 uppercase mb-0.5">
+                            Kills
                         </div>
-                        <div className="text-3xl font-display font-bold text-y2k-cyan">
+                        <div className="text-lg tall:text-2xl md:text-3xl font-display font-bold text-y2k-cyan">
                             {kills}
                         </div>
                     </div>
                     <div>
-                        <div className="text-xs font-mono text-y2k-white/50 uppercase mb-1">
-                            Survival Time
+                        <div className="text-[7px] tall:text-[9px] md:text-xs font-mono text-y2k-white/50 uppercase mb-0.5">
+                            Time
                         </div>
-                        <div className="text-3xl font-display font-bold text-y2k-white">
+                        <div className="text-lg tall:text-2xl md:text-3xl font-display font-bold text-y2k-white">
                             {formatTime(survivalTimeMs)}
                         </div>
                     </div>
                 </div>
 
-                {/* Terminal Message */}
-                <div className="bg-y2k-red/10 border border-y2k-red/50 p-4 mb-8 text-left font-mono text-sm">
-                    <div className="text-y2k-red mb-2">&gt; ORBITAL PLATFORM COMPROMISED</div>
+                {/* Terminal Message - hidden on small landscape */}
+                <div className="hidden tall:block bg-y2k-red/10 border border-y2k-red/50 p-2 tall:p-3 md:p-4 mb-3 tall:mb-4 md:mb-8 text-left font-mono text-[8px] tall:text-xs md:text-sm">
+                    <div className="text-y2k-red mb-1">&gt; ORBITAL PLATFORM COMPROMISED</div>
                     <div className="text-y2k-white/70">&gt; Hull integrity: 0%</div>
                     <div className="text-y2k-white/70">&gt; Life support: OFFLINE</div>
                     <div className="text-y2k-yellow animate-pulse">&gt; Awaiting command...</div>
                 </div>
 
-                {/* Buttons */}
-                <div className="flex gap-4">
+                {/* Buttons - compact */}
+                <div className="flex gap-2 tall:gap-3 md:gap-4">
                     {/* Restart Button */}
                     <button
                         ref={restartButtonRef}
                         onClick={onRestart}
-                        className={`flex-1 py-4 font-display font-bold text-lg uppercase tracking-wider
+                        className={`flex-1 py-2 tall:py-3 md:py-4 font-display font-bold text-xs tall:text-base md:text-lg uppercase tracking-wider
                          transition-all duration-100 active:translate-y-0.5
                          ${hoveringRestart
                                 ? 'bg-y2k-white text-black scale-105 shadow-[0_0_30px_rgba(255,255,0,0.5)]'
                                 : 'bg-y2k-yellow text-black hover:bg-y2k-white'
                             }`}
                     >
-                        [ REBOOT SYSTEM ]
+                        [ RESTART ]
                     </button>
 
                     {/* Exit Button */}
                     <button
                         ref={exitButtonRef}
                         onClick={onExit}
-                        className={`flex-1 py-4 font-display font-bold text-lg uppercase tracking-wider
+                        className={`flex-1 py-2 tall:py-3 md:py-4 font-display font-bold text-xs tall:text-base md:text-lg uppercase tracking-wider
                          transition-all duration-100 active:translate-y-0.5
                          ${hoveringExit
                                 ? 'bg-y2k-white text-y2k-red scale-105 shadow-[0_0_30px_rgba(255,0,68,0.5)]'
-                                : 'bg-transparent text-y2k-red border-2 border-y2k-red hover:bg-y2k-red hover:text-black'
+                                : 'bg-transparent text-y2k-red border border-y2k-red tall:border-2 hover:bg-y2k-red hover:text-black'
                             }`}
                     >
-                        [ EXIT SYSTEM ]
+                        [ EXIT ]
                     </button>
                 </div>
 
-                {/* Pinch hint */}
-                <div className="mt-4 text-xs font-mono text-y2k-white/50 uppercase">
+                {/* Pinch hint - hidden on landscape */}
+                <div className="hidden tall:block mt-2 tall:mt-3 md:mt-4 text-[8px] tall:text-[10px] md:text-xs font-mono text-y2k-white/50 uppercase">
                     Pinch on button to select
                 </div>
 
-                {/* Corner decorations */}
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-y2k-red" />
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-y2k-red" />
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-y2k-red" />
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-y2k-red" />
+                {/* Corner decorations - smaller on landscape */}
+                <div className="absolute top-0 left-0 w-2 h-2 tall:w-3 tall:h-3 md:w-4 md:h-4 border-t border-l tall:border-t-2 tall:border-l-2 border-y2k-red" />
+                <div className="absolute top-0 right-0 w-2 h-2 tall:w-3 tall:h-3 md:w-4 md:h-4 border-t border-r tall:border-t-2 tall:border-r-2 border-y2k-red" />
+                <div className="absolute bottom-0 left-0 w-2 h-2 tall:w-3 tall:h-3 md:w-4 md:h-4 border-b border-l tall:border-b-2 tall:border-l-2 border-y2k-red" />
+                <div className="absolute bottom-0 right-0 w-2 h-2 tall:w-3 tall:h-3 md:w-4 md:h-4 border-b border-r tall:border-b-2 tall:border-r-2 border-y2k-red" />
             </div>
 
             {/* Hand Cursor - visible on game over screen */}

@@ -296,113 +296,113 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
 
             {/* Main Calibration UI */}
             <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
-                <div className="w-full max-w-5xl p-8 flex flex-col items-center relative pointer-events-auto">
+                <div className="w-full max-w-5xl p-2 tall:p-4 md:p-8 flex flex-col items-center relative pointer-events-auto">
 
-                    {/* Header */}
-                    <div className="w-full border-b-4 border-y2k-yellow mb-8 pb-4">
-                        <h2 className="text-5xl font-display font-bold text-y2k-yellow tracking-tighter uppercase">
+                    {/* Header - compact for landscape */}
+                    <div className="w-full border-b-2 tall:border-b-4 border-y2k-yellow mb-2 tall:mb-4 md:mb-8 pb-1 tall:pb-2 md:pb-4">
+                        <h2 className="text-2xl tall:text-3xl md:text-5xl font-display font-bold text-y2k-yellow tracking-tighter uppercase">
                             {isSuccess ? 'LOCKED IN' : 'CALIBRATION'}
                         </h2>
-                        <p className="text-y2k-silver font-mono text-sm mt-2">
-                            {isSuccess ? 'Aim at START GAME and pinch to begin' : 'Hold both gestures steady for 4 seconds'}
+                        <p className="text-y2k-silver font-mono text-[8px] tall:text-xs md:text-sm mt-0.5 tall:mt-1 md:mt-2">
+                            {isSuccess ? 'Aim at START GAME and pinch' : 'Hold both gestures steady for 4s'}
                         </p>
                     </div>
 
                     {!isSuccess ? (
-                        <div className="flex flex-row justify-center items-stretch gap-6 w-full">
+                        <div className="flex flex-row justify-center items-stretch gap-2 tall:gap-4 md:gap-6 w-full">
 
-                            {/* Left Hand Card */}
-                            <div className={`flex-1 p-6 border-2 transition-colors duration-100
+                            {/* Left Hand Card - compact */}
+                            <div className={`flex-1 p-2 tall:p-4 md:p-6 border tall:border-2 transition-colors duration-100
                                 ${leftPinchDetected
                                     ? 'bg-y2k-yellow border-y2k-yellow text-black'
                                     : 'bg-black/60 border-y2k-white/30 text-y2k-white'}`}>
 
-                                <div className="text-xs font-mono opacity-60 mb-2">LEFT HAND</div>
-                                <div className="text-4xl font-display font-bold mb-4">PINCH</div>
-                                <div className="text-sm font-mono opacity-80 mb-6">
+                                <div className="text-[8px] tall:text-[10px] md:text-xs font-mono opacity-60 mb-0.5 tall:mb-1 md:mb-2">LEFT HAND</div>
+                                <div className="text-xl tall:text-2xl md:text-4xl font-display font-bold mb-1 tall:mb-2 md:mb-4">PINCH</div>
+                                <div className="text-[8px] tall:text-xs md:text-sm font-mono opacity-80 mb-2 tall:mb-4 md:mb-6 hidden tall:block">
                                     Touch thumb & index finger together
                                 </div>
 
-                                <div className={`text-center py-2 border-2 font-mono font-bold
+                                <div className={`text-center py-1 tall:py-1.5 md:py-2 border tall:border-2 font-mono font-bold text-[8px] tall:text-xs md:text-sm
                                     ${leftPinchDetected
                                         ? 'border-black text-black'
                                         : 'border-y2k-red text-y2k-red'}`}>
-                                    {leftPinchDetected ? '✓ DETECTED' : '○ WAITING'}
+                                    {leftPinchDetected ? '✓ OK' : '○ WAIT'}
                                 </div>
                             </div>
 
-                            {/* Progress Bar */}
-                            <div className="w-16 flex flex-col justify-end items-center bg-black/60 border border-y2k-white/20 p-2">
+                            {/* Progress Bar - compact */}
+                            <div className="w-8 tall:w-12 md:w-16 flex flex-col justify-end items-center bg-black/60 border border-y2k-white/20 p-1 tall:p-1.5 md:p-2">
                                 <div className="w-full bg-y2k-white/10 h-full relative flex flex-col justify-end overflow-hidden">
                                     <div
                                         className="w-full bg-y2k-yellow transition-all duration-100"
                                         style={{ height: `${progress * 100}%` }}
                                     />
                                 </div>
-                                <div className="mt-2 font-mono text-y2k-yellow text-lg font-bold">
+                                <div className="mt-0.5 tall:mt-1 md:mt-2 font-mono text-y2k-yellow text-xs tall:text-sm md:text-lg font-bold">
                                     {(progress * 100).toFixed(0)}%
                                 </div>
                             </div>
 
-                            {/* Right Hand Card */}
-                            <div className={`flex-1 p-6 border-2 transition-colors duration-100
+                            {/* Right Hand Card - compact */}
+                            <div className={`flex-1 p-2 tall:p-4 md:p-6 border tall:border-2 transition-colors duration-100
                                 ${rightPointDetected
                                     ? 'bg-y2k-yellow border-y2k-yellow text-black'
                                     : 'bg-black/60 border-y2k-white/30 text-y2k-white'}`}>
 
-                                <div className="text-xs font-mono opacity-60 mb-2">RIGHT HAND</div>
-                                <div className="text-4xl font-display font-bold mb-4">POINT</div>
-                                <div className="text-sm font-mono opacity-80 mb-6">
+                                <div className="text-[8px] tall:text-[10px] md:text-xs font-mono opacity-60 mb-0.5 tall:mb-1 md:mb-2">RIGHT HAND</div>
+                                <div className="text-xl tall:text-2xl md:text-4xl font-display font-bold mb-1 tall:mb-2 md:mb-4">POINT</div>
+                                <div className="text-[8px] tall:text-xs md:text-sm font-mono opacity-80 mb-2 tall:mb-4 md:mb-6 hidden tall:block">
                                     Make a gun shape, aim at screen
                                 </div>
 
-                                <div className={`text-center py-2 border-2 font-mono font-bold
+                                <div className={`text-center py-1 tall:py-1.5 md:py-2 border tall:border-2 font-mono font-bold text-[8px] tall:text-xs md:text-sm
                                     ${rightPointDetected
                                         ? 'border-black text-black'
                                         : 'border-y2k-red text-y2k-red'}`}>
-                                    {rightPointDetected ? '✓ DETECTED' : '○ WAITING'}
+                                    {rightPointDetected ? '✓ OK' : '○ WAIT'}
                                 </div>
                             </div>
 
                         </div>
                     ) : (
-                        <div className="w-full bg-y2k-yellow p-12 flex flex-col items-center justify-center text-black space-y-6">
-                            <h1 className="text-7xl font-display font-bold tracking-tighter">READY</h1>
-                            <p className="font-mono text-lg">
+                        <div className="w-full bg-y2k-yellow p-4 tall:p-6 md:p-12 flex flex-col items-center justify-center text-black space-y-2 tall:space-y-4 md:space-y-6">
+                            <h1 className="text-3xl tall:text-5xl md:text-7xl font-display font-bold tracking-tighter">READY</h1>
+                            <p className="font-mono text-xs tall:text-sm md:text-lg">
                                 Aim at the button and pinch to click
                             </p>
                             <button
                                 ref={buttonRef}
-                                className="mt-4 px-12 py-4 bg-black text-y2k-yellow font-display font-bold text-2xl uppercase hover:bg-white hover:text-black transition-colors cursor-none"
+                                className="mt-1 tall:mt-2 md:mt-4 px-6 tall:px-8 md:px-12 py-2 tall:py-3 md:py-4 bg-black text-y2k-yellow font-display font-bold text-base tall:text-xl md:text-2xl uppercase hover:bg-white hover:text-black transition-colors cursor-none"
                             >
                                 START GAME
                             </button>
-                            <p className="font-mono text-sm opacity-60">
+                            <p className="font-mono text-[8px] tall:text-xs md:text-sm opacity-60">
                                 (or click with mouse)
                             </p>
                             {/* Fallback mouse click */}
                             <button
                                 onClick={() => onComplete(finalCalibrationOffsetRef.current)}
-                                className="text-xs font-mono underline opacity-50 hover:opacity-100"
+                                className="text-[8px] tall:text-[10px] md:text-xs font-mono underline opacity-50 hover:opacity-100"
                             >
                                 Skip (use mouse)
                             </button>
                         </div>
                     )}
 
-                    {/* Status Bar */}
+                    {/* Status Bar - compact for landscape */}
                     {!isSuccess && (
-                        <div className="mt-8 w-full bg-black/80 border-t border-y2k-white/20 py-4 text-center">
+                        <div className="mt-2 tall:mt-4 md:mt-8 w-full bg-black/80 border-t border-y2k-white/20 py-1 tall:py-2 md:py-4 text-center">
                             {failureReason ? (
-                                <p className="text-2xl font-body text-y2k-red font-bold uppercase">
+                                <p className="text-base tall:text-xl md:text-2xl font-body text-y2k-red font-bold uppercase">
                                     {failureReason}
                                 </p>
                             ) : (rightPointDetected && leftPinchDetected) ? (
-                                <p className="text-2xl font-body text-y2k-yellow font-bold uppercase animate-pulse">
+                                <p className="text-base tall:text-xl md:text-2xl font-body text-y2k-yellow font-bold uppercase animate-pulse">
                                     Hold steady...
                                 </p>
                             ) : (
-                                <p className="text-xl font-body text-y2k-silver uppercase">
+                                <p className="text-sm tall:text-lg md:text-xl font-body text-y2k-silver uppercase">
                                     Waiting for gestures
                                 </p>
                             )}

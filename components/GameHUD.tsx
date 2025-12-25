@@ -81,16 +81,16 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
     return (
         <div className="fixed inset-0 pointer-events-none z-40">
-            {/* Top Bar - responsive padding and flex-wrap for mobile */}
-            <div className="absolute top-0 left-0 right-0 flex flex-wrap justify-between items-start p-1 sm:p-4 gap-1 sm:gap-2">
+            {/* Top Bar - ultra-compact for iPhone landscape, expands on taller/wider screens */}
+            <div className="absolute top-0 left-0 right-0 flex flex-wrap justify-between items-start p-0.5 tall:p-1 md:p-3 gap-0.5 tall:gap-1 md:gap-2">
 
-                {/* Left: Hull Integrity - responsive sizing */}
-                <div className="bg-black/80 border-2 border-y2k-yellow p-2 sm:p-3 min-w-[120px] sm:min-w-[200px]">
-                    <div className="text-[10px] sm:text-xs font-mono text-y2k-yellow/70 mb-1 uppercase tracking-wider">
-                        Hull Integrity
+                {/* Left: Hull Integrity - compact on landscape */}
+                <div className="bg-black/80 border border-y2k-yellow tall:border-2 p-1 tall:p-1.5 md:p-3 min-w-[80px] tall:min-w-[100px] md:min-w-[180px]">
+                    <div className="text-[8px] tall:text-[9px] md:text-xs font-mono text-y2k-yellow/70 mb-0.5 uppercase tracking-wide">
+                        Hull
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-2">
-                        <div className="flex-1 h-3 sm:h-4 bg-black border border-y2k-white/30">
+                    <div className="flex items-center gap-0.5 tall:gap-1 md:gap-2">
+                        <div className="flex-1 h-2 tall:h-2.5 md:h-4 bg-black border border-y2k-white/30">
                             <div
                                 className={`h-full transition-all duration-200 ${isDanger ? 'bg-y2k-red animate-pulse' :
                                     isWarning ? 'bg-y2k-yellow' :
@@ -99,7 +99,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                                 style={{ width: `${hullPercent}%` }}
                             />
                         </div>
-                        <span className={`font-display font-bold text-base sm:text-xl min-w-[40px] sm:min-w-[50px] text-right ${isDanger ? 'text-y2k-red' :
+                        <span className={`font-display font-bold text-xs tall:text-sm md:text-xl min-w-[28px] tall:min-w-[32px] md:min-w-[50px] text-right ${isDanger ? 'text-y2k-red' :
                             isWarning ? 'text-y2k-yellow' :
                                 'text-y2k-cyan'
                             }`}>
@@ -107,45 +107,45 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                         </span>
                     </div>
                     {isDanger && (
-                        <div className="text-y2k-red font-mono text-[10px] sm:text-xs mt-1 animate-pulse uppercase">
+                        <div className="text-y2k-red font-mono text-[7px] tall:text-[8px] md:text-xs mt-0.5 animate-pulse uppercase">
                             ⚠ CRITICAL
                         </div>
                     )}
                 </div>
 
-                {/* Right: Score & Stats - responsive sizing */}
-                <div className="flex gap-1 sm:gap-3">
+                {/* Right: Score & Stats - compact boxes */}
+                <div className="flex gap-0.5 tall:gap-1 md:gap-3">
                     {/* Time */}
-                    <div className="bg-black/80 border-2 border-y2k-white/30 p-1.5 sm:p-3 text-center">
-                        <div className="text-[10px] sm:text-xs font-mono text-y2k-white/50 uppercase tracking-wider">
+                    <div className="bg-black/80 border border-y2k-white/30 tall:border-2 p-0.5 tall:p-1 md:p-3 text-center">
+                        <div className="text-[7px] tall:text-[8px] md:text-xs font-mono text-y2k-white/50 uppercase">
                             Time
                         </div>
-                        <div className="font-display font-bold text-lg sm:text-2xl text-y2k-white">
+                        <div className="font-display font-bold text-sm tall:text-base md:text-2xl text-y2k-white">
                             {formatTime(elapsedMs)}
                         </div>
                     </div>
 
                     {/* Kills */}
-                    <div className={`bg-black/80 border-2 p-1.5 sm:p-3 text-center transition-all duration-100 ${isKillFlashing
+                    <div className={`bg-black/80 border tall:border-2 p-0.5 tall:p-1 md:p-3 text-center transition-all duration-100 ${isKillFlashing
                         ? 'border-y2k-yellow bg-y2k-cyan/20 scale-110'
                         : 'border-y2k-cyan'
                         }`}>
-                        <div className="text-[10px] sm:text-xs font-mono text-y2k-cyan/70 uppercase tracking-wider">
+                        <div className="text-[7px] tall:text-[8px] md:text-xs font-mono text-y2k-cyan/70 uppercase">
                             Kills
                         </div>
-                        <div className={`font-display font-bold text-lg sm:text-2xl transition-all duration-100 ${isKillFlashing ? 'text-y2k-yellow scale-125' : 'text-y2k-cyan'
+                        <div className={`font-display font-bold text-sm tall:text-base md:text-2xl transition-all duration-100 ${isKillFlashing ? 'text-y2k-yellow scale-125' : 'text-y2k-cyan'
                             }`}>
                             {kills}
                         </div>
                     </div>
 
                     {/* Score */}
-                    <div className={`bg-black/80 border-2 border-y2k-yellow p-1.5 sm:p-3 text-center transition-all duration-150 ${isScoreAnimating ? 'scale-110 shadow-[0_0_20px_rgba(255,255,0,0.5)]' : ''
+                    <div className={`bg-black/80 border tall:border-2 border-y2k-yellow p-0.5 tall:p-1 md:p-3 text-center transition-all duration-150 ${isScoreAnimating ? 'scale-110 shadow-[0_0_20px_rgba(255,255,0,0.5)]' : ''
                         }`}>
-                        <div className="text-[10px] sm:text-xs font-mono text-y2k-yellow/70 uppercase tracking-wider">
+                        <div className="text-[7px] tall:text-[8px] md:text-xs font-mono text-y2k-yellow/70 uppercase">
                             Score
                         </div>
-                        <div className={`font-display font-bold text-xl sm:text-3xl transition-all duration-150 ${isScoreAnimating ? 'text-white scale-110' : 'text-y2k-yellow'
+                        <div className={`font-display font-bold text-base tall:text-lg md:text-3xl transition-all duration-150 ${isScoreAnimating ? 'text-white scale-110' : 'text-y2k-yellow'
                             }`}>
                             {score.toLocaleString()}
                         </div>
@@ -153,21 +153,21 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 </div>
             </div>
 
-            {/* Bottom Center: Heat Gauge - responsive width */}
-            <div className="absolute bottom-12 sm:bottom-4 left-1/2 -translate-x-1/2 w-36 sm:w-80">
-                <div className={`bg-black/80 border-2 p-2 sm:p-3 transition-colors ${isOverheated ? 'border-y2k-red' : 'border-y2k-yellow/50'
+            {/* Bottom Center: Heat Gauge - smaller on landscape */}
+            <div className="absolute bottom-8 tall:bottom-10 md:bottom-4 left-1/2 -translate-x-1/2 w-28 tall:w-32 md:w-72">
+                <div className={`bg-black/80 border tall:border-2 p-1 tall:p-1.5 md:p-3 transition-colors ${isOverheated ? 'border-y2k-red' : 'border-y2k-yellow/50'
                     }`}>
-                    <div className="flex justify-between items-center mb-1">
-                        <span className={`text-[10px] sm:text-xs font-mono uppercase tracking-wider ${isOverheated ? 'text-y2k-red animate-pulse' : 'text-y2k-yellow/70'
+                    <div className="flex justify-between items-center mb-0.5">
+                        <span className={`text-[7px] tall:text-[8px] md:text-xs font-mono uppercase ${isOverheated ? 'text-y2k-red animate-pulse' : 'text-y2k-yellow/70'
                             }`}>
-                            {isOverheated ? '⚠ OVERHEAT' : 'Weapon Heat'}
+                            {isOverheated ? '⚠ HOT' : 'Heat'}
                         </span>
-                        <span className={`font-mono text-[10px] sm:text-sm ${isOverheated ? 'text-y2k-red' : heatPercent > 70 ? 'text-y2k-yellow' : 'text-y2k-white/70'
+                        <span className={`font-mono text-[7px] tall:text-[8px] md:text-sm ${isOverheated ? 'text-y2k-red' : heatPercent > 70 ? 'text-y2k-yellow' : 'text-y2k-white/70'
                             }`}>
                             {Math.round(heatPercent)}%
                         </span>
                     </div>
-                    <div className="h-2 sm:h-3 bg-black border border-y2k-white/30 overflow-hidden">
+                    <div className="h-1.5 tall:h-2 md:h-3 bg-black border border-y2k-white/30 overflow-hidden">
                         <div
                             className={`h-full transition-all duration-100 ${isOverheated ? 'animate-pulse' : ''
                                 }`}
@@ -177,30 +177,30 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                             }}
                         />
                     </div>
-                    <div className="hidden sm:block text-xs font-mono text-y2k-white/50 mt-1 text-center uppercase tracking-widest">
+                    <div className="hidden md:block text-xs font-mono text-y2k-white/50 mt-1 text-center uppercase tracking-widest">
                         Pinch to Fire • Release to Cool
                     </div>
                 </div>
             </div>
 
-            {/* Bottom Left: Missile Status - responsive width and position */}
-            <div className="absolute bottom-2 sm:bottom-4 left-1 sm:left-4 w-24 sm:w-48">
-                <div className={`bg-black/80 border-2 p-2 sm:p-3 transition-colors ${missileReady ? 'border-y2k-yellow' : 'border-y2k-yellow/50'
+            {/* Bottom Left: Missile Status - ultra-compact on landscape */}
+            <div className="absolute bottom-1 tall:bottom-2 md:bottom-4 left-0.5 tall:left-1 md:left-4 w-20 tall:w-24 md:w-44">
+                <div className={`bg-black/80 border tall:border-2 p-1 tall:p-1.5 md:p-3 transition-colors ${missileReady ? 'border-y2k-yellow' : 'border-y2k-yellow/50'
                     }`}>
-                    <div className="flex justify-between items-center mb-1">
-                        <span className={`text-[10px] sm:text-xs font-mono uppercase tracking-wider ${missileReady ? 'text-y2k-yellow' : 'text-y2k-yellow/70'
+                    <div className="flex justify-between items-center mb-0.5">
+                        <span className={`text-[7px] tall:text-[8px] md:text-xs font-mono uppercase ${missileReady ? 'text-y2k-yellow' : 'text-y2k-yellow/70'
                             }`}>
-                            {missileReady ? '🚀 READY' : '🚀 LOADING'}
+                            {missileReady ? '🚀 RDY' : '🚀 ...'}
                         </span>
                     </div>
-                    <div className="h-2 sm:h-3 bg-black border border-y2k-white/30 overflow-hidden">
+                    <div className="h-1.5 tall:h-2 md:h-3 bg-black border border-y2k-white/30 overflow-hidden">
                         <div
                             className={`h-full transition-all duration-100 ${missileReady ? 'bg-y2k-yellow' : 'bg-y2k-cyan'
                                 }`}
                             style={{ width: `${missileCooldownProgress * 100}%` }}
                         />
                     </div>
-                    <div className="hidden sm:block text-xs font-mono text-y2k-white/50 mt-1 text-center uppercase tracking-widest">
+                    <div className="hidden md:block text-xs font-mono text-y2k-white/50 mt-1 text-center uppercase tracking-widest">
                         Fist to Fire
                     </div>
                 </div>

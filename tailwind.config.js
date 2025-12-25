@@ -7,6 +7,17 @@ export default {
     './index.tsx'
   ],
   theme: {
+    screens: {
+      'xs': '480px',      // Small phones
+      'sm': '640px',      // Large phones / small tablets
+      'md': '768px',      // Tablets
+      'lg': '1024px',     // Desktops
+      'xl': '1280px',     // Large desktops
+      '2xl': '1536px',    // Extra large
+      // Height-based breakpoints for landscape detection
+      'tall': { 'raw': '(min-height: 500px)' },
+      'short': { 'raw': '(max-height: 499px)' },
+    },
     extend: {
       fontFamily: {
         mono: ['"Courier New"', 'monospace'], // Raw code look
