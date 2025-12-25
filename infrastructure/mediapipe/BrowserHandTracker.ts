@@ -26,6 +26,10 @@ export class BrowserHandTracker implements HandTracker {
       },
       runningMode: 'VIDEO',
       numHands: 2, // Support dual-hand calibration
+      // Increased confidence thresholds to reduce false positives from background
+      minHandDetectionConfidence: 0.7,  // Default 0.5 - higher = more certain detection
+      minHandPresenceConfidence: 0.7,   // Default 0.5 - track only when hand clearly visible
+      minTrackingConfidence: 0.7,       // Default 0.5 - require stable tracking between frames
     });
 
     this.startLoop();
