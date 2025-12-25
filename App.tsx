@@ -337,19 +337,6 @@ const App: React.FC = () => {
           )}
 
           {/* Exit Button (hidden when game over) */}
-          {!isGameOver && (
-            <div className="absolute top-4 left-4 z-50 pointer-events-auto">
-              <button
-                onClick={() => {
-                  phaseManager.reset();
-                }}
-                className="bg-y2k-red/20 hover:bg-y2k-red text-y2k-red hover:text-black border border-y2k-red/50 px-4 py-2 text-xs font-bold uppercase tracking-wider transition"
-              >
-                Abort
-              </button>
-            </div>
-          )}
-
           <div className="absolute bottom-4 right-4 z-50 pointer-events-auto">
             {debugConfig.debugPanels && <DebugPanel config={debugConfig} diagnostics={diagnostics} />}
           </div>
