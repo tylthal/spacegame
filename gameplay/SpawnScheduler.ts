@@ -14,10 +14,9 @@ export interface SpawnEvent {
 
 export const DEFAULT_SPAWN_CURVE: SpawnTier[] = [
   // Tier 1: Just drones (0-30s)
-  { startMs: 0, intervalMs: 2000, weights: { drone: 10, scout: 0, bomber: 0, weaver: 0 } },
-  // Tier 2: Drones and Weavers (30s+)
-  // We use equal weights here and let the CombatLoop caps decide what can actually spawn
-  { startMs: 30000, intervalMs: 1000, weights: { drone: 10, scout: 0, bomber: 0, weaver: 10 } },
+  { startMs: 0, intervalMs: 2000, weights: { drone: 10, scout: 0, bomber: 0, weaver: 0, shieldedDrone: 0 } },
+  // Tier 2: Drones, Weavers, and Shielded Drones (30s+) - CombatLoop caps at max 2 shielded
+  { startMs: 30000, intervalMs: 1000, weights: { drone: 10, scout: 0, bomber: 0, weaver: 8, shieldedDrone: 5 } },
 ];
 
 export class SpawnScheduler {

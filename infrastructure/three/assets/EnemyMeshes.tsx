@@ -422,6 +422,91 @@ function WeaverMesh() {
     );
 }
 
+// Dark green metallic material for shielded drone body
+const METAL_DARK_GREEN = {
+    color: '#1A3A1A',
+    emissive: '#0D2F0D',
+    emissiveIntensity: 0.6,
+    metalness: 0.85,
+    roughness: 0.2,
+};
+
+/**
+ * SHIELDED DRONE - Drone variant with protective shield
+ * Same geometry as DroneMesh but darker coloring to contrast with green shield
+ */
+function ShieldedDroneMesh() {
+    return (
+        <group>
+            {/* Main fuselage - compact body (darker green) */}
+            <mesh scale={[0.5, 0.35, 1.6]}>
+                <octahedronGeometry args={[0.5]} />
+                <meshStandardMaterial {...METAL_DARK_GREEN} />
+            </mesh>
+
+            {/* Green nose cone - FRONT (+Z) */}
+            <mesh position={[0, 0, 0.9]} rotation={[Math.PI / 2, 0, 0]} scale={[0.12, 0.25, 0.12]}>
+                <coneGeometry args={[1, 1, 6]} />
+                <meshStandardMaterial
+                    color="#00FF66"
+                    emissive="#00AA44"
+                    emissiveIntensity={1.0}
+                    metalness={0.8}
+                    roughness={0.2}
+                />
+            </mesh>
+
+            {/* Left swept wing */}
+            <mesh position={[-0.5, 0, -0.2]} rotation={[0, -0.3, 0]} scale={[0.6, 0.04, 0.5]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial {...METAL_DARK_GREEN} />
+            </mesh>
+
+            {/* Right swept wing */}
+            <mesh position={[0.5, 0, -0.2]} rotation={[0, 0.3, 0]} scale={[0.6, 0.04, 0.5]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial {...METAL_DARK_GREEN} />
+            </mesh>
+
+            {/* Left wingtip glow - green */}
+            <mesh position={[-0.75, 0, -0.35]} scale={[0.1, 0.06, 0.15]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial
+                    color="#00FF66"
+                    emissive="#00AA44"
+                    emissiveIntensity={4.0}
+                />
+            </mesh>
+
+            {/* Right wingtip glow - green */}
+            <mesh position={[0.75, 0, -0.35]} scale={[0.1, 0.06, 0.15]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial
+                    color="#00FF66"
+                    emissive="#00AA44"
+                    emissiveIntensity={4.0}
+                />
+            </mesh>
+
+            {/* Engine housing - BACK (-Z) */}
+            <mesh position={[0, 0, -0.7]} rotation={[Math.PI / 2, 0, 0]} scale={[0.18, 0.25, 0.18]}>
+                <cylinderGeometry args={[1, 0.8, 1, 8]} />
+                <meshStandardMaterial {...METAL_DARK_GREEN} />
+            </mesh>
+
+            {/* Engine glow core - BACK (-Z) - green */}
+            <mesh position={[0, 0, -0.85]} scale={[0.15, 0.15, 0.1]}>
+                <sphereGeometry args={[1, 8, 6]} />
+                <meshStandardMaterial
+                    color="#00FF66"
+                    emissive="#00FF66"
+                    emissiveIntensity={6.0}
+                />
+            </mesh>
+        </group>
+    );
+}
+
 /**
  * Select and render the appropriate mesh for an enemy type.
  * 
@@ -441,7 +526,8 @@ export const EnemyMesh = React.memo(function EnemyMesh({ kind }: { kind: string 
             {kind === 'scout' && <ScoutMesh />}
             {kind === 'bomber' && <BomberMesh />}
             {kind === 'weaver' && <WeaverMesh />}
-            {!['drone', 'scout', 'bomber', 'weaver'].includes(kind) && <DroneMesh />}
+            {kind === 'shieldedDrone' && <ShieldedDroneMesh />}
+            {!['drone', 'scout', 'bomber', 'weaver', 'shieldedDrone'].includes(kind) && <DroneMesh />}
         </group>
     );
 });

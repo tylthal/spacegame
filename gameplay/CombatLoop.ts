@@ -14,6 +14,11 @@ export interface EnemyInstance {
   wavePhase?: number;
   waveAmplitude?: number; // How far it spirals from trajectory
   waveFrequency?: number; // How fast it spirals
+  // Health/Shield system (optional for backwards compat)
+  health?: number;       // Core HP (default: 1)
+  shield?: number;       // Shield HP (default: 0)
+  maxShield?: number;    // For visual opacity calculation
+  lastHitTime?: number;  // For hit flash effect timing
 }
 
 export interface Bullet {
@@ -51,9 +56,9 @@ export interface CombatOptions {
 const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   hull: 100,
   fireIntervalMs: 125,
-  enemyRadius: { drone: 1.5, scout: 2.0, bomber: 2.5, weaver: 1.8 }, // Weaver is medium-sized
-  enemySpeedPerMs: { drone: 0.02, scout: 0.015, bomber: 0.01, weaver: 0.012 }, // Weaver moves slower
-  enemyDamage: { drone: 5, scout: 8, bomber: 15, weaver: 7 }, // Medium damage
+  enemyRadius: { drone: 1.5, scout: 2.0, bomber: 2.5, weaver: 1.8, shieldedDrone: 1.8 },
+  enemySpeedPerMs: { drone: 0.02, scout: 0.015, bomber: 0.01, weaver: 0.012, shieldedDrone: 0.012 },
+  enemyDamage: { drone: 5, scout: 8, bomber: 15, weaver: 7, shieldedDrone: 15 },
   spawnRadius: 400, // Enemies spawn far in the distance
   bulletSpeed: 0.18, // Faster bullets = less lead required when aiming
   maxEnemies: 6, // Limit enemies on screen
@@ -64,8 +69,10 @@ const MAX_DRONES_EARLY = 6;
 const MAX_DRONES_LATE = 7; // After 120s
 const MAX_WEAVERS_EARLY = 2; // After 30s
 const MAX_WEAVERS_LATE = 3; // After 150s
+const MAX_SHIELDED_DRONES = 2; // Hard cap
 
 const WEAVER_SPAWN_COOLDOWN_MS = 3000; // 3 seconds between weaver spawns
+const SHIELDED_DRONE_SPAWN_COOLDOWN_MS = 4000; // 4 seconds between shielded drone spawns
 
 export interface CombatTickResult {
   timestamp: number;
@@ -78,8 +85,8 @@ export class CombatLoop {
   private readonly enemies: EnemyInstance[] = [];
   private readonly bullets: Bullet[] = [];
   private readonly missiles: Missile[] = [];
-  private readonly kills: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0, weaver: 0 };
-  private readonly spawns: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0, weaver: 0 };
+  private readonly kills: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0, weaver: 0, shieldedDrone: 0 };
+  private readonly spawns: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0, weaver: 0, shieldedDrone: 0 };
 
   // Public access for renderer
   public get activeEnemies(): ReadonlyArray<EnemyInstance> { return this.enemies; }
@@ -143,6 +150,7 @@ export class CombatLoop {
   private enemyId = 0;
   private bulletId = 0;
   private weaverSpawnCooldown = 0; // Stagger weaver spawns
+  private shieldedDroneSpawnCooldown = 0; // Stagger shielded drone spawns
 
   constructor(
     private readonly scheduler: SpawnScheduler,
@@ -180,11 +188,14 @@ export class CombatLoop {
     this.kills.scout = 0;
     this.kills.bomber = 0;
     this.kills.weaver = 0;
+    this.kills.shieldedDrone = 0;
     this.spawns.drone = 0;
     this.spawns.scout = 0;
     this.spawns.bomber = 0;
     this.spawns.weaver = 0;
+    this.spawns.shieldedDrone = 0;
     this.weaverSpawnCooldown = 0;
+    this.shieldedDroneSpawnCooldown = 0;
     this.scheduler.reset();
   }
 
@@ -203,6 +214,9 @@ export class CombatLoop {
     // Update weaver spawn cooldown
     if (this.weaverSpawnCooldown > 0) {
       this.weaverSpawnCooldown = Math.max(0, this.weaverSpawnCooldown - deltaMs);
+    }
+    if (this.shieldedDroneSpawnCooldown > 0) {
+      this.shieldedDroneSpawnCooldown = Math.max(0, this.shieldedDroneSpawnCooldown - deltaMs);
     }
 
     // Spawn Logic - check specific caps for each enemy type
@@ -231,6 +245,14 @@ export class CombatLoop {
           continue;
         }
         this.weaverSpawnCooldown = WEAVER_SPAWN_COOLDOWN_MS;
+      }
+
+      if (event.kind === 'shieldedDrone') {
+        const currentShielded = this.enemies.filter(e => e.kind === 'shieldedDrone').length;
+        if (currentShielded >= MAX_SHIELDED_DRONES || this.shieldedDroneSpawnCooldown > 0) {
+          continue;
+        }
+        this.shieldedDroneSpawnCooldown = SHIELDED_DRONE_SPAWN_COOLDOWN_MS;
       }
 
       // 3. Spawn
@@ -344,6 +366,17 @@ export class CombatLoop {
       waveFrequency = 0.0005 + this.rng.next() * 0.001; // 0.0005-0.0015 cycles/ms (slower spin)
     }
 
+    // Initialize shield for shielded drones
+    let shield: number | undefined;
+    let maxShield: number | undefined;
+    let health: number | undefined;
+
+    if (kind === 'shieldedDrone') {
+      shield = 4;    // Takes 4 hits to overload shield
+      maxShield = 4; // For visual opacity calculation
+      health = 1;    // Then 1 more hit to destroy
+    }
+
     return {
       id: this.enemyId,
       kind,
@@ -352,6 +385,9 @@ export class CombatLoop {
       wavePhase,
       waveAmplitude,
       waveFrequency,
+      shield,
+      maxShield,
+      health,
     };
   }
 
@@ -378,6 +414,45 @@ export class CombatLoop {
         enemy.position.y += spiralY;
       }
     }
+  }
+
+  /**
+   * Apply damage to an enemy, handling shields and health.
+   * Returns true if enemy is destroyed, false if still alive.
+   */
+  private applyDamage(enemy: EnemyInstance, damage: number = 1): boolean {
+    const now = Date.now();
+
+    // Invincibility frames: shield is invulnerable while flashing (150ms after hit)
+    if (enemy.shield !== undefined && enemy.shield > 0 && enemy.lastHitTime !== undefined) {
+      const timeSinceHit = now - enemy.lastHitTime;
+      if (timeSinceHit < 150) {
+        // Shield is still flashing - ignore damage
+        return false;
+      }
+    }
+
+    enemy.lastHitTime = now;
+
+    // Check shield first
+    if (enemy.shield !== undefined && enemy.shield > 0) {
+      enemy.shield -= damage;
+      SoundEngine.play('shieldHit');
+      return false; // Not destroyed, shield absorbed it
+    }
+
+    // Check health (most enemies have health=1 or undefined)
+    const currentHealth = enemy.health ?? 1;
+    if (currentHealth > damage) {
+      enemy.health = currentHealth - damage;
+      SoundEngine.play('explosion');
+      return false; // Not destroyed yet
+    }
+
+    // Destroyed!
+    this.kills[enemy.kind] += 1;
+    SoundEngine.play('explosion');
+    return true;
   }
 
   private advanceBullets(deltaMs: number): EnemyInstance[] {
@@ -438,10 +513,11 @@ export class CombatLoop {
         );
 
         if (hitsCurrent || hitsPrevious) {
-          destroyed.push(enemy);
-          this.enemies.splice(j, 1);
-          this.kills[enemy.kind] += 1;
-          SoundEngine.play('explosion');
+          // Apply damage - may or may not destroy the enemy
+          if (this.applyDamage(enemy)) {
+            destroyed.push(enemy);
+            this.enemies.splice(j, 1);
+          }
           hit = true;
           break;
         }

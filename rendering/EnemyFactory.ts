@@ -1,7 +1,7 @@
 import { AssetManager } from './AssetManager';
 import { SceneNode } from './SceneGraph';
 
-export type EnemyKind = 'drone' | 'scout' | 'bomber' | 'weaver';
+export type EnemyKind = 'drone' | 'scout' | 'bomber' | 'weaver' | 'shieldedDrone';
 
 export class EnemyMesh extends SceneNode {
   constructor(public readonly kind: EnemyKind, id: number) {
@@ -15,6 +15,7 @@ export class EnemyFactory {
     scout: 0,
     bomber: 0,
     weaver: 0,
+    shieldedDrone: 0,
   };
 
   constructor(private readonly assets: AssetManager) { }

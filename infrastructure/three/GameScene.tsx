@@ -8,6 +8,7 @@ import { GameEffects } from './effects/EffectComposer';
 import { Starfield } from './particles/ParticleSystem';
 import { VoxelExplosion, Explosion, EXPLOSION_COLORS } from './effects/VoxelExplosion';
 import { MissileExplosion, MissileExplosionData } from './effects/MissileExplosion';
+import { ShieldBubble } from './effects/ShieldBubble';
 
 function AssetMesh({ id, ...props }: { id: AssetId } & any) {
     const { geometryType, args, materialParams, scale } = useSpaceshipAsset(id);
@@ -368,10 +369,22 @@ const HITBOX_RADIUS: Record<string, number> = {
     scout: 2.0,
     bomber: 2.5,
     weaver: 1.8,
+    shieldedDrone: 1.8,
 };
 
 // Sub-component to handle per-enemy updates efficiently - memoized
-const EnemyRenderer = React.memo(function EnemyRenderer({ enemy, showHitbox = false }: { enemy: { id: number, kind: string, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number } }, showHitbox?: boolean }) {
+const EnemyRenderer = React.memo(function EnemyRenderer({ enemy, showHitbox = false }: {
+    enemy: {
+        id: number,
+        kind: string,
+        position: { x: number, y: number, z: number },
+        velocity: { x: number, y: number, z: number },
+        shield?: number,
+        maxShield?: number,
+        lastHitTime?: number
+    },
+    showHitbox?: boolean
+}) {
     const group = useRef<Group>(null);
     const velocityVec = useRef(new Vector3());
     const targetPos = useRef(new Vector3());
@@ -419,6 +432,15 @@ const EnemyRenderer = React.memo(function EnemyRenderer({ enemy, showHitbox = fa
     return (
         <group ref={group}>
             <EnemyMesh kind={enemy.kind} />
+            {/* Shield bubble for shielded enemies */}
+            {enemy.shield !== undefined && enemy.shield > 0 && enemy.maxShield && (
+                <ShieldBubble
+                    radius={hitboxRadius * 1.3}
+                    shieldHP={enemy.shield}
+                    maxShieldHP={enemy.maxShield}
+                    getLastHitTime={() => enemy.lastHitTime}
+                />
+            )}
             {/* Debug hitbox visualization */}
             {showHitbox && (
                 <mesh>

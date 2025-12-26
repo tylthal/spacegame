@@ -14,23 +14,26 @@ export const GAME_CONFIG = {
         hull: 100,
         /** Milliseconds between bullet shots when firing */
         fireIntervalMs: 125,
-        /** Hitbox radius per enemy type (must match rendering) */
         enemyRadius: {
             drone: 1.5,
             scout: 2.0,
-            bomber: 2.5
+            bomber: 2.5,
+            weaver: 1.8,
+            shieldedDrone: 1.8,
         } as Record<EnemyKind, number>,
-        /** Movement speed per millisecond per enemy type */
         enemySpeedPerMs: {
             drone: 0.02,
             scout: 0.015,
-            bomber: 0.01
+            bomber: 0.01,
+            weaver: 0.025,
+            shieldedDrone: 0.018, // Slightly slower than drone
         } as Record<EnemyKind, number>,
-        /** Hull damage dealt per enemy type when they reach the station */
         enemyDamage: {
             drone: 5,
             scout: 8,
-            bomber: 15
+            bomber: 15,
+            weaver: 5,
+            shieldedDrone: 15, // High damage - priority target
         } as Record<EnemyKind, number>,
         /** Distance from camera where enemies spawn */
         spawnRadius: 400,
@@ -80,6 +83,7 @@ export const GAME_CONFIG = {
         scout: 200,
         bomber: 500,
         weaver: 300,
+        shieldedDrone: 500, // High points due to difficulty
     },
 
     // Difficulty settings

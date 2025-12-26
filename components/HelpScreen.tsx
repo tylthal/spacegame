@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { SoundEngine } from '../audio';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { EnemyMesh } from '../infrastructure/three/assets/EnemyMeshes';
+import { ShieldBubble } from '../infrastructure/three/effects/ShieldBubble';
 import type { EnemyKind } from '../rendering/EnemyFactory';
 
 interface HelpScreenProps {
@@ -245,6 +246,15 @@ function SpinningEnemy({ kind }: { kind: EnemyKind }) {
     return (
         <group ref={groupRef} scale={0.8}>
             <EnemyMesh kind={kind} />
+            {/* Show shield bubble for shielded drone preview */}
+            {kind === 'shieldedDrone' && (
+                <ShieldBubble
+                    radius={2.2}
+                    shieldHP={4}
+                    maxShieldHP={4}
+                    getLastHitTime={() => undefined}
+                />
+            )}
         </group>
     );
 }
@@ -277,6 +287,15 @@ function EnemiesTab() {
                 threat: 'MEDIUM',
                 threatColor: 'text-y2k-cyan',
                 unlockInfo: 'Appears after 30 seconds',
+            },
+            {
+                kind: 'shieldedDrone',
+                name: 'SHIELDED DRONE',
+                points: GAME_CONFIG.scoring.shieldedDrone,
+                description: 'Armored drone protected by an energy shield. Shield absorbs 4 hits before overloading, then 1 more hit destroys the core. Deals heavy damage if it reaches the station.',
+                threat: 'HIGH',
+                threatColor: 'text-red-400',
+                unlockInfo: 'Appears after 90 seconds',
             },
         ];
 

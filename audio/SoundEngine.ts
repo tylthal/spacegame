@@ -13,6 +13,7 @@ export type SoundType =
     | 'missileLaunch'
     | 'missileDetonate'
     | 'playerHit'
+    | 'shieldHit'
     | 'calibrationTick'
     | 'calibrationSuccess';
 
@@ -70,6 +71,9 @@ class SoundEngineClass {
                 break;
             case 'playerHit':
                 this.playPlayerHit(ctx, now);
+                break;
+            case 'shieldHit':
+                this.playShieldHit(ctx, now);
                 break;
             case 'calibrationTick':
                 this.playCalibrationTick(ctx, now);
@@ -312,6 +316,26 @@ class SoundEngineClass {
 
         osc.start(now);
         osc.stop(now + 0.15);
+    }
+
+    /** Metallic ping for shield impact */
+    private playShieldHit(ctx: AudioContext, now: number): void {
+        // High-pitched metallic ping
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.08);
+
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain!);
+
+        osc.start(now);
+        osc.stop(now + 0.12);
     }
 
     /** Short ascending blip for calibration progress */
