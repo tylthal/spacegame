@@ -8,9 +8,9 @@ interface TierAnnouncementProps {
 // Tier announcements with dramatic warnings
 const TIER_MESSAGES = [
     { title: 'TIER 1', subtitle: 'DRONE SWARM INCOMING', color: 'text-green-400' },
-    { title: 'WARNING', subtitle: 'WEAVER DETECTED', color: 'text-y2k-cyan' },
+    { title: 'TIER 2', subtitle: 'HOSTILES INBOUND', color: 'text-cyan-400' },
+    { title: 'WARNING', subtitle: 'WEAVER DETECTED', color: 'text-fuchsia-400' },
     { title: 'ALERT', subtitle: 'SHIELDED DRONE INCOMING', color: 'text-yellow-400' },
-    { title: 'CAUTION', subtitle: 'THREAT LEVEL INCREASING', color: 'text-orange-400' },
     { title: 'DANGER', subtitle: 'MAXIMUM THREAT', color: 'text-red-400' },
 ];
 
@@ -29,13 +29,13 @@ export function TierAnnouncement({ tier, onComplete }: TierAnnouncementProps) {
         setVisible(true);
         setPhase('enter');
 
-        // Animation timeline: enter (300ms) -> hold (1500ms) -> exit (500ms)
+        // Animation timeline: enter (300ms) -> hold (700ms) -> exit (500ms)
         const enterTimer = setTimeout(() => setPhase('hold'), 300);
-        const exitTimer = setTimeout(() => setPhase('exit'), 1800);
+        const exitTimer = setTimeout(() => setPhase('exit'), 1000);
         const completeTimer = setTimeout(() => {
             setVisible(false);
             if (onComplete) onComplete();
-        }, 2300);
+        }, 1500);
 
         return () => {
             clearTimeout(enterTimer);

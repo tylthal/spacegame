@@ -556,8 +556,8 @@ class SoundEngineClass {
             osc.frequency.linearRampToValueAtTime(600, startTime + 0.25);
 
             const gain = ctx.createGain();
-            gain.gain.setValueAtTime(0.15, startTime);
-            gain.gain.setValueAtTime(0.15, startTime + 0.2);
+            gain.gain.setValueAtTime(0.05, startTime);
+            gain.gain.setValueAtTime(0.05, startTime + 0.2);
             gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.25);
 
             osc.connect(gain);
