@@ -250,7 +250,7 @@ function SpinningEnemy({ kind }: { kind: EnemyKind }) {
             {kind === 'shieldedDrone' && (
                 <ShieldBubble
                     radius={2.2}
-                    shieldHP={4}
+                    getShieldHP={() => 4}
                     maxShieldHP={4}
                     getLastHitTime={() => undefined}
                 />
