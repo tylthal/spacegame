@@ -327,6 +327,15 @@ export class CombatLoop {
   }
 
   summary() {
+    // Calculate current tier index based on elapsed time
+    let tierIndex = 0;
+    for (let i = TIER_THRESHOLDS.length - 1; i >= 0; i--) {
+      if (this.elapsedMs >= TIER_THRESHOLDS[i]) {
+        tierIndex = i;
+        break;
+      }
+    }
+
     return {
       hull: this.hull,
       kills: { ...this.kills },
@@ -337,6 +346,7 @@ export class CombatLoop {
       isOverheated: this._isOverheated,
       missileReady: this.missileReady,
       missileCooldownProgress: this.missileCooldownProgress,
+      currentTier: tierIndex,
     };
   }
 

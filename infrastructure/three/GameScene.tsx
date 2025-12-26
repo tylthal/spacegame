@@ -9,6 +9,9 @@ import { Starfield } from './particles/ParticleSystem';
 import { VoxelExplosion, Explosion, EXPLOSION_COLORS } from './effects/VoxelExplosion';
 import { MissileExplosion, MissileExplosionData } from './effects/MissileExplosion';
 import { ShieldBubble } from './effects/ShieldBubble';
+import { FloatingScore, FloatingScoreData } from './effects/FloatingScore';
+import { GAME_CONFIG } from '../../config/gameConfig';
+import type { EnemyKind } from '../../rendering/EnemyFactory';
 
 function AssetMesh({ id, ...props }: { id: AssetId } & any) {
     const { geometryType, args, materialParams, scale } = useSpaceshipAsset(id);
@@ -226,6 +229,15 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
         setMissileExplosions(prev => prev.filter(e => e.id !== id));
     }, []);
 
+    // Floating score system
+    const [floatingScores, setFloatingScores] = useState<FloatingScoreData[]>([]);
+    const floatingScoreIdRef = useRef(0);
+    const pendingScoresRef = useRef<FloatingScoreData[]>([]);
+
+    const handleFloatingScoreComplete = useCallback((id: number) => {
+        setFloatingScores(prev => prev.filter(s => s.id !== id));
+    }, []);
+
     useFrame((state, delta) => {
         if (!combatLoop) return;
 
@@ -257,6 +269,7 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
         let hasNewExplosions = false;
         for (const [id, snapshot] of enemySnapshotsRef.current) {
             if (!currentIds.has(id)) {
+                // Spawn explosion
                 pendingExplosionsRef.current.push({
                     id: explosionIdRef.current++,
                     x: snapshot.x,
@@ -265,6 +278,17 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
                     color: EXPLOSION_COLORS[snapshot.kind] || '#00FFFF',
                     createdAt: 0, // Not used with delta-based timing
                 });
+
+                // Spawn floating score
+                const points = GAME_CONFIG.scoring[snapshot.kind as EnemyKind] || 100;
+                pendingScoresRef.current.push({
+                    id: floatingScoreIdRef.current++,
+                    x: snapshot.x,
+                    y: snapshot.y,
+                    z: snapshot.z,
+                    points,
+                });
+
                 enemySnapshotsRef.current.delete(id);
                 hasNewExplosions = true;
             }
@@ -272,9 +296,13 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
 
         // Batch update React state (once per frame max)
         if (hasNewExplosions) {
-            const pending = [...pendingExplosionsRef.current];
+            const pendingExp = [...pendingExplosionsRef.current];
             pendingExplosionsRef.current.length = 0;
-            setExplosions(prev => [...prev, ...pending]);
+            setExplosions(prev => [...prev, ...pendingExp]);
+
+            const pendingScr = [...pendingScoresRef.current];
+            pendingScoresRef.current.length = 0;
+            setFloatingScores(prev => [...prev, ...pendingScr]);
         }
 
         // Track missiles for missile explosions (reusable Set)
@@ -357,6 +385,15 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
                     key={explosion.id}
                     explosion={explosion}
                     onComplete={handleMissileExplosionComplete}
+                />
+            ))}
+
+            {/* Floating Score Indicators */}
+            {floatingScores.map(score => (
+                <FloatingScore
+                    key={score.id}
+                    score={score}
+                    onComplete={handleFloatingScoreComplete}
                 />
             ))}
         </group>

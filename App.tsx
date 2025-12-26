@@ -22,6 +22,7 @@ import { GameOverScreen } from './components/GameOverScreen';
 import { PauseScreen } from './components/PauseScreen';
 import { SoundEngine, MusicEngine } from './audio';
 import { HandCursor } from './components/HandCursor';
+import { TierAnnouncement } from './components/TierAnnouncement';
 import { CursorLayer } from './components/CursorLayer';
 import { HandWireframe } from './components/HandWireframe';
 import { HandLandmark } from './input/HandTracker';
@@ -89,7 +90,12 @@ const App: React.FC = () => {
 
   // FX State
   const [damageFlash, setDamageFlash] = useState(false);
+  const [damageShake, setDamageShake] = useState(false);
   const lastHullRef = useRef(100);
+
+  // Tier Announcement State
+  const [announceTier, setAnnounceTier] = useState<number | null>(null);
+  const lastTierRef = useRef(-1); // Start at -1 so tier 0 triggers first announcement
 
   // Wireframe debug overlay
   const [showWireframe, setShowWireframe] = useState(false);
@@ -138,11 +144,21 @@ const App: React.FC = () => {
       // Check for damage
       if (result.hull < lastHullRef.current) {
         setDamageFlash(true);
+        setDamageShake(true);
         SoundEngine.play('playerHit');
         // Clear flash after short duration
         setTimeout(() => setDamageFlash(false), 50);
+        // Clear shake after animation duration
+        setTimeout(() => setDamageShake(false), 250);
       }
       lastHullRef.current = result.hull;
+
+      // Check for tier change (announcements)
+      const summary = combatLoop.summary();
+      if (summary.currentTier > lastTierRef.current) {
+        setAnnounceTier(summary.currentTier);
+        lastTierRef.current = summary.currentTier;
+      }
 
       frameId = requestAnimationFrame(tick);
     };
@@ -299,7 +315,8 @@ const App: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 bg-slate-950 text-cyan-50 overflow-hidden font-sans select-none touch-none"
+      className={`fixed inset-0 bg-slate-950 text-cyan-50 overflow-hidden font-sans select-none touch-none
+                  ${damageShake ? 'animate-shake' : ''}`}
       style={{ width: '100%', height: '100%', top: 0, left: 0, right: 0, bottom: 0 }}
     >
       <CRTOverlay />
@@ -481,6 +498,14 @@ const App: React.FC = () => {
             WIREFRAME DEBUG (W to toggle) | Signature Lock: {inputProcessor?.isSignatureLockEnabled() ? 'ON' : 'OFF'}
           </div>
         </>
+      )}
+
+      {/* Tier Transition Announcements */}
+      {announceTier !== null && (
+        <TierAnnouncement
+          tier={announceTier}
+          onComplete={() => setAnnounceTier(null)}
+        />
       )}
 
     </div>
