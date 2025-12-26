@@ -733,9 +733,27 @@ export class CombatLoop {
             const dist = Math.hypot(dx, dy, dz);
 
             if (dist <= this.missileBlastRadius) {
-              destroyed.push(enemy);
-              this.enemies.splice(j, 1);
-              this.kills[enemy.kind] += 1;
+              // Special missile damage logic
+              enemy.lastHitTime = Date.now();
+
+              if (enemy.shield !== undefined && enemy.shield > 0) {
+                // Has shield: destroy shield completely, but don't damage core
+                enemy.shield = 0;
+                SoundEngine.play('shieldHit');
+                // Don't destroy the enemy - they survive with shield overloaded
+              } else {
+                // No shield: apply up to 4 damage (enough to kill most enemies)
+                const currentHealth = enemy.health ?? 1;
+                if (currentHealth <= 4) {
+                  // Destroy enemy
+                  destroyed.push(enemy);
+                  this.enemies.splice(j, 1);
+                  this.kills[enemy.kind] += 1;
+                } else {
+                  // Survive with reduced health
+                  enemy.health = currentHealth - 4;
+                }
+              }
             }
           }
 

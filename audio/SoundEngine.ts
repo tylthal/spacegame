@@ -22,29 +22,71 @@ class SoundEngineClass {
     private masterGain: GainNode | null = null;
     private _muted = false;
     private _volume = 0.5;
+    private _initialized = false;
 
-    /** Initialize the audio context (must be called after user interaction) */
-    init(): void {
-        if (this.audioContext) return;
-
-        this.audioContext = new AudioContext();
-        this.masterGain = this.audioContext.createGain();
-        this.masterGain.gain.value = this._volume;
-        this.masterGain.connect(this.audioContext.destination);
+    /** Check if audio is initialized and ready */
+    get isInitialized(): boolean {
+        return this._initialized && this.audioContext !== null && this.audioContext.state === 'running';
     }
 
-    /** Ensure context is running (browsers suspend until user interaction) */
-    private ensureRunning(): void {
-        if (!this.audioContext) this.init();
-        if (this.audioContext?.state === 'suspended') {
+    /** 
+     * Initialize the audio context (must be called after user interaction)
+     * Returns true if successfully initialized, false otherwise
+     */
+    init(): boolean {
+        if (this._initialized && this.audioContext?.state === 'running') return true;
+
+        try {
+            if (!this.audioContext) {
+                this.audioContext = new AudioContext();
+                this.masterGain = this.audioContext.createGain();
+                this.masterGain.gain.value = this._volume;
+                this.masterGain.connect(this.audioContext.destination);
+            }
+
+            // Try to resume if suspended
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume().then(() => {
+                    this._initialized = true;
+                }).catch(() => {
+                    // Will retry on next user interaction
+                });
+            } else {
+                this._initialized = true;
+            }
+
+            return this._initialized;
+        } catch (e) {
+            console.warn('[SoundEngine] Failed to initialize AudioContext:', e);
+            return false;
+        }
+    }
+
+    /**
+     * Try to initialize on user interaction - call this from click/touch handlers
+     * This is safe to call repeatedly
+     */
+    tryInit(): void {
+        if (!this._initialized) {
+            this.init();
+        }
+    }
+
+    /** Ensure context is running (only resumes if already created) */
+    private ensureRunning(): boolean {
+        if (!this.audioContext || !this.masterGain) return false;
+
+        if (this.audioContext.state === 'suspended') {
             this.audioContext.resume();
         }
+
+        return this.audioContext.state === 'running';
     }
 
     /** Play a sound effect */
     play(type: SoundType): void {
         if (this._muted) return;
-        this.ensureRunning();
+        if (!this.ensureRunning()) return;
         if (!this.audioContext || !this.masterGain) return;
 
         const ctx = this.audioContext;

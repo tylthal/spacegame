@@ -48,9 +48,9 @@ export function ShieldBubble({ radius, shieldHP, maxShieldHP, getLastHitTime }: 
 
             material.color.set('#00FF66');
             material.emissive.set('#00AA44');
-            material.emissiveIntensity = 0.8 + Math.sin(timeRef.current * 3) * 0.2; // Lower pulsing glow
-            // Lower base opacity, decreases as shield takes damage
-            material.opacity = 0.25 * (shieldHP / maxShieldHP);
+            material.emissiveIntensity = 0.5 + Math.sin(timeRef.current * 3) * 0.1; // Subtle pulsing glow
+            // Very low base opacity, decreases as shield takes damage
+            material.opacity = 0.15 * (shieldHP / maxShieldHP);
         }
     });
 
@@ -63,9 +63,9 @@ export function ShieldBubble({ radius, shieldHP, maxShieldHP, getLastHitTime }: 
             <meshStandardMaterial
                 color="#00FF66"
                 emissive="#00AA44"
-                emissiveIntensity={0.8}
+                emissiveIntensity={0.5}
                 transparent
-                opacity={0.25}
+                opacity={0.15}
                 side={THREE.DoubleSide}
                 depthWrite={false}
             />

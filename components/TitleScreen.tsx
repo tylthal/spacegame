@@ -14,6 +14,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onHelp }) => 
     // Start title music on first user interaction (click/touch anywhere)
     useEffect(() => {
         const startMusic = () => {
+            // Initialize audio engine on first user interaction (required by browsers)
+            SoundEngine.tryInit();
+
             if (!musicStartedRef.current) {
                 musicStartedRef.current = true;
                 MusicEngine.play('title');
