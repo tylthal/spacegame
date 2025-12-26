@@ -11,6 +11,7 @@ import { MissileExplosion, MissileExplosionData } from './effects/MissileExplosi
 import { ShieldBubble } from './effects/ShieldBubble';
 import { FloatingScore, FloatingScoreData } from './effects/FloatingScore';
 import { GAME_CONFIG } from '../../config/gameConfig';
+import { SoundEngine } from '../../audio/SoundEngine';
 import type { EnemyKind } from '../../rendering/EnemyFactory';
 
 function AssetMesh({ id, ...props }: { id: AssetId } & any) {
@@ -244,58 +245,43 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
         // CRITICAL: Tick the Game Logic (Physics, Spawning, Heat)
         // Only tick if the game is actively running (Phase = PLAYING)
         if (isRunning) {
-            combatLoop.tick(delta * 1000);
-        }
+            const { destroyed } = combatLoop.tick(delta * 1000);
 
-        // Track current enemies and detect deaths for explosions
-        // Using reusable Set to avoid allocations
-        const currentEnemies = combatLoop.activeEnemies;
-        const currentIds = currentEnemyIdsRef.current;
-        currentIds.clear();
-        for (const e of currentEnemies) currentIds.add(e.id);
+            // Handle destroyed enemies (sound + visual) from the tick result
+            // This ensures we only trigger effects for actual kills (not station hits)
+            if (destroyed && destroyed.length > 0) {
+                for (const enemy of destroyed) {
+                    // Spawn explosion
+                    pendingExplosionsRef.current.push({
+                        id: explosionIdRef.current++,
+                        x: enemy.position.x,
+                        y: enemy.position.y,
+                        z: enemy.position.z,
+                        color: EXPLOSION_COLORS[enemy.kind] || '#00FFFF',
+                        createdAt: 0,
+                    });
 
-        // Update snapshots for current enemies
-        for (const enemy of currentEnemies) {
-            enemySnapshotsRef.current.set(enemy.id, {
-                id: enemy.id,
-                kind: enemy.kind,
-                x: enemy.position.x,
-                y: enemy.position.y,
-                z: enemy.position.z,
-            });
-        }
+                    // Spawn floating score
+                    const points = GAME_CONFIG.scoring[enemy.kind as EnemyKind] || 100;
+                    pendingScoresRef.current.push({
+                        id: floatingScoreIdRef.current++,
+                        x: enemy.position.x,
+                        y: enemy.position.y,
+                        z: enemy.position.z,
+                        points,
+                    });
 
-        // Find enemies that died (were in snapshot but not in current)
-        let hasNewExplosions = false;
-        for (const [id, snapshot] of enemySnapshotsRef.current) {
-            if (!currentIds.has(id)) {
-                // Spawn explosion
-                pendingExplosionsRef.current.push({
-                    id: explosionIdRef.current++,
-                    x: snapshot.x,
-                    y: snapshot.y,
-                    z: snapshot.z,
-                    color: EXPLOSION_COLORS[snapshot.kind] || '#00FFFF',
-                    createdAt: 0, // Not used with delta-based timing
-                });
-
-                // Spawn floating score
-                const points = GAME_CONFIG.scoring[snapshot.kind as EnemyKind] || 100;
-                pendingScoresRef.current.push({
-                    id: floatingScoreIdRef.current++,
-                    x: snapshot.x,
-                    y: snapshot.y,
-                    z: snapshot.z,
-                    points,
-                });
-
-                enemySnapshotsRef.current.delete(id);
-                hasNewExplosions = true;
+                    // Play score pickup sound
+                    SoundEngine.play('scorePickup');
+                }
             }
         }
 
+        // Track current enemies for React updates
+        const currentEnemies = combatLoop.activeEnemies;
+
         // Batch update React state (once per frame max)
-        if (hasNewExplosions) {
+        if (pendingExplosionsRef.current.length > 0 || pendingScoresRef.current.length > 0) {
             const pendingExp = [...pendingExplosionsRef.current];
             pendingExplosionsRef.current.length = 0;
             setExplosions(prev => [...prev, ...pendingExp]);

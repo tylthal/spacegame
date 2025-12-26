@@ -107,18 +107,25 @@ const App: React.FC = () => {
   // Sync Phase Manager -> React State (extracted to hook)
   usePhaseSync(phaseManager, combatLoop, setPhase);
 
-  // Music based on game phase
+  // Music and Atmosphere based on game phase
   useEffect(() => {
     if (phase === 'TITLE') {
       MusicEngine.play('title');
+      SoundEngine.stopAmbience();
+      SoundEngine.stopLowHullAlarm();
     } else if (phase === 'PLAYING' && !isPaused && !isGameOver) {
       MusicEngine.play('battle');
+      SoundEngine.startAmbience();
     } else if (isPaused || isGameOver) {
       // Fade out during pause/game over for dramatic effect
       MusicEngine.fadeOut(500);
+      SoundEngine.stopAmbience();
+      SoundEngine.stopLowHullAlarm();
     } else {
       // Calibrating or other states - no music
       MusicEngine.stop();
+      SoundEngine.stopAmbience();
+      SoundEngine.stopLowHullAlarm();
     }
   }, [phase, isPaused, isGameOver]);
 
@@ -145,7 +152,7 @@ const App: React.FC = () => {
       if (result.hull < lastHullRef.current) {
         setDamageFlash(true);
         setDamageShake(true);
-        SoundEngine.play('playerHit');
+        // SoundEngine.play('playerHit');
         // Clear flash after short duration
         setTimeout(() => setDamageFlash(false), 50);
         // Clear shake after animation duration
@@ -157,7 +164,18 @@ const App: React.FC = () => {
       const summary = combatLoop.summary();
       if (summary.currentTier > lastTierRef.current) {
         setAnnounceTier(summary.currentTier);
+        // Play tier warning if tier > 0 (don't play on initial start)
+        if (summary.currentTier > 0) {
+          SoundEngine.play('tierWarning');
+        }
         lastTierRef.current = summary.currentTier;
+      }
+
+      // Check for low hull alarm (< 30% and alive)
+      if (summary.hull <= 30 && summary.hull > 0 && !isGameOver) {
+        SoundEngine.startLowHullAlarm();
+      } else {
+        SoundEngine.stopLowHullAlarm();
       }
 
       frameId = requestAnimationFrame(tick);
@@ -297,6 +315,7 @@ const App: React.FC = () => {
       if (summary.hull <= 0 && frozenTimeRef.current === null) {
         frozenTimeRef.current = summary.elapsedMs;
         setIsGameOver(true);
+        SoundEngine.play('gameOver');
       }
 
       setHudState({

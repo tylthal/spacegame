@@ -290,6 +290,12 @@ export class CombatLoop {
       const enemy = this.createEnemy(event.kind);
       this.enemies.push(enemy);
       spawned.push(enemy);
+
+      if (enemy.kind === 'weaver') {
+        SoundEngine.play('weaverSpawn');
+      } else if (enemy.kind === 'shieldedDrone') {
+        SoundEngine.play('shieldedSpawn');
+      }
     }
 
     // Move Entities
@@ -306,6 +312,7 @@ export class CombatLoop {
       this._heat = Math.max(0, this._heat - cooldownRate * deltaMs);
       if (this._isOverheated && this._heat <= this.overheatRecoveryThreshold) {
         this._isOverheated = false;
+        SoundEngine.play('weaponReady');
       }
     }
 
@@ -479,6 +486,9 @@ export class CombatLoop {
     if (enemy.shield !== undefined && enemy.shield > 0) {
       enemy.shield -= damage;
       SoundEngine.play('shieldHit');
+      if (enemy.shield <= 0) {
+        SoundEngine.play('shieldBreak');
+      }
       return false; // Not destroyed, shield absorbed it
     }
 
@@ -492,7 +502,11 @@ export class CombatLoop {
 
     // Destroyed!
     this.kills[enemy.kind] += 1;
-    SoundEngine.play('explosion');
+    if (enemy.kind === 'weaver' || enemy.kind === 'bomber') {
+      SoundEngine.play('explosionLarge');
+    } else {
+      SoundEngine.play('explosionSmall');
+    }
     return true;
   }
 
@@ -583,10 +597,17 @@ export class CombatLoop {
 
     while (this.sinceLastShot >= this.options.fireIntervalMs) {
       this.sinceLastShot -= this.options.fireIntervalMs;
+      const oldHeat = this._heat;
       this._heat += this.heatPerShot;
+
+      // Heat warnings
+      if (oldHeat < 70 && this._heat >= 70) SoundEngine.play('heatWarning');
+      if (oldHeat < 90 && this._heat >= 90) SoundEngine.play('heatWarning');
+
       if (this._heat >= this.overheatThreshold) {
         this._heat = this.maxHeat;
         this._isOverheated = true;
+        SoundEngine.play('overheat');
       }
 
       const speed = this.options.bulletSpeed;
@@ -763,6 +784,9 @@ export class CombatLoop {
 
       // Check if detonation was already triggered
       if (missile.detonationTriggeredAt !== undefined) {
+        // Play seeking beep during countdown
+        SoundEngine.play('missileBeep');
+
         // Check if delay has elapsed
         if (now - missile.detonationTriggeredAt >= detonationDelay) {
           // EXPLODE - apply area damage
