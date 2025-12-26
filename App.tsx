@@ -434,7 +434,7 @@ const App: React.FC = () => {
       {/* Fixed Bottom Right Window - Responsive sizing */}
       {USE_REAL_INPUT && (
         <div
-          className="fixed bg-black rounded-lg overflow-hidden border border-slate-700 shadow-2xl z-50 pointer-events-none animate-in fade-in duration-1000 slide-in-from-bottom-4
+          className="fixed bg-black rounded-lg overflow-hidden border-2 border-slate-400 shadow-2xl z-50 pointer-events-none animate-in fade-in duration-1000 slide-in-from-bottom-4
                      w-[120px] h-[68px] bottom-1 right-1
                      sm:w-[200px] sm:h-[113px] sm:bottom-2 sm:right-2
                      md:w-[300px] md:h-[170px] md:bottom-4 md:right-4"
