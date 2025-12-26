@@ -1,17 +1,26 @@
 
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
-import { HandFrame, HandTracker, HandLandmark, Handedness, FrameResult } from '../../input/HandTracker';
+import { HandFrame, HandTracker, Handedness, FrameResult } from '../../input/HandTracker';
 
-// Throttle inference to 30fps for better performance on lower-spec devices
-const INFERENCE_INTERVAL_MS = 33; // ~30fps instead of 60fps
+// P3 Optimization: Adaptive frame rate based on tracking state
+const FAST_INTERVAL_MS = 33;   // ~30fps - used when hands lost or just acquired
+const SLOW_INTERVAL_MS = 50;   // ~20fps - used when tracking is stable
+
+// Transition thresholds
+const STABLE_FRAMES_THRESHOLD = 10; // After 10 consecutive frames with hands, slow down
+const LOST_TIMEOUT_MS = 200;         // After 200ms without hands, stay fast
 
 export class BrowserHandTracker implements HandTracker {
   private handLandmarker: HandLandmarker | null = null;
   private video: HTMLVideoElement | null = null;
   private listeners = new Set<(frame: FrameResult) => void>();
-  private requestAnimationFrameId: number | null = null;
   private lastVideoTime = -1;
-  private lastProcessTime = 0; // For 30fps throttling
+
+  // P3: Adaptive rate state
+  private intervalId: ReturnType<typeof setInterval> | null = null;
+  private currentInterval = FAST_INTERVAL_MS;
+  private consecutiveFramesWithHands = 0;
+  private lastHandsDetectedTime = 0;
 
   constructor() { }
 
@@ -40,26 +49,47 @@ export class BrowserHandTracker implements HandTracker {
   }
 
   private startLoop() {
-    if (this.requestAnimationFrameId) return;
+    if (this.intervalId) return;
+    this.intervalId = setInterval(() => this.processFrame(), this.currentInterval);
+  }
 
-    const loop = () => {
-      this.processFrame();
-      this.requestAnimationFrameId = requestAnimationFrame(loop);
-    };
-    loop();
+  // P3: Dynamically adjust interval based on tracking state
+  private adjustInterval(handsDetected: boolean) {
+    const now = performance.now();
+
+    if (handsDetected) {
+      this.consecutiveFramesWithHands++;
+      this.lastHandsDetectedTime = now;
+
+      // After stable tracking, slow down to save power
+      if (this.consecutiveFramesWithHands >= STABLE_FRAMES_THRESHOLD &&
+        this.currentInterval !== SLOW_INTERVAL_MS) {
+        this.setInterval(SLOW_INTERVAL_MS);
+      }
+    } else {
+      this.consecutiveFramesWithHands = 0;
+
+      // Hands lost - switch to fast detection
+      if (this.currentInterval !== FAST_INTERVAL_MS) {
+        this.setInterval(FAST_INTERVAL_MS);
+      }
+    }
+  }
+
+  private setInterval(newInterval: number) {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
+    this.currentInterval = newInterval;
+    this.intervalId = setInterval(() => this.processFrame(), this.currentInterval);
   }
 
   private processFrame() {
     if (!this.handLandmarker || !this.video) return;
 
-    // Throttle to ~30fps for better performance on lower-spec devices
-    const now = performance.now();
-    if (now - this.lastProcessTime < INFERENCE_INTERVAL_MS) return;
-    this.lastProcessTime = now;
-
     if (this.video.currentTime !== this.lastVideoTime) {
       this.lastVideoTime = this.video.currentTime;
-      const startTimeMs = now;
+      const startTimeMs = performance.now();
 
       const result = this.handLandmarker.detectForVideo(this.video, startTimeMs);
       const hands: HandFrame[] = [];
@@ -89,6 +119,9 @@ export class BrowserHandTracker implements HandTracker {
         }
       }
 
+      // P3: Adjust frame rate based on tracking state
+      this.adjustInterval(hands.length > 0);
+
       // Always emit a frame result, even if empty (for stability checks)
       this.emit({ timestamp: startTimeMs, hands });
     }
@@ -104,9 +137,9 @@ export class BrowserHandTracker implements HandTracker {
   }
 
   stop() {
-    if (this.requestAnimationFrameId) {
-      cancelAnimationFrame(this.requestAnimationFrameId);
-      this.requestAnimationFrameId = null;
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
     }
     this.handLandmarker?.close();
   }

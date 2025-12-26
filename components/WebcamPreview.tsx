@@ -25,10 +25,12 @@ export function WebcamPreview({ onStreamReady, onError }: WebcamPreviewProps) {
 
         async function setupCamera() {
             try {
+                // P1 Optimization: Lower resolution for faster MediaPipe processing
+                // 640x480 = 6.75× fewer pixels than 1080p, still accurate for hand tracking
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
                         facingMode: 'user',
                     },
                     audio: false,
