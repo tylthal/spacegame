@@ -283,19 +283,19 @@ function EnemiesTab() {
                 kind: 'weaver',
                 name: 'WEAVER',
                 points: GAME_CONFIG.scoring.weaver,
-                description: 'Evasive disc craft with spinning blades. Weaves left and right in a sine-wave pattern, making it harder to hit.',
+                description: 'Evasive disc craft with spinning blades. Moves in a corkscrew spiral pattern, making it difficult to track and hit.',
                 threat: 'MEDIUM',
                 threatColor: 'text-y2k-cyan',
-                unlockInfo: 'Appears after 30 seconds',
+                unlockInfo: 'Appears after 45 seconds',
             },
             {
                 kind: 'shieldedDrone',
                 name: 'SHIELDED DRONE',
                 points: GAME_CONFIG.scoring.shieldedDrone,
-                description: 'Armored drone protected by an energy shield. Shield absorbs 4 hits before overloading, then 1 more hit destroys the core. Deals heavy damage if it reaches the station.',
+                description: 'Armored drone protected by an energy shield. Shield absorbs 4 hits before overloading (watch for the flash!), then 1 more hit destroys the core. Missiles can strip the shield instantly but won\'t damage the core.',
                 threat: 'HIGH',
                 threatColor: 'text-red-400',
-                unlockInfo: 'Appears after 90 seconds',
+                unlockInfo: 'Appears after 1 minute 30 seconds',
             },
         ];
 

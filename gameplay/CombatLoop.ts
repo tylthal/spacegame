@@ -64,12 +64,33 @@ const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   maxEnemies: 6, // Limit enemies on screen
 };
 
-// Enemy Type Limits & Progression
-const MAX_DRONES_EARLY = 6;
-const MAX_DRONES_LATE = 7; // After 120s
-const MAX_WEAVERS_EARLY = 2; // After 30s
-const MAX_WEAVERS_LATE = 3; // After 150s
-const MAX_SHIELDED_DRONES = 2; // Hard cap
+// Enemy Type Limits & Progression - Strategy A "Slow Burn"
+// Progressive caps that increase over time
+interface SpawnTierCaps {
+  maxDrones: number;
+  maxWeavers: number;
+  maxShielded: number;
+  droneSpawnChance: number;   // 0-1 probability
+  weaverSpawnChance: number;
+  shieldedSpawnChance: number;
+}
+
+// Time thresholds in ms
+const TIER_THRESHOLDS = [0, 45000, 90000, 150000, 210000]; // 0s, 45s, 1m30s, 2m30s, 3m30s
+
+// Caps and spawn probabilities per tier
+const TIER_CAPS: SpawnTierCaps[] = [
+  // Tier 1: 0-45s - Drones only
+  { maxDrones: 3, maxWeavers: 0, maxShielded: 0, droneSpawnChance: 0.8, weaverSpawnChance: 0, shieldedSpawnChance: 0 },
+  // Tier 2: 45s-1m30s - Weavers introduced
+  { maxDrones: 4, maxWeavers: 1, maxShielded: 0, droneSpawnChance: 0.9, weaverSpawnChance: 0.3, shieldedSpawnChance: 0 },
+  // Tier 3: 1m30s-2m30s - Shielded introduced
+  { maxDrones: 5, maxWeavers: 1, maxShielded: 1, droneSpawnChance: 1.0, weaverSpawnChance: 0.5, shieldedSpawnChance: 0.2 },
+  // Tier 4: 2m30s-3m30s - Increasing pressure
+  { maxDrones: 6, maxWeavers: 2, maxShielded: 1, droneSpawnChance: 1.0, weaverSpawnChance: 0.7, shieldedSpawnChance: 0.4 },
+  // Tier 5: 3m30s+ - Full intensity
+  { maxDrones: 7, maxWeavers: 3, maxShielded: 2, droneSpawnChance: 1.0, weaverSpawnChance: 0.85, shieldedSpawnChance: 0.6 },
+];
 
 const WEAVER_SPAWN_COOLDOWN_MS = 3000; // 3 seconds between weaver spawns
 const SHIELDED_DRONE_SPAWN_COOLDOWN_MS = 4000; // 4 seconds between shielded drone spawns
@@ -219,39 +240,49 @@ export class CombatLoop {
       this.shieldedDroneSpawnCooldown = Math.max(0, this.shieldedDroneSpawnCooldown - deltaMs);
     }
 
-    // Spawn Logic - check specific caps for each enemy type
+    // Spawn Logic - Strategy A "Slow Burn" with progressive caps and probability
     const spawnEvents = this.scheduler.step(deltaMs);
     const spawned: EnemyInstance[] = [];
 
-    // Limits based on elapsed time
-    const maxDrones = this.elapsedMs > 120000 ? MAX_DRONES_LATE : MAX_DRONES_EARLY; // Bump at 2m
-    const maxWeavers = this.elapsedMs > 150000 ? MAX_WEAVERS_LATE : MAX_WEAVERS_EARLY; // Bump at 2m30s
-    // Note: Weavers only start spawning at 30s based on SpawnScheduler, 
-    // but the cap is logically 0 before 30s if we wanted to enforce it here too.
+    // Determine current tier based on elapsed time
+    let tierIndex = 0;
+    for (let i = TIER_THRESHOLDS.length - 1; i >= 0; i--) {
+      if (this.elapsedMs >= TIER_THRESHOLDS[i]) {
+        tierIndex = i;
+        break;
+      }
+    }
+    const tier = TIER_CAPS[tierIndex];
 
     for (const event of spawnEvents) {
       // 1. Check Global Limit (Safety Cap)
-      if (this.enemies.length >= 12) break;
+      if (this.enemies.length >= 15) break;
 
-      // 2. Check Specific Caps
+      // 2. Check Specific Caps AND Probability
       if (event.kind === 'drone') {
         const currentDrones = this.enemies.filter(e => e.kind === 'drone').length;
-        if (currentDrones >= maxDrones) continue;
+        if (currentDrones >= tier.maxDrones) continue;
+        // Probability check
+        if (this.rng.next() > tier.droneSpawnChance) continue;
       }
 
       if (event.kind === 'weaver') {
         const currentWeavers = this.enemies.filter(e => e.kind === 'weaver').length;
-        if (currentWeavers >= maxWeavers || this.weaverSpawnCooldown > 0) {
+        if (currentWeavers >= tier.maxWeavers || this.weaverSpawnCooldown > 0) {
           continue;
         }
+        // Probability check
+        if (this.rng.next() > tier.weaverSpawnChance) continue;
         this.weaverSpawnCooldown = WEAVER_SPAWN_COOLDOWN_MS;
       }
 
       if (event.kind === 'shieldedDrone') {
         const currentShielded = this.enemies.filter(e => e.kind === 'shieldedDrone').length;
-        if (currentShielded >= MAX_SHIELDED_DRONES || this.shieldedDroneSpawnCooldown > 0) {
+        if (currentShielded >= tier.maxShielded || this.shieldedDroneSpawnCooldown > 0) {
           continue;
         }
+        // Probability check
+        if (this.rng.next() > tier.shieldedSpawnChance) continue;
         this.shieldedDroneSpawnCooldown = SHIELDED_DRONE_SPAWN_COOLDOWN_MS;
       }
 

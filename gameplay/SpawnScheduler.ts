@@ -12,11 +12,32 @@ export interface SpawnEvent {
   kind: EnemyKind;
 }
 
+/**
+ * Strategy A: "Slow Burn" - Gradual difficulty progression
+ * 
+ * Spawn probabilities increase over time:
+ * - Drones: 80% → 100%
+ * - Weavers: 0% → 85%  
+ * - Shielded: 0% → 60%
+ * 
+ * Weights represent relative spawn probabilities when the scheduler picks an enemy.
+ * Max caps are enforced in CombatLoop.
+ */
 export const DEFAULT_SPAWN_CURVE: SpawnTier[] = [
-  // Tier 1: Just drones (0-30s)
-  { startMs: 0, intervalMs: 2000, weights: { drone: 10, scout: 0, bomber: 0, weaver: 0, shieldedDrone: 0 } },
-  // Tier 2: Drones, Weavers, and Shielded Drones (30s+) - CombatLoop caps at max 2 shielded
-  { startMs: 30000, intervalMs: 1000, weights: { drone: 10, scout: 0, bomber: 0, weaver: 8, shieldedDrone: 5 } },
+  // Tier 1: 0-45s - Drones only, slow spawn rate
+  { startMs: 0, intervalMs: 2500, weights: { drone: 8, scout: 0, bomber: 0, weaver: 0, shieldedDrone: 0 } },
+
+  // Tier 2: 45s-1m30s - Weavers introduced at low rate
+  { startMs: 45000, intervalMs: 2000, weights: { drone: 9, scout: 0, bomber: 0, weaver: 3, shieldedDrone: 0 } },
+
+  // Tier 3: 1m30s-2m30s - Shielded drones introduced at low rate
+  { startMs: 90000, intervalMs: 1500, weights: { drone: 10, scout: 0, bomber: 0, weaver: 5, shieldedDrone: 2 } },
+
+  // Tier 4: 2m30s-3m30s - Increasing pressure
+  { startMs: 150000, intervalMs: 1200, weights: { drone: 10, scout: 0, bomber: 0, weaver: 7, shieldedDrone: 4 } },
+
+  // Tier 5: 3m30s+ - Full intensity
+  { startMs: 210000, intervalMs: 1000, weights: { drone: 10, scout: 0, bomber: 0, weaver: 8, shieldedDrone: 6 } },
 ];
 
 export class SpawnScheduler {

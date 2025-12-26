@@ -107,18 +107,59 @@ The rebuild will continue layering modules behind tests. Remaining work focuses 
 ## Gameplay systems (Issue 7)
 
 - `SeededRng` offers deterministic random values for repeatable simulations and weighted rolls.
-- `SpawnScheduler` advances a time-based difficulty curve:
-  - 0–20s: interval 1200ms, drones only.
-  - 20–40s: interval 900ms, drones with a light scout mix.
-  - 40–60s: interval 700ms, drones/scouts plus occasional bombers.
-  - 60s+: interval 550ms, balanced drones/scouts with heavier bomber representation.
-- `Collision.segmentHitsCircle` handles fast projectiles by clamping closest-point math on the shot segment, covering tangential
-  misses and shots fired from inside the target volume.
+- `SpawnScheduler` advances a time-based difficulty curve (Strategy A "Slow Burn"):
+
+### Spawn Tiers
+
+| Tier | Time | Interval | Enemies |
+|------|------|----------|---------|
+| 1 | 0-45s | 2.5s | Drones only |
+| 2 | 45s-1m30s | 2.0s | + Weavers |
+| 3 | 1m30s-2m30s | 1.5s | + Shielded Drones |
+| 4 | 2m30s-3m30s | 1.2s | Increasing pressure |
+| 5 | 3m30s+ | 1.0s | Full intensity |
+
+### Progressive Max Caps
+
+| Tier | Drones | Weavers | Shielded |
+|------|--------|---------|----------|
+| 1 | 3 | 0 | 0 |
+| 2 | 4 | 1 | 0 |
+| 3 | 5 | 1 | 1 |
+| 4 | 6 | 2 | 1 |
+| 5 | 7 | 3 | 2 |
+
+### Spawn Probabilities
+
+Even when below the max cap, each enemy type has a probability check:
+
+| Tier | Drones | Weavers | Shielded |
+|------|--------|---------|----------|
+| 1 | 80% | 0% | 0% |
+| 2 | 90% | 30% | 0% |
+| 3 | 100% | 50% | 20% |
+| 4 | 100% | 70% | 40% |
+| 5 | 100% | 85% | 60% |
+
+### Enemy Types
+
+| Type | HP | Shield | Damage | Points | Speed |
+|------|-----|--------|--------|--------|-------|
+| Drone | 1 | 0 | 5 | 100 | 0.02 |
+| Weaver | 1 | 0 | 7 | 300 | 0.012 |
+| Shielded Drone | 1 | 4 | 15 | 500 | 0.012 |
+
+- **Shielded Drone**: Protected by energy shield (4 hits to overload, then 1 hit to destroy). Shield flashes white when hit with 150ms invincibility frames. Missiles strip shield completely but don't damage core.
+- **Weaver**: Moves in corkscrew/spiral pattern, harder to hit.
+
+- `Collision.segmentHitsSphere` handles fast projectiles with swept collision detection covering both current and previous positions.
 - `CombatLoop` orchestrates deterministic ticks:
   - Spawns via `SpawnScheduler` with per-kind radius, speed, and hull damage budgets.
-  - Fires a cadence-based vertical shot (default 450ms) using `segmentHitsCircle` to cull targets.
-  - Advances enemies toward the base (`baseY=1`), deducting hull (`drone=5`, `scout=8`, `bomber=15`) when they breach.
-  - Exposes summary stats for hull, spawns, kills, and elapsed time to keep integration tests deterministic.
+  - `applyDamage()` handles shields → health → destruction flow.
+  - Fires a cadence-based shot (default 125ms) using `segmentHitsSphere` to detect hits.
+  - Missiles detonate with area damage: max 4 damage to normal enemies, strips shields on shielded enemies.
+  - Advances enemies toward the base, deducting hull when they breach.
+  - Exposes summary stats for hull, spawns, kills, and elapsed time.
 
 ## 3D Rendering (Three.js / React Three Fiber)
 
@@ -143,8 +184,15 @@ Enemy meshes need to face the direction they're flying. This is handled by:
 Each enemy type has distinct visual characteristics for quick identification:
 
 - **Drone**: Compact body, red nose cone, cyan engine glow, swept wings
-- **Scout**: Angular body, copper sensor dish, twin orange engines
-- **Bomber**: Heavy armored body, gold plating, purple triple engines
+- **Weaver**: Flat disc with spinning blades, orange accents
+- **Shielded Drone**: Dark green body, green accents, translucent green energy shield that pulses and flashes white when hit
 
-Materials use emissive properties for visibility in dark space environments.
+### Shield Visual System
+
+- `ShieldBubble.tsx` renders translucent energy shields around shielded enemies
+- Uses getter function for `lastHitTime` to avoid React stale closure issues
+- Shield flashes white for 150ms on hit with scale pulse
+- Opacity decreases as shield HP drops
+- Materials use emissive properties for visibility in dark space environments.
+
 
