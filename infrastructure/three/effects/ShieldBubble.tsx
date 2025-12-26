@@ -4,7 +4,7 @@ import * as THREE from 'three';
 
 interface ShieldBubbleProps {
     radius: number;
-    shieldHP: number;      // Current shield health
+    getShieldHP: () => number | undefined; // Getter for dynamic updates
     maxShieldHP: number;   // For opacity calculation
     getLastHitTime: () => number | undefined;  // Getter function for fresh lastHitTime each frame
 }
@@ -16,13 +16,22 @@ interface ShieldBubbleProps {
  * - Gentle idle pulse animation
  * - Fully transparent when shield depleted
  */
-export function ShieldBubble({ radius, shieldHP, maxShieldHP, getLastHitTime }: ShieldBubbleProps) {
+export function ShieldBubble({ radius, getShieldHP, maxShieldHP, getLastHitTime }: ShieldBubbleProps) {
     const meshRef = useRef<THREE.Mesh>(null);
     const timeRef = useRef(0);
 
     useFrame((_, delta) => {
         if (!meshRef.current) return;
         timeRef.current += delta;
+
+        const currentShieldHP = getShieldHP() ?? 0;
+
+        // Hide if shield is depleted
+        if (currentShieldHP <= 0) {
+            meshRef.current.visible = false;
+            return;
+        }
+        meshRef.current.visible = true;
 
         const material = meshRef.current.material as THREE.MeshStandardMaterial;
 
@@ -50,12 +59,10 @@ export function ShieldBubble({ radius, shieldHP, maxShieldHP, getLastHitTime }: 
             material.emissive.set('#00AA44');
             material.emissiveIntensity = 0.5 + Math.sin(timeRef.current * 3) * 0.1; // Subtle pulsing glow
             // Very low base opacity, decreases as shield takes damage
-            material.opacity = 0.15 * (shieldHP / maxShieldHP);
+            material.opacity = 0.15 * (currentShieldHP / maxShieldHP);
         }
     });
 
-    // Don't render if no shield
-    if (shieldHP <= 0) return null;
 
     return (
         <mesh ref={meshRef}>

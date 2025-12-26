@@ -456,10 +456,10 @@ const EnemyRenderer = React.memo(function EnemyRenderer({ enemy, showHitbox = fa
         <group ref={group}>
             <EnemyMesh kind={enemy.kind} />
             {/* Shield bubble for shielded enemies */}
-            {enemy.shield !== undefined && enemy.shield > 0 && enemy.maxShield && (
+            {enemy.shield !== undefined && enemy.maxShield && (
                 <ShieldBubble
                     radius={hitboxRadius * 1.3}
-                    shieldHP={enemy.shield}
+                    getShieldHP={() => enemy.shield}
                     maxShieldHP={enemy.maxShield}
                     getLastHitTime={() => enemy.lastHitTime}
                 />
