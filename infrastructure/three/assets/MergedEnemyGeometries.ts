@@ -1,21 +1,43 @@
 /**
  * MergedEnemyGeometries.ts
  * 
- * Creates pre-baked merged geometries for each enemy type.
- * These geometries combine all sub-meshes into a single draw call.
+ * Creates pre-baked merged geometries with VERTEX COLORS for multi-part coloring.
+ * Uses HDR vertex colors (values > 1.0) for glowing parts - bloom will pick these up.
  * 
- * Uses Three.js BufferGeometryUtils to merge geometries with applied transforms.
+ * - Hull parts: Normal RGB (0.1-0.3) - dark metallic
+ * - Accent lights: HDR RGB (2.0-4.0) - will glow via bloom
+ * - Engine jets: Maximum HDR (5.0+) - brightest glow
  */
 
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
-// Material presets matching EnemyMeshes.tsx
-const METAL_CHROME = { color: 0xE0E0E0, emissive: 0x505060, emissiveIntensity: 0.8, metalness: 0.9, roughness: 0.1 };
-const METAL_GUNMETAL = { color: 0x808090, emissive: 0x404050, emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.3 };
-const METAL_COPPER = { color: 0xCD7F32, emissive: 0x8B4513, emissiveIntensity: 0.5, metalness: 0.85, roughness: 0.35 };
-const METAL_GOLD = { color: 0xFFD700, emissive: 0xCC9900, emissiveIntensity: 0.6, metalness: 0.95, roughness: 0.2 };
-const METAL_DARK_GREEN = { color: 0x1A3A1A, emissive: 0x0D2F0D, emissiveIntensity: 0.6, metalness: 0.85, roughness: 0.2 };
+// ============================================
+// COLOR DEFINITIONS (HDR values for glow)
+// ============================================
+
+// Hull colors (dark metallic, normal range 0-1)
+const HULL_DARK = { r: 0.12, g: 0.12, b: 0.15 };
+const HULL_CYAN = { r: 0.08, g: 0.15, b: 0.18 };
+const HULL_PINK = { r: 0.18, g: 0.08, b: 0.15 };
+const HULL_ORANGE = { r: 0.22, g: 0.12, b: 0.08 };
+const HULL_PURPLE = { r: 0.15, g: 0.08, b: 0.18 };
+const HULL_GREEN = { r: 0.08, g: 0.18, b: 0.1 };
+
+// Accent lights (increased HDR values for glow via bloom)
+const LIGHT_CYAN = { r: 0.5, g: 4.0, b: 4.0 };
+const LIGHT_PINK = { r: 4.0, g: 0.5, b: 2.5 };
+const LIGHT_ORANGE = { r: 4.0, g: 2.0, b: 0.3 };
+const LIGHT_PURPLE = { r: 3.5, g: 0.5, b: 4.0 };
+const LIGHT_GREEN = { r: 1.0, g: 4.0, b: 0.5 };
+
+// Engine jets (maximum HDR for intense bright glow)
+const JET_WHITE = { r: 8.0, g: 8.0, b: 8.0 };
+const JET_CYAN = { r: 3.0, g: 8.0, b: 8.0 };
+const JET_PINK = { r: 8.0, g: 3.0, b: 6.0 };
+const JET_ORANGE = { r: 8.0, g: 5.0, b: 2.0 };
+const JET_PURPLE = { r: 6.0, g: 3.0, b: 8.0 };
+const JET_GREEN = { r: 3.0, g: 8.0, b: 3.0 };
 
 // Cached geometries and materials
 let droneGeometry: THREE.BufferGeometry | null = null;
@@ -24,24 +46,30 @@ let bomberGeometry: THREE.BufferGeometry | null = null;
 let weaverGeometry: THREE.BufferGeometry | null = null;
 let shieldedDroneGeometry: THREE.BufferGeometry | null = null;
 
-let droneMaterial: THREE.MeshStandardMaterial | null = null;
-let scoutMaterial: THREE.MeshStandardMaterial | null = null;
-let bomberMaterial: THREE.MeshStandardMaterial | null = null;
-let weaverMaterial: THREE.MeshStandardMaterial | null = null;
-let shieldedDroneMaterial: THREE.MeshStandardMaterial | null = null;
+let sharedMaterial: THREE.MeshBasicMaterial | null = null;
 
-// Helper to create a geometry with applied transform
-// Converts to non-indexed geometry to ensure compatibility when merging
-function createTransformedGeometry(
+// Helper to add vertex colors to a geometry
+function setVertexColor(geometry: THREE.BufferGeometry, color: { r: number, g: number, b: number }): void {
+    const count = geometry.attributes.position.count;
+    const colors = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+    }
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+// Helper to create a geometry with applied transform and vertex color
+function createColoredGeometry(
     geometry: THREE.BufferGeometry,
+    color: { r: number, g: number, b: number },
     position: [number, number, number] = [0, 0, 0],
     rotation: [number, number, number] = [0, 0, 0],
     scale: [number, number, number] = [1, 1, 1]
 ): THREE.BufferGeometry {
-    // Convert to non-indexed geometry for merge compatibility
-    // (Some geometries like Box/Cone are indexed, Octahedron is not)
     const nonIndexed = geometry.index ? geometry.toNonIndexed() : geometry.clone();
-    geometry.dispose(); // Dispose original
+    geometry.dispose();
 
     const matrix = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation[0], rotation[1], rotation[2]));
@@ -51,348 +79,356 @@ function createTransformedGeometry(
         new THREE.Vector3(scale[0], scale[1], scale[2])
     );
     nonIndexed.applyMatrix4(matrix);
+    setVertexColor(nonIndexed, color);
     return nonIndexed;
 }
 
 /**
- * DRONE - Compact fighter with swept-back wings
- * Creates a merged geometry from all drone sub-meshes
+ * DRONE - Sleek arrow fighter
+ * Hull: Dark cyan-tinted | Lights: Cyan HDR | Jets: White-cyan HDR
  */
 function createDroneGeometry(): THREE.BufferGeometry {
     const geometries: THREE.BufferGeometry[] = [];
 
-    // Main fuselage - octahedron scaled
-    const fuselage = createTransformedGeometry(
-        new THREE.OctahedronGeometry(0.5),
-        [0, 0, 0], [0, 0, 0], [0.5, 0.35, 1.6]
-    );
-    geometries.push(fuselage);
+    // === HULL PARTS (dark metal) ===
+    geometries.push(createColoredGeometry(
+        new THREE.OctahedronGeometry(0.5), HULL_CYAN,
+        [0, 0, 0], [0, 0, 0], [0.5, 0.35, 1.8]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.ConeGeometry(0.15, 0.6, 6), HULL_CYAN,
+        [0, 0, 1.1], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(1, 0.05, 0.6), HULL_DARK,
+        [-0.55, 0, -0.1], [0, -0.4, 0.1], [0.7, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(1, 0.05, 0.6), HULL_DARK,
+        [0.55, 0, -0.1], [0, 0.4, -0.1], [0.7, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.CylinderGeometry(0.12, 0.15, 0.5, 8), HULL_DARK,
+        [-0.3, -0.05, -0.6], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.CylinderGeometry(0.12, 0.15, 0.5, 8), HULL_DARK,
+        [0.3, -0.05, -0.6], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
 
-    // Nose cone
-    const nose = createTransformedGeometry(
-        new THREE.ConeGeometry(1, 1, 6),
-        [0, 0, 0.9], [Math.PI / 2, 0, 0], [0.12, 0.25, 0.12]
-    );
-    geometries.push(nose);
+    // === ACCENT LIGHTS (HDR for glow) ===
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.15, 8, 6), LIGHT_CYAN,
+        [0, 0.18, 0.4], [0, 0, 0], [1, 0.6, 1.5]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(0.15, 0.08, 0.25), LIGHT_CYAN,
+        [-0.85, 0, -0.25], [0, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(0.15, 0.08, 0.25), LIGHT_CYAN,
+        [0.85, 0, -0.25], [0, 0, 0], [1, 1, 1]
+    ));
 
-    // Left swept wing
-    const leftWing = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [-0.5, 0, -0.2], [0, -0.3, 0], [0.6, 0.04, 0.5]
-    );
-    geometries.push(leftWing);
+    // === ENGINE JETS (max HDR for intense glow) ===
+    geometries.push(createColoredGeometry(
+        new THREE.ConeGeometry(0.12, 0.4, 8), JET_CYAN,
+        [-0.3, -0.05, -1.0], [-Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.ConeGeometry(0.12, 0.4, 8), JET_CYAN,
+        [0.3, -0.05, -1.0], [-Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.1, 8, 6), JET_WHITE,
+        [-0.3, -0.05, -0.88], [0, 0, 0], [1, 1, 0.5]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.1, 8, 6), JET_WHITE,
+        [0.3, -0.05, -0.88], [0, 0, 0], [1, 1, 0.5]
+    ));
 
-    // Right swept wing
-    const rightWing = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [0.5, 0, -0.2], [0, 0.3, 0], [0.6, 0.04, 0.5]
-    );
-    geometries.push(rightWing);
-
-    // Left wingtip glow
-    const leftWingtip = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [-0.75, 0, -0.35], [0, 0, 0], [0.1, 0.06, 0.15]
-    );
-    geometries.push(leftWingtip);
-
-    // Right wingtip glow
-    const rightWingtip = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [0.75, 0, -0.35], [0, 0, 0], [0.1, 0.06, 0.15]
-    );
-    geometries.push(rightWingtip);
-
-    // Engine housing
-    const engineHousing = createTransformedGeometry(
-        new THREE.CylinderGeometry(1, 0.8, 1, 8),
-        [0, 0, -0.7], [Math.PI / 2, 0, 0], [0.18, 0.25, 0.18]
-    );
-    geometries.push(engineHousing);
-
-    // Engine glow core
-    const engineCore = createTransformedGeometry(
-        new THREE.SphereGeometry(1, 8, 6),
-        [0, 0, -0.85], [0, 0, 0], [0.15, 0.15, 0.1]
-    );
-    geometries.push(engineCore);
-
-    // Engine outer glow
-    const engineGlow = createTransformedGeometry(
-        new THREE.SphereGeometry(1, 8, 6),
-        [0, 0, -0.9], [0, 0, 0], [0.25, 0.25, 0.05]
-    );
-    geometries.push(engineGlow);
-
-    // Front running light
-    const frontLight = createTransformedGeometry(
-        new THREE.SphereGeometry(1, 6, 4),
-        [0, 0.15, 0.6], [0, 0, 0], [0.08, 0.04, 0.08]
-    );
-    geometries.push(frontLight);
-
-    // Merge all geometries
-    const merged = BufferGeometryUtils.mergeGeometries(geometries);
-    if (!merged) {
-        throw new Error('Failed to merge drone geometries');
-    }
-
-    // Apply enemy scale (1.5x as in EnemyMesh component)
+    const merged = BufferGeometryUtils.mergeGeometries(geometries, false);
+    if (!merged) throw new Error('Failed to merge drone geometries');
     merged.scale(1.5, 1.5, 1.5);
-
-    // Dispose individual geometries
     geometries.forEach(g => g.dispose());
-
     return merged;
 }
 
 /**
- * SCOUT - Medium interceptor with sensor array
+ * SCOUT - X-wing style with 4 fins
+ * Hull: Dark pink-tinted | Lights: Hot pink HDR | Jets: Pink-white HDR
  */
 function createScoutGeometry(): THREE.BufferGeometry {
     const geometries: THREE.BufferGeometry[] = [];
 
-    // Main hull
-    const hull = createTransformedGeometry(
-        new THREE.OctahedronGeometry(0.5),
-        [0, 0, 0], [0, 0, 0], [0.6, 0.3, 2.2]
-    );
-    geometries.push(hull);
+    // === HULL ===
+    geometries.push(createColoredGeometry(
+        new THREE.OctahedronGeometry(0.5), HULL_PINK,
+        [0, 0, 0], [0, 0, 0], [0.4, 0.3, 2.4]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.ConeGeometry(0.1, 0.8, 6), HULL_DARK,
+        [0, 0, 1.4], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    const finPositions: [number, number, number, number][] = [
+        [-0.4, 0.25, -0.3, 0.3],
+        [0.4, 0.25, -0.3, -0.3],
+        [-0.4, -0.25, -0.3, -0.3],
+        [0.4, -0.25, -0.3, 0.3],
+    ];
+    finPositions.forEach(([x, y, z, rot]) => {
+        geometries.push(createColoredGeometry(
+            new THREE.BoxGeometry(0.6, 0.04, 0.8), HULL_DARK,
+            [x, y, z], [rot, rot > 0 ? -0.2 : 0.2, 0], [1, 1, 1]
+        ));
+    });
 
-    // Sensor dish
-    const dish = createTransformedGeometry(
-        new THREE.CylinderGeometry(1, 0.6, 1, 8),
-        [0, 0.25, 0.5], [Math.PI / 2, 0, 0], [0.3, 0.05, 0.3]
-    );
-    geometries.push(dish);
+    // === ACCENT LIGHTS (HDR) ===
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.2, 10, 8), LIGHT_PINK,
+        [0, 0.15, 0.5], [0, 0, 0], [1, 0.8, 1.2]
+    ));
+    const tipPositions: [number, number, number][] = [
+        [-0.65, 0.35, -0.55],
+        [0.65, 0.35, -0.55],
+        [-0.65, -0.35, -0.55],
+        [0.65, -0.35, -0.55],
+    ];
+    tipPositions.forEach(pos => {
+        geometries.push(createColoredGeometry(
+            new THREE.SphereGeometry(0.05, 6, 4), LIGHT_PINK,
+            pos, [0, 0, 0], [1, 1, 1]
+        ));
+    });
 
-    // Cockpit
-    const cockpit = createTransformedGeometry(
-        new THREE.SphereGeometry(1, 8, 6),
-        [0, 0.1, 0.8], [0, 0, 0], [0.2, 0.1, 0.3]
-    );
-    geometries.push(cockpit);
+    // === ENGINE JETS (HDR) ===
+    tipPositions.forEach(pos => {
+        geometries.push(createColoredGeometry(
+            new THREE.ConeGeometry(0.08, 0.35, 6), JET_PINK,
+            [pos[0], pos[1], pos[2] - 0.2], [-Math.PI / 2, 0, 0], [1, 1, 1]
+        ));
+    });
 
-    // Left engine nacelle
-    const leftEngine = createTransformedGeometry(
-        new THREE.CylinderGeometry(1, 1, 1, 6),
-        [-0.4, 0, -0.5], [0, 0, 0], [0.15, 0.15, 0.8]
-    );
-    geometries.push(leftEngine);
-
-    // Right engine nacelle
-    const rightEngine = createTransformedGeometry(
-        new THREE.CylinderGeometry(1, 1, 1, 6),
-        [0.4, 0, -0.5], [0, 0, 0], [0.15, 0.15, 0.8]
-    );
-    geometries.push(rightEngine);
-
-    // Left engine glow
-    const leftGlow = createTransformedGeometry(
-        new THREE.SphereGeometry(1, 8, 6),
-        [-0.4, 0, -0.95], [0, 0, 0], [0.12, 0.12, 0.05]
-    );
-    geometries.push(leftGlow);
-
-    // Right engine glow
-    const rightGlow = createTransformedGeometry(
-        new THREE.SphereGeometry(1, 8, 6),
-        [0.4, 0, -0.95], [0, 0, 0], [0.12, 0.12, 0.05]
-    );
-    geometries.push(rightGlow);
-
-    const merged = BufferGeometryUtils.mergeGeometries(geometries);
-    if (!merged) {
-        throw new Error('Failed to merge scout geometries');
-    }
+    const merged = BufferGeometryUtils.mergeGeometries(geometries, false);
+    if (!merged) throw new Error('Failed to merge scout geometries');
     merged.scale(1.5, 1.5, 1.5);
     geometries.forEach(g => g.dispose());
     return merged;
 }
 
 /**
- * BOMBER - Heavy assault craft
+ * BOMBER - Heavy hexagonal hull with weapon pods
+ * Hull: Dark orange-tinted | Lights: Orange HDR | Jets: Orange-white HDR
  */
 function createBomberGeometry(): THREE.BufferGeometry {
     const geometries: THREE.BufferGeometry[] = [];
 
-    // Main hull
-    const hull = createTransformedGeometry(
-        new THREE.OctahedronGeometry(0.5),
-        [0, 0, 0], [0, 0, 0], [0.8, 0.6, 2.5]
-    );
-    geometries.push(hull);
+    // === HULL ===
+    geometries.push(createColoredGeometry(
+        new THREE.CylinderGeometry(0.5, 0.6, 1.8, 6), HULL_ORANGE,
+        [0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(0.7, 0.1, 1.4), HULL_DARK,
+        [0, 0.45, 0], [0, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.ConeGeometry(0.25, 0.8, 6), HULL_DARK,
+        [0, 0, 1.3], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(0.2, 0.15, 0.6), HULL_DARK,
+        [-0.55, -0.2, 0.4], [0, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(0.2, 0.15, 0.6), HULL_DARK,
+        [0.55, -0.2, 0.4], [0, 0, 0], [1, 1, 1]
+    ));
 
-    // Top armor plate
-    const topPlate = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [0, 0.35, 0], [0, 0, 0], [0.5, 0.08, 1.5]
-    );
-    geometries.push(topPlate);
+    // === ACCENT LIGHTS (HDR) ===
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.06, 6, 4), LIGHT_ORANGE,
+        [-0.55, -0.2, 0.9], [0, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.06, 6, 4), LIGHT_ORANGE,
+        [0.55, -0.2, 0.9], [0, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(0.8, 0.04, 0.06), LIGHT_ORANGE,
+        [0, 0.5, 0], [0, 0, 0], [1, 1, 1]
+    ));
 
-    // Left armor plate
-    const leftPlate = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [-0.35, 0, 0], [0, 0, 0], [0.08, 0.4, 1.2]
-    );
-    geometries.push(leftPlate);
+    // === ENGINE JETS (HDR) ===
+    const enginePositions: [number, number, number][] = [
+        [0, 0, -1.1],
+        [-0.35, -0.15, -0.9],
+        [0.35, -0.15, -0.9],
+    ];
+    enginePositions.forEach((pos, i) => {
+        const size = i === 0 ? 0.18 : 0.12;
+        geometries.push(createColoredGeometry(
+            new THREE.CylinderGeometry(size, size * 1.2, 0.4, 8), HULL_DARK,
+            pos, [Math.PI / 2, 0, 0], [1, 1, 1]
+        ));
+        geometries.push(createColoredGeometry(
+            new THREE.ConeGeometry(size * 0.9, 0.5, 8), JET_ORANGE,
+            [pos[0], pos[1], pos[2] - 0.35], [-Math.PI / 2, 0, 0], [1, 1, 1]
+        ));
+        geometries.push(createColoredGeometry(
+            new THREE.SphereGeometry(size * 0.7, 8, 6), JET_WHITE,
+            [pos[0], pos[1], pos[2] - 0.2], [0, 0, 0], [1, 1, 0.5]
+        ));
+    });
 
-    // Right armor plate
-    const rightPlate = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [0.35, 0, 0], [0, 0, 0], [0.08, 0.4, 1.2]
-    );
-    geometries.push(rightPlate);
-
-    // Nose spike
-    const nose = createTransformedGeometry(
-        new THREE.ConeGeometry(1, 2, 6),
-        [0, 0, 1.4], [-Math.PI / 2, 0, 0], [0.15, 0.5, 0.15]
-    );
-    geometries.push(nose);
-
-    // Left weapon pod
-    const leftPod = createTransformedGeometry(
-        new THREE.CylinderGeometry(1, 1, 1, 6),
-        [-0.5, -0.2, 0.5], [0, 0, 0], [0.12, 0.12, 0.4]
-    );
-    geometries.push(leftPod);
-
-    // Right weapon pod
-    const rightPod = createTransformedGeometry(
-        new THREE.CylinderGeometry(1, 1, 1, 6),
-        [0.5, -0.2, 0.5], [0, 0, 0], [0.12, 0.12, 0.4]
-    );
-    geometries.push(rightPod);
-
-    // Center engine
-    const centerEngine = createTransformedGeometry(
-        new THREE.CylinderGeometry(1, 0.8, 1, 8),
-        [0, 0, -1.2], [0, 0, 0], [0.25, 0.25, 0.4]
-    );
-    geometries.push(centerEngine);
-
-    // Left engine
-    const leftEngineSmall = createTransformedGeometry(
-        new THREE.CylinderGeometry(1, 0.8, 1, 8),
-        [-0.35, -0.15, -1.0], [0, 0, 0], [0.18, 0.18, 0.35]
-    );
-    geometries.push(leftEngineSmall);
-
-    // Right engine
-    const rightEngineSmall = createTransformedGeometry(
-        new THREE.CylinderGeometry(1, 0.8, 1, 8),
-        [0.35, -0.15, -1.0], [0, 0, 0], [0.18, 0.18, 0.35]
-    );
-    geometries.push(rightEngineSmall);
-
-    // Center glow
-    const centerGlow = createTransformedGeometry(
-        new THREE.SphereGeometry(1, 8, 6),
-        [0, 0, -1.45], [0, 0, 0], [0.2, 0.2, 0.1]
-    );
-    geometries.push(centerGlow);
-
-    // Left glow
-    const leftGlow = createTransformedGeometry(
-        new THREE.SphereGeometry(1, 8, 6),
-        [-0.35, -0.15, -1.2], [0, 0, 0], [0.12, 0.12, 0.05]
-    );
-    geometries.push(leftGlow);
-
-    // Right glow
-    const rightGlow = createTransformedGeometry(
-        new THREE.SphereGeometry(1, 8, 6),
-        [0.35, -0.15, -1.2], [0, 0, 0], [0.12, 0.12, 0.05]
-    );
-    geometries.push(rightGlow);
-
-    const merged = BufferGeometryUtils.mergeGeometries(geometries);
-    if (!merged) {
-        throw new Error('Failed to merge bomber geometries');
-    }
+    const merged = BufferGeometryUtils.mergeGeometries(geometries, false);
+    if (!merged) throw new Error('Failed to merge bomber geometries');
     merged.scale(1.5, 1.5, 1.5);
     geometries.forEach(g => g.dispose());
     return merged;
 }
 
 /**
- * WEAVER - Evasive disc craft with spinning blades
+ * WEAVER - Organic curved body with rotating rings
+ * Hull: Dark purple-tinted | Lights: Purple HDR | Jets: Purple-white HDR
  */
 function createWeaverGeometry(): THREE.BufferGeometry {
     const geometries: THREE.BufferGeometry[] = [];
 
-    // Central disc
-    const disc = createTransformedGeometry(
-        new THREE.CylinderGeometry(0.6, 0.6, 0.3, 16),
-        [0, 0, 0], [Math.PI / 2, 0, 0], [1.2, 0.15, 1.2]
-    );
-    geometries.push(disc);
+    // === HULL ===
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.4, 12, 10), HULL_PURPLE,
+        [0, 0, 0], [0, 0, 0], [1, 0.6, 1.5]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.TorusGeometry(0.55, 0.06, 8, 16), HULL_DARK,
+        [0, 0, 0], [Math.PI / 2, 0, Math.PI / 6], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.TorusGeometry(0.5, 0.05, 8, 16), HULL_DARK,
+        [0, 0, 0], [Math.PI / 2, 0, -Math.PI / 6], [1, 1, 1]
+    ));
 
-    // Upper dome
-    const dome = createTransformedGeometry(
-        new THREE.SphereGeometry(0.5, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
-        [0, 0.1, 0], [0, 0, 0], [0.5, 0.25, 0.5]
-    );
-    geometries.push(dome);
+    // === ACCENT LIGHTS (HDR) ===
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.15, 8, 6), LIGHT_PURPLE,
+        [0, 0, 0.65], [0, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.OctahedronGeometry(0.15), LIGHT_CYAN,
+        [0, 0, 0], [0, 0, 0], [1, 1, 1]
+    ));
+    const ringAngles = [0, Math.PI / 2, Math.PI, Math.PI * 1.5];
+    ringAngles.forEach(angle => {
+        const x = Math.cos(angle) * 0.55;
+        const y = Math.sin(angle) * 0.55;
+        geometries.push(createColoredGeometry(
+            new THREE.SphereGeometry(0.04, 4, 4), LIGHT_PURPLE,
+            [x, y, 0], [0, 0, 0], [1, 1, 1]
+        ));
+    });
 
-    // Blade 1
-    const blade1 = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [0.5, 0, 0.5], [0, Math.PI / 4, 0], [0.8, 0.04, 0.15]
-    );
-    geometries.push(blade1);
+    // === ENGINE JETS (HDR) ===
+    const thrusterAngles = [0, Math.PI / 2, Math.PI, Math.PI * 1.5];
+    thrusterAngles.forEach(angle => {
+        const x = Math.cos(angle) * 0.35;
+        const y = Math.sin(angle) * 0.35;
+        geometries.push(createColoredGeometry(
+            new THREE.ConeGeometry(0.06, 0.25, 6), JET_PURPLE,
+            [x, y, -0.5], [-Math.PI / 2, 0, 0], [1, 1, 1]
+        ));
+        geometries.push(createColoredGeometry(
+            new THREE.SphereGeometry(0.05, 6, 4), JET_WHITE,
+            [x, y, -0.62], [0, 0, 0], [1, 1, 0.5]
+        ));
+    });
+    geometries.push(createColoredGeometry(
+        new THREE.ConeGeometry(0.12, 0.4, 8), JET_PURPLE,
+        [0, 0, -0.75], [-Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
 
-    // Blade 2
-    const blade2 = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [0.5, 0, -0.5], [0, -Math.PI / 4, 0], [0.8, 0.04, 0.15]
-    );
-    geometries.push(blade2);
-
-    // Blade 3
-    const blade3 = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [-0.5, 0, 0.5], [0, -Math.PI / 4, 0], [0.8, 0.04, 0.15]
-    );
-    geometries.push(blade3);
-
-    // Blade 4
-    const blade4 = createTransformedGeometry(
-        new THREE.BoxGeometry(1, 1, 1),
-        [-0.5, 0, -0.5], [0, Math.PI / 4, 0], [0.8, 0.04, 0.15]
-    );
-    geometries.push(blade4);
-
-    // Center engine
-    const engine = createTransformedGeometry(
-        new THREE.CylinderGeometry(1, 0.8, 1, 8),
-        [0, -0.1, 0], [Math.PI / 2, 0, 0], [0.3, 0.1, 0.3]
-    );
-    geometries.push(engine);
-
-    // Front sensor
-    const sensor = createTransformedGeometry(
-        new THREE.ConeGeometry(1, 1, 6),
-        [0, 0, 0.7], [Math.PI / 2, 0, 0], [0.1, 0.15, 0.1]
-    );
-    geometries.push(sensor);
-
-    const merged = BufferGeometryUtils.mergeGeometries(geometries);
-    if (!merged) {
-        throw new Error('Failed to merge weaver geometries');
-    }
+    const merged = BufferGeometryUtils.mergeGeometries(geometries, false);
+    if (!merged) throw new Error('Failed to merge weaver geometries');
     merged.scale(1.5, 1.5, 1.5);
     geometries.forEach(g => g.dispose());
     return merged;
 }
 
 /**
- * SHIELDED DRONE - Same as drone but darker coloring
+ * SHIELDED DRONE - Reinforced hull with shield dome
+ * Hull: Dark green-tinted | Lights: Lime green HDR | Jets: Green-white HDR
  */
 function createShieldedDroneGeometry(): THREE.BufferGeometry {
-    // Same geometry as drone
-    return createDroneGeometry();
+    const geometries: THREE.BufferGeometry[] = [];
+
+    // === HULL ===
+    geometries.push(createColoredGeometry(
+        new THREE.OctahedronGeometry(0.5), HULL_GREEN,
+        [0, 0, 0], [0, 0, 0], [0.6, 0.4, 1.6]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.ConeGeometry(0.18, 0.5, 6), HULL_DARK,
+        [0, 0, 1.0], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(0.15, 0.3, 0.8), HULL_DARK,
+        [-0.4, 0, 0], [0, 0, 0.1], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(0.15, 0.3, 0.8), HULL_DARK,
+        [0.4, 0, 0], [0, 0, -0.1], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.CylinderGeometry(0.1, 0.12, 0.4, 8), HULL_DARK,
+        [-0.25, -0.1, -0.6], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.CylinderGeometry(0.1, 0.12, 0.4, 8), HULL_DARK,
+        [0.25, -0.1, -0.6], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+
+    // === ACCENT LIGHTS (HDR) ===
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.2, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), LIGHT_GREEN,
+        [0, 0.3, 0], [0, 0, 0], [1, 0.8, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.12, 8, 6), LIGHT_GREEN,
+        [0, 0.15, 0], [0, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(0.04, 0.25, 0.6), LIGHT_GREEN,
+        [-0.48, 0, 0], [0, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.BoxGeometry(0.04, 0.25, 0.6), LIGHT_GREEN,
+        [0.48, 0, 0], [0, 0, 0], [1, 1, 1]
+    ));
+
+    // === ENGINE JETS (HDR) ===
+    geometries.push(createColoredGeometry(
+        new THREE.ConeGeometry(0.1, 0.35, 8), JET_GREEN,
+        [-0.25, -0.1, -0.95], [-Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.ConeGeometry(0.1, 0.35, 8), JET_GREEN,
+        [0.25, -0.1, -0.95], [-Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.08, 6, 4), JET_WHITE,
+        [-0.25, -0.1, -0.82], [0, 0, 0], [1, 1, 0.5]
+    ));
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.08, 6, 4), JET_WHITE,
+        [0.25, -0.1, -0.82], [0, 0, 0], [1, 1, 0.5]
+    ));
+
+    const merged = BufferGeometryUtils.mergeGeometries(geometries, false);
+    if (!merged) throw new Error('Failed to merge shielded drone geometries');
+    merged.scale(1.5, 1.5, 1.5);
+    geometries.forEach(g => g.dispose());
+    return merged;
 }
 
 // ========================================
@@ -401,9 +437,6 @@ function createShieldedDroneGeometry(): THREE.BufferGeometry {
 
 export type EnemyType = 'drone' | 'scout' | 'bomber' | 'weaver' | 'shieldedDrone';
 
-/**
- * Get the merged geometry for an enemy type (cached)
- */
 export function getEnemyGeometry(type: EnemyType): THREE.BufferGeometry {
     switch (type) {
         case 'drone':
@@ -428,93 +461,38 @@ export function getEnemyGeometry(type: EnemyType): THREE.BufferGeometry {
 }
 
 /**
- * Get the material for an enemy type (cached)
+ * Material for enemy ships using MeshBasicMaterial.
+ * 
+ * MeshBasicMaterial displays vertex colors directly without lighting calculations.
+ * This allows:
+ * - Dark hull colors (0.1-0.2) to stay dark
+ * - Bright accent lights (4.0+ HDR) to appear bright
+ * - Engine jets (8.0+ HDR) to glow intensely via bloom
+ * 
+ * toneMapped: false preserves HDR values for bloom post-processing
  */
-export function getEnemyMaterial(type: EnemyType): THREE.MeshStandardMaterial {
-    switch (type) {
-        case 'drone':
-            if (!droneMaterial) {
-                droneMaterial = new THREE.MeshStandardMaterial({
-                    color: METAL_CHROME.color,
-                    emissive: METAL_CHROME.emissive,
-                    emissiveIntensity: METAL_CHROME.emissiveIntensity,
-                    metalness: METAL_CHROME.metalness,
-                    roughness: METAL_CHROME.roughness,
-                });
-            }
-            return droneMaterial;
-        case 'scout':
-            if (!scoutMaterial) {
-                scoutMaterial = new THREE.MeshStandardMaterial({
-                    color: METAL_CHROME.color,
-                    emissive: METAL_CHROME.emissive,
-                    emissiveIntensity: METAL_CHROME.emissiveIntensity,
-                    metalness: METAL_CHROME.metalness,
-                    roughness: METAL_CHROME.roughness,
-                });
-            }
-            return scoutMaterial;
-        case 'bomber':
-            if (!bomberMaterial) {
-                bomberMaterial = new THREE.MeshStandardMaterial({
-                    color: METAL_GUNMETAL.color,
-                    emissive: METAL_GUNMETAL.emissive,
-                    emissiveIntensity: METAL_GUNMETAL.emissiveIntensity,
-                    metalness: METAL_GUNMETAL.metalness,
-                    roughness: METAL_GUNMETAL.roughness,
-                });
-            }
-            return bomberMaterial;
-        case 'weaver':
-            if (!weaverMaterial) {
-                weaverMaterial = new THREE.MeshStandardMaterial({
-                    color: METAL_GUNMETAL.color,
-                    emissive: METAL_GUNMETAL.emissive,
-                    emissiveIntensity: METAL_GUNMETAL.emissiveIntensity,
-                    metalness: METAL_GUNMETAL.metalness,
-                    roughness: METAL_GUNMETAL.roughness,
-                });
-            }
-            return weaverMaterial;
-        case 'shieldedDrone':
-            if (!shieldedDroneMaterial) {
-                shieldedDroneMaterial = new THREE.MeshStandardMaterial({
-                    color: METAL_DARK_GREEN.color,
-                    emissive: METAL_DARK_GREEN.emissive,
-                    emissiveIntensity: METAL_DARK_GREEN.emissiveIntensity,
-                    metalness: METAL_DARK_GREEN.metalness,
-                    roughness: METAL_DARK_GREEN.roughness,
-                });
-            }
-            return shieldedDroneMaterial;
-        default:
-            return getEnemyMaterial('drone');
+export function getEnemyMaterial(_type: EnemyType): THREE.MeshBasicMaterial {
+    if (!sharedMaterial) {
+        sharedMaterial = new THREE.MeshBasicMaterial({
+            vertexColors: true,
+            toneMapped: false, // Allow HDR vertex colors to pass through to bloom
+        });
     }
+    return sharedMaterial as THREE.MeshBasicMaterial;
 }
 
-/**
- * Dispose all cached geometries and materials
- */
 export function disposeEnemyAssets(): void {
     droneGeometry?.dispose();
     scoutGeometry?.dispose();
     bomberGeometry?.dispose();
     weaverGeometry?.dispose();
     shieldedDroneGeometry?.dispose();
-    droneMaterial?.dispose();
-    scoutMaterial?.dispose();
-    bomberMaterial?.dispose();
-    weaverMaterial?.dispose();
-    shieldedDroneMaterial?.dispose();
+    sharedMaterial?.dispose();
 
     droneGeometry = null;
     scoutGeometry = null;
     bomberGeometry = null;
     weaverGeometry = null;
     shieldedDroneGeometry = null;
-    droneMaterial = null;
-    scoutMaterial = null;
-    bomberMaterial = null;
-    weaverMaterial = null;
-    shieldedDroneMaterial = null;
+    sharedMaterial = null;
 }
