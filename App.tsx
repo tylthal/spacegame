@@ -144,10 +144,12 @@ const App: React.FC = () => {
 
       const delta = Math.max(0, time - lastTime); // Clamp to non-negative
       lastTime = time;
-      const result = combatLoop.tick(delta);
+      // Polling Loop for UI & FX (Rendering drives the physics tick in GameScene)
+      // We just read the current state here for the HUD and Overlay FX
+      const summary = combatLoop.summary();
 
-      // Check for damage
-      if (result.hull < lastHullRef.current) {
+      // Check for damage (compare previous hull to current)
+      if (summary.hull < lastHullRef.current) {
         setDamageFlash(true);
         setDamageShake(true);
         // SoundEngine.play('playerHit');
@@ -156,11 +158,11 @@ const App: React.FC = () => {
         // Clear shake after animation duration
         setTimeout(() => setDamageShake(false), 250);
       }
-      lastHullRef.current = result.hull;
+      lastHullRef.current = summary.hull;
 
 
 
-      const summary = combatLoop.summary();
+
       // Check for low hull alarm (< 30% and alive)
       if (summary.hull <= 30 && summary.hull > 0 && !isGameOver) {
         SoundEngine.startLowHullAlarm();

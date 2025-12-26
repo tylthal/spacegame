@@ -814,6 +814,12 @@ export class CombatLoop {
                   destroyed.push(enemy);
                   this.enemies.splice(j, 1);
                   this.kills[enemy.kind] += 1;
+
+                  if (enemy.kind === 'weaver' || enemy.kind === 'bomber' || enemy.kind === 'shieldedDrone') {
+                    SoundEngine.play('explosionLarge');
+                  } else {
+                    SoundEngine.play('explosionSmall');
+                  }
                 } else {
                   // Survive with reduced health
                   enemy.health = currentHealth - 4;
