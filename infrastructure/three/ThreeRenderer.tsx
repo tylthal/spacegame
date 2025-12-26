@@ -27,11 +27,16 @@ function StaticFighterCamera({ combatLoop }: { combatLoop?: CombatLoop }) {
 
 export function ThreeRenderer(props: ThreeRendererProps) {
     const { combatLoop } = props;
+
+    // Cap DPR at 1.5 for performance (was [1, 2])
+    // On 2x displays, this reduces pixels by ~44%
+    const maxDpr = Math.min(window.devicePixelRatio, 1.5);
+
     return (
         <div className="absolute inset-0 z-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
             <Canvas
                 camera={{ position: [0, 3, 5], fov: 60 }}
-                dpr={[1, 2]}
+                dpr={maxDpr}
             >
                 <color attach="background" args={['#000000']} />
 
