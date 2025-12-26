@@ -22,7 +22,7 @@ import { GameOverScreen } from './components/GameOverScreen';
 import { PauseScreen } from './components/PauseScreen';
 import { SoundEngine, MusicEngine } from './audio';
 import { HandCursor } from './components/HandCursor';
-import { TierAnnouncement } from './components/TierAnnouncement';
+
 import { CursorLayer } from './components/CursorLayer';
 import { HandWireframe } from './components/HandWireframe';
 import { HandLandmark } from './input/HandTracker';
@@ -93,9 +93,7 @@ const App: React.FC = () => {
   const [damageShake, setDamageShake] = useState(false);
   const lastHullRef = useRef(100);
 
-  // Tier Announcement State
-  const [announceTier, setAnnounceTier] = useState<number | null>(null);
-  const lastTierRef = useRef(-1); // Start at -1 so tier 0 triggers first announcement
+
 
   // Wireframe debug overlay
   const [showWireframe, setShowWireframe] = useState(false);
@@ -160,16 +158,7 @@ const App: React.FC = () => {
       }
       lastHullRef.current = result.hull;
 
-      // Check for tier change (announcements)
-      const summary = combatLoop.summary();
-      if (summary.currentTier > lastTierRef.current) {
-        setAnnounceTier(summary.currentTier);
-        // Play tier warning if tier > 0 (don't play on initial start)
-        if (summary.currentTier > 0) {
-          SoundEngine.play('tierWarning');
-        }
-        lastTierRef.current = summary.currentTier;
-      }
+
 
       // Check for low hull alarm (< 30% and alive)
       if (summary.hull <= 30 && summary.hull > 0 && !isGameOver) {
@@ -414,6 +403,7 @@ const App: React.FC = () => {
                 combatLoop.reset();
                 setIsGameOver(false);
                 frozenTimeRef.current = null;
+
               }}
               onExit={() => {
                 // Go back to title screen
@@ -519,13 +509,7 @@ const App: React.FC = () => {
         </>
       )}
 
-      {/* Tier Transition Announcements */}
-      {announceTier !== null && (
-        <TierAnnouncement
-          tier={announceTier}
-          onComplete={() => setAnnounceTier(null)}
-        />
-      )}
+
 
     </div>
   );

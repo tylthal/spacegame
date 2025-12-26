@@ -8,9 +8,9 @@ interface TierAnnouncementProps {
 // Tier announcements with dramatic warnings
 const TIER_MESSAGES = [
     { title: 'TIER 1', subtitle: 'DRONE SWARM INCOMING', color: 'text-green-400' },
-    { title: 'TIER 2', subtitle: 'HOSTILES INBOUND', color: 'text-cyan-400' },
-    { title: 'WARNING', subtitle: 'WEAVER DETECTED', color: 'text-fuchsia-400' },
-    { title: 'ALERT', subtitle: 'SHIELDED DRONE INCOMING', color: 'text-yellow-400' },
+    { title: 'TIER 2', subtitle: 'WEAVER DETECTED', color: 'text-cyan-400' },
+    { title: 'TIER 3', subtitle: 'SHIELDED DRONE INCOMING', color: 'text-fuchsia-400' },
+    { title: 'TIER 4', subtitle: 'SWARM INTENSIFYING', color: 'text-yellow-400' },
     { title: 'DANGER', subtitle: 'MAXIMUM THREAT', color: 'text-red-400' },
 ];
 
