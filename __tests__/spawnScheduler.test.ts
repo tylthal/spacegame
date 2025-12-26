@@ -15,11 +15,12 @@ describe('SpawnScheduler', () => {
     const rng = new SeededRng(42);
     const scheduler = new SpawnScheduler(rng, DEFAULT_SPAWN_CURVE);
 
-    // 10 steps x 1200ms = 12000ms, spawn interval is 2000ms, so expect 6 spawns
+    // 10 steps x 1200ms = 12000ms, spawn interval is 2500ms (Tier 1), so expect 4 spawns
+    // Spawns at 2500, 5000, 7500, 10000
     const events = stepMany(scheduler, 10, 1200);
-    expect(events.length).toBeGreaterThan(4);
-    expect(events.length).toBeLessThan(8); // 6 is expected
-    expect(events[0]).toEqual({ at: 2000, kind: 'drone' });
+    expect(events.length).toBeGreaterThanOrEqual(4);
+    expect(events.length).toBeLessThan(6);
+    expect(events[0]).toEqual({ at: 2500, kind: 'drone' });
     const uniqueKinds = new Set(events.map(event => event.kind));
     expect(uniqueKinds).toEqual(new Set(['drone']));
   });
@@ -33,10 +34,10 @@ describe('SpawnScheduler', () => {
     const lastTimestamp = events.at(-1)?.at ?? 0;
     expect(lastTimestamp).toBeGreaterThanOrEqual(60000);
 
-    // Weavers appear after 30s
+    // Weavers appear after 45s
     const counts = events.reduce(
       (tally, event) => ({ ...tally, [event.kind]: (tally[event.kind] || 0) + 1 }),
-      { drone: 0, scout: 0, bomber: 0, weaver: 0 } as Record<string, number>,
+      { drone: 0, weaver: 0, shieldedDrone: 0 } as Record<string, number>,
     );
 
     // Verify mix
