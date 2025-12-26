@@ -19,6 +19,10 @@ vi.mock('../../audio', () => ({
     init: vi.fn(),
     setVolume: vi.fn(),
     setMuted: vi.fn(),
+    startAmbience: vi.fn(),
+    stopAmbience: vi.fn(),
+    startLowHullAlarm: vi.fn(),
+    stopLowHullAlarm: vi.fn(),
   },
   MusicEngine: {
     play: vi.fn(),
