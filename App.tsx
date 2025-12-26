@@ -160,6 +160,7 @@ const App: React.FC = () => {
 
 
 
+      const summary = combatLoop.summary();
       // Check for low hull alarm (< 30% and alive)
       if (summary.hull <= 30 && summary.hull > 0 && !isGameOver) {
         SoundEngine.startLowHullAlarm();
