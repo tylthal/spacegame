@@ -61,7 +61,7 @@ export const GAME_CONFIG = {
         /** Proximity distance to trigger detonation (larger = easier to hit) */
         detonationProximity: 14,
         /** Delay in ms after triggering before explosion */
-        detonationDelayMs: 500,
+        detonationDelayMs: 0,
         /** Blast radius for area damage (larger = more enemies hit) */
         blastRadius: 30,
     },

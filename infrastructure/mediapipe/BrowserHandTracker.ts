@@ -2,12 +2,16 @@
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { HandFrame, HandTracker, HandLandmark, Handedness, FrameResult } from '../../input/HandTracker';
 
+// Throttle inference to 30fps for better performance on lower-spec devices
+const INFERENCE_INTERVAL_MS = 33; // ~30fps instead of 60fps
+
 export class BrowserHandTracker implements HandTracker {
   private handLandmarker: HandLandmarker | null = null;
   private video: HTMLVideoElement | null = null;
   private listeners = new Set<(frame: FrameResult) => void>();
   private requestAnimationFrameId: number | null = null;
   private lastVideoTime = -1;
+  private lastProcessTime = 0; // For 30fps throttling
 
   constructor() { }
 
@@ -48,9 +52,14 @@ export class BrowserHandTracker implements HandTracker {
   private processFrame() {
     if (!this.handLandmarker || !this.video) return;
 
+    // Throttle to ~30fps for better performance on lower-spec devices
+    const now = performance.now();
+    if (now - this.lastProcessTime < INFERENCE_INTERVAL_MS) return;
+    this.lastProcessTime = now;
+
     if (this.video.currentTime !== this.lastVideoTime) {
       this.lastVideoTime = this.video.currentTime;
-      const startTimeMs = performance.now();
+      const startTimeMs = now;
 
       const result = this.handLandmarker.detectForVideo(this.video, startTimeMs);
       const hands: HandFrame[] = [];
