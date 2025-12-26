@@ -3,13 +3,12 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { Group, Mesh, Vector3, Object3D, InstancedMesh, PerspectiveCamera } from 'three';
 import { CombatLoop } from '../../gameplay/CombatLoop';
 import { useSpaceshipAsset, AssetId } from './assets/AssetLoader';
-import { EnemyMesh } from './assets/EnemyMeshes';
 import { GameEffects } from './effects/EffectComposer';
 import { Starfield } from './particles/ParticleSystem';
 import { VoxelExplosion, Explosion, EXPLOSION_COLORS } from './effects/VoxelExplosion';
 import { MissileExplosion, MissileExplosionData } from './effects/MissileExplosion';
-import { ShieldBubble } from './effects/ShieldBubble';
 import { FloatingScore, FloatingScoreData } from './effects/FloatingScore';
+import { InstancedEnemyRenderer } from './InstancedEnemyRenderer';
 import { GAME_CONFIG } from '../../config/gameConfig';
 import { SoundEngine } from '../../audio/SoundEngine';
 import type { EnemyKind } from '../../rendering/EnemyFactory';
@@ -349,12 +348,10 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
             {/* Missiles - Larger projectiles with area damage */}
             {combatLoop && <InstancedMissileRenderer combatLoop={combatLoop} />}
 
-            {/* Enemies */}
-            <group>
-                {combatLoop?.activeEnemies.map(enemy => (
-                    <EnemyRenderer key={enemy.id} enemy={enemy as any} />
-                ))}
-            </group>
+            {/* Enemies - Instanced for High Performance */}
+            {combatLoop && (
+                <InstancedEnemyRenderer enemies={combatLoop.activeEnemies as any} />
+            )}
 
             {/* Explosions */}
             {explosions.map(explosion => (
@@ -385,98 +382,3 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
         </group>
     );
 }
-
-// Hitbox radii must match CombatLoop's enemyRadius values
-const HITBOX_RADIUS: Record<string, number> = {
-    drone: 1.5,
-    scout: 2.0,
-    bomber: 2.5,
-    weaver: 1.8,
-    shieldedDrone: 1.8,
-};
-
-// Sub-component to handle per-enemy updates efficiently - memoized
-const EnemyRenderer = React.memo(function EnemyRenderer({ enemy, showHitbox = false }: {
-    enemy: {
-        id: number,
-        kind: string,
-        position: { x: number, y: number, z: number },
-        velocity: { x: number, y: number, z: number },
-        shield?: number,
-        maxShield?: number,
-        lastHitTime?: number
-    },
-    showHitbox?: boolean
-}) {
-    const group = useRef<Group>(null);
-    const velocityVec = useRef(new Vector3());
-    const targetPos = useRef(new Vector3());
-
-    useFrame(() => {
-        if (!group.current) return;
-
-        const { x, y, z } = enemy.position;
-        group.current.position.set(x, y, z);
-
-        // ========================================
-        // ENEMY ORIENTATION SYSTEM
-        // ========================================
-        // 
-        // How it works:
-        // 1. Enemy meshes are authored with NOSE at +Z and ENGINE at -Z
-        // 2. Three.js lookAt() makes the object's -Z axis point at the target
-        // 3. By looking at a point AHEAD (in velocity direction), the mesh's
-        //    -Z (engine) points toward where we're going
-        // 4. This means +Z (nose) points AWAY from where we're looking,
-        //    which is the OPPOSITE direction of travel
-        // 
-        // Wait, that sounds backwards, but it works because of how the
-        // camera/world coordinates interact. Empirically tested: lookAt(ahead)
-        // makes the nose lead and engine trail. DO NOT CHANGE without testing!
-        // ========================================
-
-        const { x: vx, y: vy, z: vz } = enemy.velocity;
-        velocityVec.current.set(vx, vy, vz);
-
-        // Look at point AHEAD in velocity direction
-        targetPos.current.set(
-            x + vx * 10,
-            y + vy * 10,
-            z + vz * 10
-        );
-
-        // Reset rotation before applying new lookAt
-        group.current.rotation.set(0, 0, 0);
-        group.current.lookAt(targetPos.current);
-    });
-
-    const hitboxRadius = HITBOX_RADIUS[enemy.kind] || 1.5;
-
-    return (
-        <group ref={group}>
-            <EnemyMesh kind={enemy.kind} />
-            {/* Shield bubble for shielded enemies */}
-            {enemy.shield !== undefined && enemy.maxShield && (
-                <ShieldBubble
-                    radius={hitboxRadius * 1.3}
-                    getShieldHP={() => enemy.shield}
-                    maxShieldHP={enemy.maxShield}
-                    getLastHitTime={() => enemy.lastHitTime}
-                />
-            )}
-            {/* Debug hitbox visualization */}
-            {showHitbox && (
-                <mesh>
-                    <sphereGeometry args={[hitboxRadius, 16, 12]} />
-                    <meshBasicMaterial
-                        color="#00ff00"
-                        wireframe={true}
-                        transparent={true}
-                        opacity={0.5}
-                    />
-                </mesh>
-            )}
-        </group>
-    );
-});
-
