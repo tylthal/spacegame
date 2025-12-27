@@ -35,11 +35,14 @@ const ENEMIES: { kind: EnemyKind; name: string; description: string; difficulty:
 
 export const PracticeModeScreen: React.FC<PracticeModeScreenProps> = ({ onSelect, onBack }) => {
     return (
-        <div className="absolute inset-0 flex items-start md:items-center justify-start z-[60] overflow-y-auto pointer-events-none">
+        <div
+            className="absolute inset-0 flex items-start md:items-center justify-start z-[60] overflow-y-auto"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+        >
             {/* Background panel for readability - only covers content area */}
-            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm -z-10" />
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm pointer-events-none" style={{ zIndex: -1 }} />
 
-            <div className="w-full max-w-xl text-left pointer-events-auto p-3 tall:p-4 md:p-12 pb-8">
+            <div className="w-full max-w-xl text-left p-3 tall:p-4 md:p-12 pb-8">
                 <h2 className="text-2xl tall:text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-blue-500 mb-1 tall:mb-2 filter drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
                     COMBAT SIMULATOR
                 </h2>

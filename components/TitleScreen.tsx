@@ -173,14 +173,13 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onPractice, o
             {/* On md+: Takes right half of screen */}
             {/* On mobile: Shows as centered background behind content */}
             <div
-                className="absolute inset-0 md:relative md:flex-1 pointer-events-none overflow-visible -z-10 md:z-0"
-                style={{ position: 'relative' }}
+                className="absolute inset-0 md:relative md:flex-1 pointer-events-none overflow-visible"
+                style={{ zIndex: -1 }}
             >
                 <div
-                    className="absolute inset-0 md:inset-[-50%] md:w-[200%] md:h-[200%] flex items-center justify-center"
-                    style={{ opacity: 0.4 }} // Subtle on mobile as background
+                    className="absolute inset-0 md:inset-[-50%] md:w-[200%] md:h-[200%] flex items-center justify-center opacity-40 md:opacity-100"
                 >
-                    <div className="w-full h-full md:opacity-100" style={{ minHeight: '100%' }}>
+                    <div className="w-full h-full" style={{ minHeight: '100%' }}>
                         <Canvas
                             camera={{ position: [35, 15, 35], fov: 50, near: 0.1, far: 300 }}
                             shadows
