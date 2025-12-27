@@ -21,6 +21,7 @@ export interface EnemyInstance {
   lastHitTime?: number;  // For hit flash effect timing
   lastFireTime?: number; // For bomber firing cooldown
   isCharging?: boolean;  // Visual cue for bomber firing
+  shieldDownTime?: number; // Timestamp when shield broke
 }
 
 export interface Bullet {
@@ -602,6 +603,16 @@ export class CombatLoop {
         enemy.position.y += spiralY;
       }
 
+      // Shield Recharge Logic (3s delay)
+      if (enemy.shield !== undefined && enemy.shield <= 0 && enemy.shieldDownTime !== undefined) {
+        const now = this.elapsedMs;
+        if (now - enemy.shieldDownTime >= 3000) {
+          enemy.shield = enemy.maxShield; // Full recharge
+          enemy.shieldDownTime = undefined; // Reset timer
+          SoundEngine.play('shieldedSpawn'); // Audio feedback for recharge
+        }
+      }
+
       // Bomber logic: Fire bullets at player
       if (enemy.kind === 'bomber' && this.options.hull > 0) {
         const fireInterval = BOMBER_FIRE_INTERVAL_MS;
@@ -765,6 +776,7 @@ export class CombatLoop {
       SoundEngine.play('shieldHit');
       if (enemy.shield <= 0) {
         SoundEngine.play('shieldBreak');
+        enemy.shieldDownTime = this.elapsedMs; // Mark time of break using Game Time (not Date.now)
       }
       return false; // Not destroyed, shield absorbed it
     }
@@ -1081,7 +1093,8 @@ export class CombatLoop {
               if (enemy.shield !== undefined && enemy.shield > 0) {
                 // Has shield: destroy shield completely, but don't damage core
                 enemy.shield = 0;
-                SoundEngine.play('shieldHit');
+                enemy.shieldDownTime = this.elapsedMs; // Enable recharge
+                SoundEngine.play('shieldBreak');
                 // Don't destroy the enemy - they survive with shield overloaded
               } else {
                 // No shield: apply up to 4 damage (enough to kill most enemies)
