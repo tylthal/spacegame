@@ -42,7 +42,7 @@ class SoundEngineClass {
     private audioContext: AudioContext | null = null;
     private masterGain: GainNode | null = null;
     private _muted = false;
-    private _volume = 0.5;
+    private _volume = 0.7; // Boosted SFX volume (prioritized over music)
     private _initialized = false;
 
     // Atmosphere state
@@ -104,10 +104,13 @@ class SoundEngineClass {
         if (!this.audioContext || !this.masterGain) return false;
 
         if (this.audioContext.state === 'suspended') {
+            // Start resume but don't wait - allow sound to play anyway
+            // This fixes sounds not playing when music already started
             resumeAudioContext();
         }
 
-        return this.audioContext.state === 'running';
+        // Return true if running OR if resuming (to allow sounds during resume)
+        return this.audioContext.state === 'running' || this.audioContext.state === 'suspended';
     }
 
     /** Play a sound effect */
