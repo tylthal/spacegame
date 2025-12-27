@@ -70,6 +70,20 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         prevKillsRef.current = kills;
     }, [kills]);
 
+    // --- Heal Flash Animation ---
+    const [showHealFlash, setShowHealFlash] = useState(false);
+    const prevHullRef = useRef(hull);
+
+    useEffect(() => {
+        if (hull > prevHullRef.current && isHealing) {
+            setShowHealFlash(true);
+            const timer = setTimeout(() => setShowHealFlash(false), 800);
+            prevHullRef.current = hull;
+            return () => clearTimeout(timer);
+        }
+        prevHullRef.current = hull;
+    }, [hull, isHealing]);
+
     // --- Heat Gauge Color ---
     const getHeatColor = () => {
         if (isOverheated) return '#FF0044';
@@ -115,7 +129,27 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                             ⚠ CRITICAL
                         </div>
                     )}
+
+                    {/* Floating +1 heal indicator - below hull box with random position */}
+                    {showHealFlash && (
+                        <div
+                            className="absolute top-full mt-1 font-display font-bold text-xl md:text-3xl text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.9)]"
+                            style={{
+                                left: `${50 + (Math.random() - 0.5) * 60}%`,
+                                transform: 'translateX(-50%)',
+                                animation: 'healFloat 0.8s ease-out forwards',
+                            }}
+                        >
+                            +1
+                        </div>
+                    )}
                 </div>
+                <style>{`
+                    @keyframes healFloat {
+                        0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                        100% { opacity: 0; transform: translateX(-50%) translateY(-40px); }
+                    }
+                `}</style>
 
                 {/* Right: Score & Stats */}
                 <div className="flex gap-1 tall:gap-2 md:gap-3">
@@ -225,7 +259,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                         />
                     </div>
                     <div className="hidden md:block text-xs font-mono text-y2k-white/70 mt-1 text-center uppercase tracking-widest text-shadow-soft">
-                        👍👍 Thumbs Up
+                        🙏 Prayer
                     </div>
                 </div>
             </div>
@@ -245,7 +279,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                         />
                     </div>
                     <div className="hidden md:block text-xs font-mono text-y2k-white/70 mt-1 text-center uppercase tracking-widest text-shadow-soft">
-                        ✊✊ Both Fists
+                        ✊🖐️ Fist + Palm
                     </div>
                 </div>
             </div>

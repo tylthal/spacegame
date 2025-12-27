@@ -248,13 +248,25 @@ const App: React.FC = () => {
       const leftHandFist = event.hands.left?.gesture === 'fist';
       combatLoop.setFiringMissile(leftHandFist || false);
 
-      // 5. Shockwave - "Power Slam" (both fists clenched)
-      const bothFists = event.hands.left?.gesture === 'fist' && event.hands.right?.gesture === 'fist';
-      combatLoop.setFiringShockwave(bothFists);
+      // 5. Shockwave - Fist + Palm combo (left fist, right palm)
+      const fistPalmCombo = event.hands.left?.gesture === 'fist' && event.hands.right?.gesture === 'palm';
+      combatLoop.setFiringShockwave(fistPalmCombo);
 
-      // 6. Healing - "Thumbs Up" (both hands thumbs-up gesture)
-      const bothThumbsUp = event.hands.left?.gesture === 'thumbsUp' && event.hands.right?.gesture === 'thumbsUp';
-      combatLoop.setHealing(bothThumbsUp);
+      // 6. Healing - Prayer (palms together, hands close)
+      // Detect when both hands are palm/open AND close together
+      const leftPalm = event.hands.left?.gesture === 'palm';
+      const rightPalm = event.hands.right?.gesture === 'palm';
+      let handsClose = false;
+      if (event.hands.left && event.hands.right) {
+        const leftWrist = event.hands.left.landmarks[0];
+        const rightWrist = event.hands.right.landmarks[0];
+        const dx = leftWrist.x - rightWrist.x;
+        const dy = leftWrist.y - rightWrist.y;
+        const dist = Math.hypot(dx, dy);
+        handsClose = dist < 0.25; // Hands within 25% of screen width
+      }
+      const isPraying = leftPalm && rightPalm && handsClose;
+      combatLoop.setHealing(isPraying);
 
       // 7. Update wireframe debug data (only when visible to save performance)
       if (showWireframe) {
@@ -544,17 +556,25 @@ const App: React.FC = () => {
           }`}
       />
 
-      {/* Healing Overlay - Green pulsing border with sparkles */}
+      {/* Healing Overlay - Enhanced green visuals with +HP feedback */}
       <div
-        className={`pointer-events-none fixed inset-0 z-50 border-[4px] md:border-[8px] border-emerald-500/70 
-                    shadow-[inset_0_0_30px_rgba(16,185,129,0.5),inset_0_0_60px_rgba(16,185,129,0.3)]
-                    transition-opacity duration-300 ${hudState.isHealing ? 'opacity-100 animate-pulse' : 'opacity-0'}`}
+        className={`pointer-events-none fixed inset-0 z-50 transition-opacity duration-300 ${hudState.isHealing ? 'opacity-100' : 'opacity-0'}`}
       >
-        {/* Sparkle corners */}
-        <div className="absolute top-2 left-2 w-4 h-4 bg-emerald-400/80 rounded-full blur-sm animate-ping" />
-        <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-400/80 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.2s' }} />
-        <div className="absolute bottom-2 left-2 w-4 h-4 bg-emerald-400/80 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.4s' }} />
-        <div className="absolute bottom-2 right-2 w-4 h-4 bg-emerald-400/80 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.6s' }} />
+        {/* Glowing green border - thicker and brighter */}
+        <div className="absolute inset-0 border-[6px] md:border-[12px] border-emerald-400/80 animate-pulse" />
+
+        {/* Inner glow vignette */}
+        <div className="absolute inset-0 shadow-[inset_0_0_80px_rgba(16,185,129,0.6),inset_0_0_150px_rgba(16,185,129,0.3)]" />
+
+        {/* Sparkle particles - more and brighter */}
+        <div className="absolute top-4 left-4 w-6 h-6 bg-emerald-300 rounded-full blur-sm animate-ping" />
+        <div className="absolute top-4 right-4 w-6 h-6 bg-emerald-300 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.15s' }} />
+        <div className="absolute bottom-4 left-4 w-6 h-6 bg-emerald-300 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.3s' }} />
+        <div className="absolute bottom-4 right-4 w-6 h-6 bg-emerald-300 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.45s' }} />
+        <div className="absolute top-1/2 left-4 w-4 h-4 bg-emerald-400 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.2s' }} />
+        <div className="absolute top-1/2 right-4 w-4 h-4 bg-emerald-400 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.35s' }} />
+        <div className="absolute top-4 left-1/2 w-4 h-4 bg-emerald-400 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.5s' }} />
+        <div className="absolute bottom-4 left-1/2 w-4 h-4 bg-emerald-400 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.1s' }} />
       </div>
 
       {/* Hand Wireframe Debug Overlay (toggle with W key) */}

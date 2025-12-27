@@ -9,8 +9,8 @@ import {
   SIGNATURE_MATCH_THRESHOLD,
 } from './HandSignature';
 
-// Gestures: pinch (shooting), fist (gripping/shockwave), palm (stop/pause), point (default/aiming), thumbsUp (healing)
-type Gesture = 'pinch' | 'fist' | 'palm' | 'point' | 'thumbsUp';
+// Gestures: pinch (shooting), fist (missile), palm (stop/pause), point (default/aiming)
+type Gesture = 'pinch' | 'fist' | 'palm' | 'point';
 
 export interface VirtualMousepadConfig {
   origin: { x: number; y: number };
@@ -431,46 +431,34 @@ export class InputProcessor {
     if (rawLandmarks && rawLandmarks[0] && rawLandmarks[4] && rawLandmarks[8] && rawLandmarks[12] && rawLandmarks[16] && rawLandmarks[20]) {
       const rawDiagonal = this.boundingDiagonal(rawLandmarks as HandLandmark[]);
       const rawPinch = this.normalizedDistance(rawLandmarks[4], rawLandmarks[8], rawDiagonal);
-      const rawCurl = [rawLandmarks[8], rawLandmarks[12], rawLandmarks[16], rawLandmarks[20]]
-        .map(tip => this.normalizedDistance(tip, rawLandmarks[0], rawDiagonal))
-        .reduce((sum, distance) => sum + distance, 0) / 4;
+      const rawFingerCurls = [rawLandmarks[8], rawLandmarks[12], rawLandmarks[16], rawLandmarks[20]]
+        .map(tip => this.normalizedDistance(tip, rawLandmarks[0], rawDiagonal));
+      const rawAvgCurl = rawFingerCurls.reduce((sum, d) => sum + d, 0) / 4;
 
-      // Check FIST before PINCH - fist naturally closes thumb+index but all fingers are curled
-      if (rawCurl <= this.gestureConfig.fistThreshold) {
-        return 'fist';
-      }
-
+      // PINCH: thumb and index together
       if (rawPinch <= this.gestureConfig.pinchThreshold) {
         return 'pinch';
       }
+
+      // FIST: fingers curled (simple detection)
+      if (rawAvgCurl <= this.gestureConfig.fistThreshold) {
+        return 'fist';
+      }
     }
 
-    // Check FIST before PINCH - fist naturally closes thumb+index but all fingers are curled
-    if (averageCurl <= this.gestureConfig.fistThreshold) {
-      return 'fist';
-    }
-
+    // PINCH: thumb and index together
     if (pinchDistance <= this.gestureConfig.pinchThreshold) {
       return 'pinch';
     }
 
-    // THUMBS UP DETECTION:
-    // Thumb extended (far from wrist) but other fingers curled (close to wrist)
-    const thumbDistance = this.normalizedDistance(thumbTip, wrist, boundingDiagonal);
-    const fingersCurled = curlDistances.every(d => d <= 0.45); // All 4 fingers curled
-    const thumbExtended = thumbDistance >= 0.5; // Thumb sticking out
-
-    if (thumbExtended && fingersCurled) {
-      return 'thumbsUp';
+    // FIST: fingers curled
+    if (averageCurl <= this.gestureConfig.fistThreshold) {
+      return 'fist';
     }
 
-    // EXPLICIT PALM DETECTION:
-    // Palm requires ALL fingers to be extended (far from wrist)
-    // and fingers spread apart (not bunched together)
-    const palmExtensionThreshold = 0.55; // Fingers must be > 55% of diagonal from wrist
+    // PALM: All fingers extended and spread
+    const palmExtensionThreshold = 0.55;
     const allFingersExtended = curlDistances.every(d => d >= palmExtensionThreshold);
-
-    // Check that thumb is also extended away from index (spread hand)
     const thumbSpread = this.normalizedDistance(thumbTip, indexTip, boundingDiagonal) >= 0.15;
 
     if (allFingersExtended && thumbSpread) {

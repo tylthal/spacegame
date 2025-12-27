@@ -8,6 +8,7 @@ const thumbMcp: HandLandmark = { x: 0.42, y: 0.75, z: 0.02 };
 const thumbIp: HandLandmark = { x: 0.4, y: 0.72, z: 0.02 };
 const thumbTipOpen: HandLandmark = { x: 0.38, y: 0.68, z: 0.02 };
 const thumbTipPinch: HandLandmark = { x: 0.49, y: 0.63, z: 0.02 };
+const thumbTipFist: HandLandmark = { x: 0.42, y: 0.76, z: 0.02 }; // Thumb curled, away from index
 
 const indexMcp: HandLandmark = { x: 0.5, y: 0.7, z: 0.02 };
 const indexPip: HandLandmark = { x: 0.52, y: 0.6, z: 0.02 };
@@ -75,7 +76,7 @@ export const pinchFrame: HandFrame = {
 export const fistFrame: HandFrame = {
   timestamp: baseTimestamp + 20,
   handedness: 'Right',
-  landmarks: buildHand(thumbTipPinch, indexTipFist, middleTipFist, ringTipFist, pinkyTipFist),
+  landmarks: buildHand(thumbTipFist, indexTipFist, middleTipFist, ringTipFist, pinkyTipFist),
 };
 
 export const jitteredOpenPalm = (delta: number, timestampOffset: number): HandFrame => ({

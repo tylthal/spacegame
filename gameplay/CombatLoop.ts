@@ -180,7 +180,7 @@ export class CombatLoop {
   // Healing state (thumbs-up gesture)
   private _isHealing = false;
   private healAccumulator = 0; // Accumulates ms until we heal 1 HP
-  private readonly healRatePerSecond = 3; // 3 HP per second
+  private readonly healRatePerSecond = 1; // 1 HP per second (slower, deliberate healing)
   public get isHealing(): boolean { return this._isHealing; }
 
   // Public missile state for UI
@@ -303,11 +303,11 @@ export class CombatLoop {
   }
 
   public setHealing(healing: boolean) {
-    this._isHealing = healing;
-    // Reset accumulator when starting to heal
-    if (healing) {
+    // Only reset accumulator when STARTING to heal (edge detection)
+    if (healing && !this._isHealing) {
       this.healAccumulator = 0;
     }
+    this._isHealing = healing;
   }
 
   tick(deltaMs: number): CombatTickResult {
