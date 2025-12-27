@@ -4,7 +4,6 @@ export interface HudOverlayProps {
   score: number;
   hull: number;
   lives: number;
-  lives: number;
   multiplier?: number;
   shockwaveProgress?: number; // 0..1 (1 = ready)
   ariaLabel?: string;
@@ -125,14 +124,12 @@ const HudOverlay: React.FC<HudOverlayProps> = ({ score, hull, lives, multiplier 
             </svg>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-      {/* Bottom Area (Guidance or contextual info) */ }
+      {/* Bottom Area (Guidance or contextual info) */}
       <div className="hidden md:block self-start bg-slate-950/50 backdrop-blur-sm border border-white/5 p-4 rounded-xl max-w-sm pointer-events-auto">
         <p className="text-xs text-slate-300 leading-relaxed font-mono">
           <span className="text-cyan-400 block mb-1"> SYSTEM DIAGNOSTIC </span>
-          Visual layer hydrated. Post-processing active.
           Visual layer hydrated. Post-processing active.
           Input monitoring engaged.
           <span className="block mt-2 text-indigo-300">ULTIMATE: PRAYER GESTURE (HANDS TOGETHER)</span>
