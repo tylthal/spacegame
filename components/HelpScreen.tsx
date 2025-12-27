@@ -301,7 +301,7 @@ function EnemiesTab() {
                 kind: 'bomber',
                 name: 'BOMBER',
                 points: GAME_CONFIG.scoring.bomber,
-                description: 'Heavy assault craft. Fires red plasma projectiles at your station. Intercepting these projectiles gives +50 PTS. Yellow/orange nose glows when charging.',
+                description: 'Heavy assault craft (5 HP). Fires white and blue plasma bombs every 10s. Shooting down projectiles protects the station and earns +50 PTS.',
                 threat: 'EXTREME',
                 threatColor: 'text-orange-500',
                 unlockInfo: 'Appears after 2 minutes 30 seconds',
