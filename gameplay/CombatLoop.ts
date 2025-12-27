@@ -106,13 +106,14 @@ const TIER_CAPS: SpawnTierCaps[] = [
 const WEAVER_SPAWN_COOLDOWN_MS = 3000; // 3 seconds between weaver spawns
 const SHIELDED_DRONE_SPAWN_COOLDOWN_MS = 4000; // 4 seconds between shielded drone spawns
 const BOMBER_SPAWN_COOLDOWN_MS = 5000; // 5 seconds between bomber spawns
-const BOMBER_FIRE_INTERVAL_MS = 2000; // Bomber fires every 2 seconds
+const BOMBER_FIRE_INTERVAL_MS = 10000; // Bomber fires every 10 seconds (slower)
 const BOMBER_BULLET_SPEED = 0.05; // Slower than player bullets
 
 export interface CombatTickResult {
   timestamp: number;
   spawned: EnemyInstance[];
   destroyed: EnemyInstance[];
+  interceptedEnemyBullets: Vector3[];
   hull: number;
 }
 
@@ -123,6 +124,7 @@ export class CombatLoop {
   private readonly enemyBullets: EnemyBullet[] = []; // Bullets fired BY enemies (bombers)
   private readonly kills: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0, weaver: 0, shieldedDrone: 0 };
   private readonly spawns: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0, weaver: 0, shieldedDrone: 0 };
+  private intercepts = 0; // Track intercepted bullets for scoring
 
   // Public access for renderer
   public get activeEnemies(): ReadonlyArray<EnemyInstance> { return this.enemies; }
@@ -193,6 +195,10 @@ export class CombatLoop {
   private _maxBombersByDifficulty = 2; // Default: normal (2)
   public setMaxBombers(max: number): void { this._maxBombersByDifficulty = max; }
 
+  // Practice Mode State
+  private _practiceMode: EnemyKind | null = null;
+  public setPracticeMode(kind: EnemyKind | null) { this._practiceMode = kind; }
+
   private hull: number;
   private elapsedMs = 0;
   private enemyId = 0;
@@ -246,10 +252,12 @@ export class CombatLoop {
     this.spawns.bomber = 0;
     this.spawns.weaver = 0;
     this.spawns.shieldedDrone = 0;
+    this.intercepts = 0;
     this.weaverSpawnCooldown = 0;
     this.shieldedDroneSpawnCooldown = 0;
     this.bomberSpawnCooldown = 0;
     this.scheduler.reset();
+    // NOTE: We do NOT reset _practiceMode here, as reset() is called before start
   }
 
   public setFiring(firing: boolean) {
@@ -275,9 +283,27 @@ export class CombatLoop {
       this.bomberSpawnCooldown = Math.max(0, this.bomberSpawnCooldown - deltaMs);
     }
 
-    // Spawn Logic - Strategy A "Slow Burn" with progressive caps and probability
-    const spawnEvents = this.scheduler.step(deltaMs);
+    // Spawn Logic
+    let spawnEvents: { kind: EnemyKind }[] = [];
+
+    if (this._practiceMode) {
+      // PRACTICE MODE: Generate synthetic events for the selected type
+      // Rate: 1.5s interval roughly (scaled by rng/frame)
+      // Actually, let's just use a simple frequency check since we have deltaMs
+      // 2% chance per frame at 60fps ~ 1 spawn per 0.8s ... too fast?
+      // Let's aim for 1 spawn every 2 seconds on average
+      // 2000ms. delta is say 16ms. 16/2000 = 0.008 probability per tick
+      const spawnProb = (deltaMs / 2000);
+      if (this.rng.next() < spawnProb) {
+        spawnEvents.push({ kind: this._practiceMode });
+      }
+    } else {
+      // STANDARD MODE: Use Scheduler
+      spawnEvents = this.scheduler.step(deltaMs);
+    }
+
     const spawned: EnemyInstance[] = [];
+    const interceptedEnemyBullets: Vector3[] = []; // Track intercepted bullets
 
     // Determine current tier based on elapsed time
     let tierIndex = 0;
@@ -299,44 +325,63 @@ export class CombatLoop {
       const scaledMaxWeavers = Math.floor(tier.maxWeavers * this._enemyCapMultiplier);
       const scaledMaxShielded = Math.floor(tier.maxShielded * this._enemyCapMultiplier);
       // Bomber cap is overridden by difficulty setting (1/2/3 for easy/normal/hard)
+      // Bomber cap is overridden by difficulty setting (1/2/3 for easy/normal/hard)
       const scaledMaxBombers = Math.min(tier.maxBombers, this._maxBombersByDifficulty);
 
       // 2. Check Specific Caps AND Probability
-      if (event.kind === 'drone') {
-        const currentDrones = this.enemies.filter(e => e.kind === 'drone').length;
-        if (currentDrones >= scaledMaxDrones) continue;
-        // Probability check
-        if (this.rng.next() > tier.droneSpawnChance) continue;
-      }
+      if (this._practiceMode) {
+        // PRACTICE MODE OVERRIDE
+        // Only spawn the selected enemy type
+        if (event.kind !== this._practiceMode) continue;
 
-      if (event.kind === 'weaver') {
-        const currentWeavers = this.enemies.filter(e => e.kind === 'weaver').length;
-        if (currentWeavers >= scaledMaxWeavers || this.weaverSpawnCooldown > 0) {
-          continue;
-        }
-        // Probability check
-        if (this.rng.next() > tier.weaverSpawnChance) continue;
-        this.weaverSpawnCooldown = WEAVER_SPAWN_COOLDOWN_MS;
-      }
+        // Simple fixed cap for practice
+        const PRACTICE_CAP = 3;
+        const currentCount = this.enemies.filter(e => e.kind === this._practiceMode).length;
 
-      if (event.kind === 'shieldedDrone') {
-        const currentShielded = this.enemies.filter(e => e.kind === 'shieldedDrone').length;
-        if (currentShielded >= scaledMaxShielded || this.shieldedDroneSpawnCooldown > 0) {
-          continue;
-        }
-        // Probability check
-        if (this.rng.next() > tier.shieldedSpawnChance) continue;
-        this.shieldedDroneSpawnCooldown = SHIELDED_DRONE_SPAWN_COOLDOWN_MS;
-      }
+        if (currentCount >= PRACTICE_CAP) continue;
 
-      if (event.kind === 'bomber') {
-        const currentBombers = this.enemies.filter(e => e.kind === 'bomber').length;
-        if (currentBombers >= scaledMaxBombers || this.bomberSpawnCooldown > 0) {
-          continue;
+        // Valid spawn
+        this.bomberSpawnCooldown = BOMBER_SPAWN_COOLDOWN_MS; // Optional: respect cooldowns?
+        // Actually for practice we might want faster feedback so ignore cooldowns or keep them short.
+        // Let's just spawn it.
+      } else {
+        // NORMAL SPAWN LOGIC
+        if (event.kind === 'drone') {
+          const currentDrones = this.enemies.filter(e => e.kind === 'drone').length;
+          if (currentDrones >= scaledMaxDrones) continue;
+          // Probability check
+          if (this.rng.next() > tier.droneSpawnChance) continue;
         }
-        // Probability check
-        if (this.rng.next() > tier.bomberSpawnChance) continue;
-        this.bomberSpawnCooldown = BOMBER_SPAWN_COOLDOWN_MS;
+
+        if (event.kind === 'weaver') {
+          const currentWeavers = this.enemies.filter(e => e.kind === 'weaver').length;
+          if (currentWeavers >= scaledMaxWeavers || this.weaverSpawnCooldown > 0) {
+            continue;
+          }
+          // Probability check
+          if (this.rng.next() > tier.weaverSpawnChance) continue;
+          this.weaverSpawnCooldown = WEAVER_SPAWN_COOLDOWN_MS;
+        }
+
+        if (event.kind === 'shieldedDrone') {
+          const currentShielded = this.enemies.filter(e => e.kind === 'shieldedDrone').length;
+          if (currentShielded >= scaledMaxShielded || this.shieldedDroneSpawnCooldown > 0) {
+            continue;
+          }
+          // Probability check
+          if (this.rng.next() > tier.shieldedSpawnChance) continue;
+          this.shieldedDroneSpawnCooldown = SHIELDED_DRONE_SPAWN_COOLDOWN_MS;
+        }
+
+        if (event.kind === 'bomber') {
+          const currentBombers = this.enemies.filter(e => e.kind === 'bomber').length;
+          if (currentBombers >= scaledMaxBombers || this.bomberSpawnCooldown > 0) {
+            continue;
+          }
+          // Probability check
+          if (this.rng.next() > tier.bomberSpawnChance) continue;
+          this.bomberSpawnCooldown = BOMBER_SPAWN_COOLDOWN_MS;
+        }
       }
 
       // 3. Spawn
@@ -387,7 +432,7 @@ export class CombatLoop {
     }
 
     // Advance enemy bullets and check for player hits
-    this.advanceEnemyBullets(deltaMs);
+    this.advanceEnemyBullets(deltaMs, interceptedEnemyBullets);
 
     // Heat Logic
     if (this._isFiring && !this._isOverheated) {
@@ -414,6 +459,7 @@ export class CombatLoop {
       timestamp: this.elapsedMs,
       spawned,
       destroyed,
+      interceptedEnemyBullets,
       hull: this.hull,
     };
   }
@@ -432,6 +478,7 @@ export class CombatLoop {
       hull: this.hull,
       kills: { ...this.kills },
       spawns: { ...this.spawns },
+      intercepts: this.intercepts,
       active: this.enemies.length,
       elapsedMs: this.elapsedMs,
       heat: this._heat,
@@ -556,8 +603,10 @@ export class CombatLoop {
     }
   }
 
-  // Advance enemy bullets and check for player hits
-  private advanceEnemyBullets(deltaMs: number): void {
+  // Advance enemy bullets and check for player hits AND player bullet interceptions
+  private advanceEnemyBullets(deltaMs: number, interceptedEnemyBullets: Vector3[]): void {
+    const BULLET_RADIUS = 0.5; // Collision radius
+
     for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
       const bullet = this.enemyBullets[i];
       if (!bullet.active) {
@@ -570,12 +619,57 @@ export class CombatLoop {
       bullet.position.y += bullet.velocity.y * deltaMs;
       bullet.position.z += bullet.velocity.z * deltaMs;
 
+      // 1. Check collisions with PLAYER BULLETS (Interception)
+      let isIntercepted = false;
+      // Reverse loop to allow removal
+      const INTERCEPT_RADIUS = 3.0; // Generous hitbox
+
+      for (let j = this.bullets.length - 1; j >= 0; j--) {
+        const pBullet = this.bullets[j];
+
+        // SWEPT COLLISION CHECK
+        // Calculate previous position of player bullet
+        const prevPx = pBullet.position.x - pBullet.velocity.x * deltaMs;
+        const prevPy = pBullet.position.y - pBullet.velocity.y * deltaMs;
+        const prevPz = pBullet.position.z - pBullet.velocity.z * deltaMs;
+
+        const hit = segmentHitsSphere(
+          { x: prevPx, y: prevPy, z: prevPz },      // Start
+          pBullet.position,                         // End
+          bullet.position,                          // Sphere Center (Stationary-ish)
+          INTERCEPT_RADIUS
+        );
+
+        if (hit) {
+          // HIT!
+          isIntercepted = true;
+
+          // Remove player bullet
+          this.bulletPool.push(pBullet);
+          this.bullets.splice(j, 1);
+
+          // Record interception (manual clone)
+          interceptedEnemyBullets.push({ ...bullet.position });
+          this.intercepts++; // Track for scoring
+          break;
+        }
+      }
+
+      if (isIntercepted) {
+        // Remove enemy bullet and continue
+        bullet.active = false; // logic flag
+        this.enemyBullets.splice(i, 1);
+        SoundEngine.play('explosionSmall'); // Audio feedback for interception
+        continue;
+      }
+
+      // 2. Check collisions with PLAYER (Hull Damage)
       // Check if bullet reached player (z > -5 means it's past the camera/player)
       if (bullet.position.z > -5) {
         // Hit the player! Deal 1 damage to hull
         this.hull = Math.max(0, this.hull - 1);
         bullet.active = false;
-        SoundEngine.play('playerHit');
+        SoundEngine.play('bomberProjectileHit');
         this.enemyBullets.splice(i, 1);
         continue;
       }

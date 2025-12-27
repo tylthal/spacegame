@@ -82,6 +82,67 @@ function InstancedBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
     );
 }
 
+// Render enemy bullets - Blue Sphere with White Lightning Core
+function InstancedEnemyBulletRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
+    const coreRef = useRef<InstancedMesh>(null);
+    const haloRef = useRef<InstancedMesh>(null);
+    const dummy = useRef(new Object3D());
+
+    useFrame(() => {
+        if (!coreRef.current || !haloRef.current) return;
+
+        const bullets = combatLoop.activeEnemyBullets;
+
+        // Update instance counts
+        coreRef.current.count = bullets.length;
+        haloRef.current.count = bullets.length;
+
+        for (let i = 0; i < bullets.length; i++) {
+            const bullet = bullets[i];
+            const { x, y, z } = bullet.position;
+
+            dummy.current.position.set(x, y, z);
+            // No rotation needed for spheres, but we can set it anyway
+            dummy.current.updateMatrix();
+
+            coreRef.current.setMatrixAt(i, dummy.current.matrix);
+            haloRef.current.setMatrixAt(i, dummy.current.matrix);
+        }
+
+        coreRef.current.instanceMatrix.needsUpdate = true;
+        haloRef.current.instanceMatrix.needsUpdate = true;
+    });
+
+    return (
+        <group>
+            {/* INNER CORE: Very bright, small, white/blue - looks like lightning source */}
+            <instancedMesh ref={coreRef} args={[undefined, undefined, 200]} frustumCulled={false}>
+                <sphereGeometry args={[0.25, 8, 8]} />
+                <meshStandardMaterial
+                    color="#FFFFFF"
+                    emissive="#FFFFFF"
+                    emissiveIntensity={4}
+                    toneMapped={false}
+                />
+            </instancedMesh>
+
+            {/* OUTER HALO: Larger, transparent blue - "Electric" aura */}
+            <instancedMesh ref={haloRef} args={[undefined, undefined, 200]} frustumCulled={false}>
+                <sphereGeometry args={[0.5, 12, 12]} />
+                <meshStandardMaterial
+                    color="#0088FF"
+                    emissive="#0044FF"
+                    emissiveIntensity={2}
+                    transparent={true}
+                    opacity={0.6}
+                    roughness={0.1}
+                    metalness={0.1}
+                />
+            </instancedMesh>
+        </group>
+    );
+}
+
 // Render missiles - larger and more dramatic than bullets
 function InstancedMissileRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
     const meshRef = useRef<InstancedMesh>(null);
@@ -244,10 +305,10 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
         // CRITICAL: Tick the Game Logic (Physics, Spawning, Heat)
         // Only tick if the game is actively running (Phase = PLAYING)
         if (isRunning) {
-            const { destroyed } = combatLoop.tick(delta * 1000);
+            const tickResult = combatLoop.tick(delta * 1000);
+            const { destroyed, interceptedEnemyBullets } = tickResult;
 
-            // Handle destroyed enemies (sound + visual) from the tick result
-            // This ensures we only trigger effects for actual kills (not station hits)
+            // Handle destroyed enemies (sound + visual)
             if (destroyed && destroyed.length > 0) {
                 for (const enemy of destroyed) {
                     // Spawn explosion
@@ -274,66 +335,91 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
                     SoundEngine.play('scorePickup');
                 }
             }
-        }
 
-        // Track current enemies for React updates
-        const currentEnemies = combatLoop.activeEnemies;
+            // Handle intercepted enemy bullets (Blue/White explosion)
+            if (interceptedEnemyBullets && interceptedEnemyBullets.length > 0) {
+                for (const pos of interceptedEnemyBullets) {
+                    // Spawn Blue Explosion
+                    pendingExplosionsRef.current.push({
+                        id: explosionIdRef.current++,
+                        x: pos.x,
+                        y: pos.y,
+                        z: pos.z,
+                        color: '#00FFFF', // Cyan/Blue
+                        createdAt: 0,
+                    });
 
-        // Batch update React state (once per frame max)
-        if (pendingExplosionsRef.current.length > 0 || pendingScoresRef.current.length > 0) {
-            const pendingExp = [...pendingExplosionsRef.current];
-            pendingExplosionsRef.current.length = 0;
-            setExplosions(prev => [...prev, ...pendingExp]);
-
-            const pendingScr = [...pendingScoresRef.current];
-            pendingScoresRef.current.length = 0;
-            setFloatingScores(prev => [...prev, ...pendingScr]);
-        }
-
-        // Track missiles for missile explosions (reusable Set)
-        const currentMissiles = combatLoop.activeMissiles;
-        const currentMissileIds = currentMissileIdsRef.current;
-        currentMissileIds.clear();
-        for (const m of currentMissiles) currentMissileIds.add(m.id);
-
-        // Update missile snapshots
-        for (const missile of currentMissiles) {
-            missileSnapshotsRef.current.set(missile.id, {
-                id: missile.id,
-                x: missile.position.x,
-                y: missile.position.y,
-                z: missile.position.z,
-            });
-        }
-
-        // Find missiles that detonated
-        let hasNewMissileExplosions = false;
-        for (const [id, snapshot] of missileSnapshotsRef.current) {
-            if (!currentMissileIds.has(id)) {
-                pendingMissileExplosionsRef.current.push({
-                    id: missileExplosionIdRef.current++,
-                    x: snapshot.x,
-                    y: snapshot.y,
-                    z: snapshot.z,
-                    blastRadius: MISSILE_BLAST_RADIUS,
-                    createdAt: 0,
-                });
-                missileSnapshotsRef.current.delete(id);
-                hasNewMissileExplosions = true;
+                    // Spawn White Core Explosion (for that "flash" effect)
+                    pendingExplosionsRef.current.push({
+                        id: explosionIdRef.current++,
+                        x: pos.x,
+                        y: pos.y,
+                        z: pos.z + 0.5, // Slightly in front
+                        color: '#FFFFFF', // White
+                        createdAt: 0,
+                    });
+                }
             }
-        }
 
-        if (hasNewMissileExplosions) {
-            const pending = [...pendingMissileExplosionsRef.current];
-            pendingMissileExplosionsRef.current.length = 0;
-            setMissileExplosions(prev => [...prev, ...pending]);
-        }
+            // Track current enemies for React updates
+            const currentEnemies = combatLoop.activeEnemies;
 
-        // Only track enemies for React updates now
-        const count = currentEnemies.length;
-        if (count !== lastEntityCount.current) {
-            lastEntityCount.current = count;
-            setVersion(v => v + 1);
+            // Batch update React state (once per frame max)
+            if (pendingExplosionsRef.current.length > 0 || pendingScoresRef.current.length > 0) {
+                const pendingExp = [...pendingExplosionsRef.current];
+                pendingExplosionsRef.current.length = 0;
+                setExplosions(prev => [...prev, ...pendingExp]);
+
+                const pendingScr = [...pendingScoresRef.current];
+                pendingScoresRef.current.length = 0;
+                setFloatingScores(prev => [...prev, ...pendingScr]);
+            }
+
+            // Track missiles for missile explosions (reusable Set)
+            const currentMissiles = combatLoop.activeMissiles;
+            const currentMissileIds = currentMissileIdsRef.current;
+            currentMissileIds.clear();
+            for (const m of currentMissiles) currentMissileIds.add(m.id);
+
+            // Update missile snapshots
+            for (const missile of currentMissiles) {
+                missileSnapshotsRef.current.set(missile.id, {
+                    id: missile.id,
+                    x: missile.position.x,
+                    y: missile.position.y,
+                    z: missile.position.z,
+                });
+            }
+
+            // Find missiles that detonated
+            let hasNewMissileExplosions = false;
+            for (const [id, snapshot] of missileSnapshotsRef.current) {
+                if (!currentMissileIds.has(id)) {
+                    pendingMissileExplosionsRef.current.push({
+                        id: missileExplosionIdRef.current++,
+                        x: snapshot.x,
+                        y: snapshot.y,
+                        z: snapshot.z,
+                        blastRadius: MISSILE_BLAST_RADIUS,
+                        createdAt: 0,
+                    });
+                    missileSnapshotsRef.current.delete(id);
+                    hasNewMissileExplosions = true;
+                }
+            }
+
+            if (hasNewMissileExplosions) {
+                const pending = [...pendingMissileExplosionsRef.current];
+                pendingMissileExplosionsRef.current.length = 0;
+                setMissileExplosions(prev => [...prev, ...pending]);
+            }
+
+            // Only track enemies for React updates now
+            const count = currentEnemies.length;
+            if (count !== lastEntityCount.current) {
+                lastEntityCount.current = count;
+                setVersion(v => v + 1);
+            }
         }
     });
 
@@ -344,6 +430,9 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
 
             {/* Bullets - Instanced for High Performance */}
             {combatLoop && <InstancedBulletRenderer combatLoop={combatLoop} />}
+
+            {/* Enemy Bullets - Instanced Red Plasma */}
+            {combatLoop && <InstancedEnemyBulletRenderer combatLoop={combatLoop} />}
 
             {/* Missiles - Larger projectiles with area damage */}
             {combatLoop && <InstancedMissileRenderer combatLoop={combatLoop} />}

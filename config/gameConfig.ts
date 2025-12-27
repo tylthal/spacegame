@@ -81,9 +81,10 @@ export const GAME_CONFIG = {
     scoring: {
         drone: 100,
         scout: 200,
-        bomber: 500,
+        bomber: 750, // Updated from 500
         weaver: 300,
         shieldedDrone: 500, // High points due to difficulty
+        enemyBullet: 50, // Points for intercepting a bomber projectile
     },
 
     // Difficulty settings - affect enemy movement speed, spawn caps, and bomber limits

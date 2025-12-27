@@ -27,10 +27,10 @@ export type SoundType =
     | 'weaponReady'
     | 'missileBeep'
     // Phase 3: Enemies
-    | 'weaverSpawn'
     | 'shieldedSpawn'
     | 'bomberSpawn'
     | 'enemyFire'
+    | 'bomberProjectileHit'
     | 'explosionSmall'
     | 'explosionLarge';
 
@@ -184,6 +184,9 @@ class SoundEngineClass {
                 break;
             case 'enemyFire':
                 this.playEnemyFire(ctx, now);
+                break;
+            case 'bomberProjectileHit':
+                this.playBomberProjectileHit(ctx, now);
                 break;
             case 'explosionSmall':
                 this.playExplosionSmall(ctx, now);
@@ -852,6 +855,50 @@ class SoundEngineClass {
 
         osc.start(now);
         osc.stop(now + 0.12);
+    }
+
+    /** Heavy explosion for bomber projectile impact */
+    private playBomberProjectileHit(ctx: AudioContext, now: number): void {
+        // 1. Low frequency boom (Impact)
+        const osc1 = ctx.createOscillator();
+        osc1.type = 'triangle';
+        osc1.frequency.setValueAtTime(150, now);
+        osc1.frequency.exponentialRampToValueAtTime(40, now + 0.3);
+
+        const gain1 = ctx.createGain();
+        gain1.gain.setValueAtTime(0.8, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+        osc1.connect(gain1);
+        gain1.connect(this.masterGain!);
+
+        osc1.start(now);
+        osc1.stop(now + 0.4);
+
+        // 2. Crackle/Lightning noise (The "Electrical" part)
+        const bufferSize = ctx.sampleRate * 0.3;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * 0.8;
+        }
+
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.value = 800;
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.5, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(this.masterGain!);
+
+        noise.start(now);
     }
 
     /** Small pop for drones/missiles */

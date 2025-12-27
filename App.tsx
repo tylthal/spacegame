@@ -12,6 +12,7 @@ import { TitleScreen } from './components/TitleScreen';
 import { CalibrationScreen } from './components/CalibrationScreen';
 import { DifficultyScreen } from './components/DifficultyScreen';
 import { HelpScreen } from './components/HelpScreen';
+import { PracticeModeScreen } from './components/PracticeModeScreen';
 import { WebcamPreview } from './components/WebcamPreview';
 import { CRTOverlay } from './components/CRTOverlay';
 import { InputProcessor } from './input/InputProcessor';
@@ -67,6 +68,9 @@ const App: React.FC = () => {
 
   // Help screen state (overlay on title)
   const [showHelp, setShowHelp] = useState(false);
+  // Practice mode selection state
+  const [showPracticeSelect, setShowPracticeSelect] = useState(false);
+  const [isPractice, setIsPractice] = useState(false);
 
   // Cursor state moved to CursorLayer
 
@@ -300,7 +304,8 @@ const App: React.FC = () => {
         summary.kills.drone * GAME_CONFIG.scoring.drone +
         summary.kills.scout * GAME_CONFIG.scoring.scout +
         summary.kills.bomber * GAME_CONFIG.scoring.bomber +
-        summary.kills.weaver * GAME_CONFIG.scoring.weaver
+        summary.kills.weaver * GAME_CONFIG.scoring.weaver +
+        (summary.intercepts || 0) * GAME_CONFIG.scoring.enemyBullet
       );
 
       // Check for game over - freeze the timer (only once)
@@ -347,11 +352,32 @@ const App: React.FC = () => {
       {phase === 'TITLE' && (
         <>
           <TitleScreen
-            onStart={() => phaseManager.startSession()}
+            onStart={() => {
+              setIsPractice(false);
+              combatLoop.setPracticeMode(null);
+              phaseManager.startSession();
+            }}
+            onPractice={() => setShowPracticeSelect(true)}
             onHelp={() => setShowHelp(true)}
           />
           {showHelp && (
             <HelpScreen onBack={() => setShowHelp(false)} />
+          )}
+          {showPracticeSelect && (
+            <PracticeModeScreen
+              onSelect={(kind) => {
+                setIsPractice(true);
+                combatLoop.setPracticeMode(kind);
+                // Default practice settings (Normal difficulty)
+                combatLoop.setSpeedMultiplier(1.0);
+                combatLoop.setEnemyCapMultiplier(1.0);
+                combatLoop.setMaxBombers(2);
+
+                setShowPracticeSelect(false);
+                phaseManager.startSession();
+              }}
+              onBack={() => setShowPracticeSelect(false)}
+            />
           )}
         </>
       )}
@@ -366,8 +392,14 @@ const App: React.FC = () => {
             if (inputProcessor) {
               inputProcessor.setCalibration(offset);
             }
-            // Go to difficulty selection
-            setPhase('READY');
+
+            // If in practice mode, skip difficulty selection and go straight to playing
+            if (isPractice) {
+              setPhase('PLAYING');
+            } else {
+              // Go to difficulty selection
+              setPhase('READY');
+            }
           }}
         />
       )}
@@ -408,12 +440,15 @@ const App: React.FC = () => {
                 combatLoop.reset();
                 setIsGameOver(false);
                 frozenTimeRef.current = null;
-
+                // If practice mode, we stay in practice mode
+                // If normal mode, we keep settings
               }}
               onExit={() => {
                 // Go back to title screen
                 phaseManager.reset();
                 setIsGameOver(false);
+                setIsPractice(false); // Reset practice mode
+                combatLoop.setPracticeMode(null);
               }}
             />
           )}
@@ -430,6 +465,8 @@ const App: React.FC = () => {
                 // Go back to title screen
                 phaseManager.reset();
                 setIsPaused(false);
+                setIsPractice(false); // Reset practice mode
+                combatLoop.setPracticeMode(null);
               }}
             />
           )}

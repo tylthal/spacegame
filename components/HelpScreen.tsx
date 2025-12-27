@@ -301,7 +301,7 @@ function EnemiesTab() {
                 kind: 'bomber',
                 name: 'BOMBER',
                 points: GAME_CONFIG.scoring.bomber,
-                description: 'Heavy assault craft with reinforced hull. Takes 5 hits to destroy and FIRES BULLETS at your station dealing 1 damage each. Yellow/orange nose glows when charging weapons.',
+                description: 'Heavy assault craft. Fires red plasma projectiles at your station. Intercepting these projectiles gives +50 PTS. Yellow/orange nose glows when charging.',
                 threat: 'EXTREME',
                 threatColor: 'text-orange-500',
                 unlockInfo: 'Appears after 2 minutes 30 seconds',

@@ -5,12 +5,14 @@ import { OrbitalStation } from '../infrastructure/three/assets/OrbitalStation';
 
 interface TitleScreenProps {
     onStart: () => void;
+    onPractice?: () => void;
     onHelp?: () => void;
 }
 
-export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onHelp }) => {
+export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onPractice, onHelp }) => {
     const [isHovering, setIsHovering] = useState(false);
     const [isHoveringHelp, setIsHoveringHelp] = useState(false);
+    const [isHoveringPractice, setIsHoveringPractice] = useState(false);
     const musicStartedRef = useRef(false);
 
     // Start title music on first user interaction (click/touch anywhere)
@@ -48,6 +50,22 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onHelp }) => 
     const handleClick = () => {
         SoundEngine.play('buttonPress');
         onStart();
+    };
+
+    const handlePracticeEnter = () => {
+        if (!isHoveringPractice) {
+            SoundEngine.play('menuHover');
+            setIsHoveringPractice(true);
+        }
+    };
+
+    const handlePracticeLeave = () => {
+        setIsHoveringPractice(false);
+    };
+
+    const handlePracticeClick = () => {
+        SoundEngine.play('buttonPress');
+        onPractice?.();
     };
 
     const handleHelpEnter = () => {
@@ -100,30 +118,44 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onHelp }) => 
                 </div>
 
                 {/* BUTTONS - Compact for landscape */}
-                <div className="pt-3 tall:pt-4 md:pt-12 flex gap-3 tall:gap-4 md:gap-6">
-                    <button
-                        onClick={handleClick}
-                        onMouseEnter={handleMouseEnter}
-                        onMouseLeave={handleMouseLeave}
-                        className="group relative px-4 tall:px-6 md:px-10 py-2 tall:py-3 md:py-5 bg-transparent border-2 border-y2k-yellow hover:bg-y2k-yellow text-y2k-yellow hover:text-y2k-black transition-all duration-0 font-display font-bold text-sm tall:text-base md:text-2xl tracking-widest uppercase"
-                    >
-                        <span className="relative z-10 group-hover:animate-twitch">START</span>
-
-                        {/* Hard Shadow/Offset */}
-                        <div className="absolute top-0.5 left-0.5 tall:top-1 tall:left-1 md:top-2 md:left-2 w-full h-full border-2 border-y2k-red -z-10 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform" />
-                    </button>
-
-                    {onHelp && (
+                <div className="pt-3 tall:pt-4 md:pt-12 flex flex-col gap-3 tall:gap-4 md:gap-6 items-start">
+                    <div className="flex gap-3 tall:gap-4 md:gap-6">
                         <button
-                            onClick={handleHelpClick}
-                            onMouseEnter={handleHelpEnter}
-                            onMouseLeave={handleHelpLeave}
-                            className="group relative px-4 tall:px-6 md:px-10 py-2 tall:py-3 md:py-5 bg-transparent border-2 border-[#00FFFF] hover:bg-[#00FFFF] text-[#00FFFF] hover:text-black transition-all duration-0 font-display font-bold text-sm tall:text-base md:text-2xl tracking-widest uppercase"
+                            onClick={handleClick}
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                            className="group relative px-4 tall:px-6 md:px-10 py-2 tall:py-3 md:py-5 bg-transparent border-2 border-y2k-yellow hover:bg-y2k-yellow text-y2k-yellow hover:text-y2k-black transition-all duration-0 font-display font-bold text-sm tall:text-base md:text-2xl tracking-widest uppercase"
                         >
-                            <span className="relative z-10 group-hover:animate-twitch">HELP</span>
+                            <span className="relative z-10 group-hover:animate-twitch">START</span>
 
                             {/* Hard Shadow/Offset */}
-                            <div className="absolute top-0.5 left-0.5 tall:top-1 tall:left-1 md:top-2 md:left-2 w-full h-full border-2 border-y2k-silver -z-10 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform" />
+                            <div className="absolute top-0.5 left-0.5 tall:top-1 tall:left-1 md:top-2 md:left-2 w-full h-full border-2 border-y2k-red -z-10 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform" />
+                        </button>
+
+                        {onHelp && (
+                            <button
+                                onClick={handleHelpClick}
+                                onMouseEnter={handleHelpEnter}
+                                onMouseLeave={handleHelpLeave}
+                                className="group relative px-4 tall:px-6 md:px-10 py-2 tall:py-3 md:py-5 bg-transparent border-2 border-[#00FFFF] hover:bg-[#00FFFF] text-[#00FFFF] hover:text-black transition-all duration-0 font-display font-bold text-sm tall:text-base md:text-2xl tracking-widest uppercase"
+                            >
+                                <span className="relative z-10 group-hover:animate-twitch">HELP</span>
+
+                                {/* Hard Shadow/Offset */}
+                                <div className="absolute top-0.5 left-0.5 tall:top-1 tall:left-1 md:top-2 md:left-2 w-full h-full border-2 border-y2k-silver -z-10 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform" />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Practice Mode Button - Smaller/Secondary style */}
+                    {onPractice && (
+                        <button
+                            onClick={handlePracticeClick}
+                            onMouseEnter={handlePracticeEnter}
+                            onMouseLeave={handlePracticeLeave}
+                            className="group relative px-4 tall:px-6 md:px-8 py-1.5 tall:py-2 md:py-3 bg-transparent border border-slate-500 hover:border-white hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-200 font-mono font-bold text-xs tall:text-sm md:text-lg tracking-widest uppercase"
+                        >
+                            <span className="relative z-10">PRACTICE MODE</span>
                         </button>
                     )}
                 </div>
