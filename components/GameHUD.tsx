@@ -13,6 +13,8 @@ export interface GameHUDProps {
     isHealing?: boolean;
 }
 
+import { GAME_CONFIG } from '../config/gameConfig';
+
 const formatTime = (ms: number): string => {
     const totalSeconds = Math.floor(ms / 1000);
     const mins = Math.floor(totalSeconds / 60);
@@ -39,7 +41,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     shockwaveProgress = 1,
     isHealing = false,
 }) => {
-    const hullPercent = Math.max(0, Math.min(100, hull));
+    const maxHull = GAME_CONFIG.combat.hull;
+    const hullPercent = Math.max(0, Math.ceil((hull / maxHull) * 100));
     const isDanger = hullPercent <= 25;
     const isWarning = hullPercent <= 50 && hullPercent > 25;
     const heatPercent = Math.max(0, Math.min(100, heat));
@@ -70,19 +73,47 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         prevKillsRef.current = kills;
     }, [kills]);
 
-    // --- Heal Flash Animation ---
-    const [showHealFlash, setShowHealFlash] = useState(false);
+    // --- Heal Ring & Counter ---
+    const [healProgress, setHealProgress] = useState(0); // 0-100% progress to next HP
+    const [totalHealed, setTotalHealed] = useState(0); // Cumulative HP healed
+    const [healPulse, setHealPulse] = useState(false); // Flash when HP gained
     const prevHullRef = useRef(hull);
+    const healTimerRef = useRef<number | null>(null);
 
     useEffect(() => {
+        // Track when HP increases
         if (hull > prevHullRef.current && isHealing) {
-            setShowHealFlash(true);
-            const timer = setTimeout(() => setShowHealFlash(false), 800);
+            const gained = hull - prevHullRef.current;
+            setTotalHealed(prev => prev + gained);
+            setHealPulse(true);
+            setHealProgress(0);
+            const timer = setTimeout(() => setHealPulse(false), 300);
             prevHullRef.current = hull;
             return () => clearTimeout(timer);
         }
         prevHullRef.current = hull;
     }, [hull, isHealing]);
+
+    // Progress ring fills while healing (1 HP per second = 100% over 1 second)
+    useEffect(() => {
+        if (isHealing && hull < maxHull) {
+            healTimerRef.current = window.setInterval(() => {
+                setHealProgress(prev => Math.min(100, prev + 5)); // 20 ticks/sec * 5 = 100%/sec
+            }, 50);
+        } else {
+            if (healTimerRef.current) {
+                clearInterval(healTimerRef.current);
+                healTimerRef.current = null;
+            }
+            if (!isHealing) {
+                setHealProgress(0);
+                setTotalHealed(0);
+            }
+        }
+        return () => {
+            if (healTimerRef.current) clearInterval(healTimerRef.current);
+        };
+    }, [isHealing, hull, maxHull]);
 
     // --- Heat Gauge Color ---
     const getHeatColor = () => {
@@ -117,39 +148,63 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                                 style={{ width: `${hullPercent}%` }}
                             />
                         </div>
-                        <span className={`font-display font-bold text-sm tall:text-base md:text-xl min-w-[32px] tall:min-w-[40px] md:min-w-[50px] text-right text-shadow-hard ${isDanger ? 'text-y2k-red' :
-                            isWarning ? 'text-y2k-yellow' :
-                                'text-y2k-cyan'
-                            }`}>
-                            {hullPercent}%
-                        </span>
+                        {/* Hull percentage with progress ring when healing */}
+                        <div className="relative">
+                            {/* Progress ring (SVG circle) */}
+                            {isHealing && (
+                                <svg
+                                    className="absolute -inset-1 w-[calc(100%+8px)] h-[calc(100%+8px)]"
+                                    viewBox="0 0 44 44"
+                                >
+                                    {/* Background ring */}
+                                    <circle
+                                        cx="22" cy="22" r="18"
+                                        fill="none"
+                                        stroke="rgba(16,185,129,0.3)"
+                                        strokeWidth="3"
+                                    />
+                                    {/* Progress ring */}
+                                    <circle
+                                        cx="22" cy="22" r="18"
+                                        fill="none"
+                                        stroke="#10B981"
+                                        strokeWidth="3"
+                                        strokeLinecap="round"
+                                        strokeDasharray={`${healProgress * 1.13} 113`}
+                                        transform="rotate(-90 22 22)"
+                                        className={healPulse ? 'animate-ping' : ''}
+                                    />
+                                </svg>
+                            )}
+                            <span className={`font-display font-bold text-sm tall:text-base md:text-xl min-w-[32px] tall:min-w-[40px] md:min-w-[50px] text-right text-shadow-hard transition-all duration-150 ${isHealing ? 'text-emerald-400 scale-110' :
+                                isDanger ? 'text-y2k-red' :
+                                    isWarning ? 'text-y2k-yellow' :
+                                        'text-y2k-cyan'
+                                } ${healPulse ? 'scale-125' : ''}`}>
+                                {hullPercent}%
+                            </span>
+                        </div>
                     </div>
-                    {isDanger && (
+
+                    {/* Status indicators */}
+                    {isDanger && !isHealing && (
                         <div className="text-y2k-red font-mono text-[9px] tall:text-[10px] md:text-xs mt-0.5 animate-pulse uppercase text-shadow-soft">
                             ⚠ CRITICAL
                         </div>
                     )}
 
-                    {/* Floating +1 heal indicator - below hull box with random position */}
-                    {showHealFlash && (
-                        <div
-                            className="absolute top-full mt-1 font-display font-bold text-xl md:text-3xl text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.9)]"
-                            style={{
-                                left: `${50 + (Math.random() - 0.5) * 60}%`,
-                                transform: 'translateX(-50%)',
-                                animation: 'healFloat 0.8s ease-out forwards',
-                            }}
-                        >
-                            +1
+                    {/* Cumulative heal counter */}
+                    {isHealing && totalHealed > 0 && (
+                        <div className="text-emerald-400 font-mono text-[10px] tall:text-xs md:text-sm mt-0.5 uppercase text-shadow-soft animate-pulse">
+                            +{totalHealed} HP REPAIRED
+                        </div>
+                    )}
+                    {isHealing && totalHealed === 0 && (
+                        <div className="text-emerald-400/70 font-mono text-[9px] tall:text-[10px] md:text-xs mt-0.5 uppercase text-shadow-soft">
+                            🔧 REPAIRING...
                         </div>
                     )}
                 </div>
-                <style>{`
-                    @keyframes healFloat {
-                        0% { opacity: 1; transform: translateX(-50%) translateY(0); }
-                        100% { opacity: 0; transform: translateX(-50%) translateY(-40px); }
-                    }
-                `}</style>
 
                 {/* Right: Score & Stats */}
                 <div className="flex gap-1 tall:gap-2 md:gap-3">
