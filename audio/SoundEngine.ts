@@ -1028,55 +1028,6 @@ class SoundEngineClass {
         noise.start(now);
     }
 
-    /** Small pop for drones/missiles */
-    private playExplosionSmall(ctx: AudioContext, now: number): void {
-        const bufferSize = ctx.sampleRate * 0.1; // Short
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.value = 800;
-
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.masterGain!);
-        noise.start(now);
-    }
-
-    /** Massive rumble for large enemies */
-    private playExplosionLarge(ctx: AudioContext, now: number): void {
-        const bufferSize = ctx.sampleRate * 1.5; // Long rumble
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(100, now); // Very low rumble
-        filter.frequency.linearRampToValueAtTime(10, now + 1.5);
-
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.8, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
-
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.masterGain!);
-        noise.start(now);
-    }
-
     /** Set master volume (0-1) */
     setVolume(volume: number): void {
         this._volume = Math.max(0, Math.min(1, volume));

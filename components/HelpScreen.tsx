@@ -216,8 +216,6 @@ function ControlsTab() {
 function ControlCard({ title, gesture, gestureColor, description }: {
     title: string;
     gesture: string;
-    title: string;
-    gesture: string;
     gestureColor: 'cyan' | 'green' | 'red' | 'yellow' | 'indigo';
     description: string;
 }) {

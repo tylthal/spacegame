@@ -158,7 +158,6 @@ export class CombatLoop {
   private readonly missileProximityRadius = 8; // Detonation proximity
   private readonly missileBlastRadius = 15; // Area damage radius
   private missileId = 0;
-  private missileId = 0;
   private readonly missilePool: Missile[] = [];
 
   // Shockwave state (prayer gesture)
@@ -255,7 +254,6 @@ export class CombatLoop {
     this.enemyId = 0;
     this.bulletId = 0;
     this.enemyBulletId = 0;
-    this.missileId = 0;
     this.missileId = 0;
     this.missileCooldownMs = 0;
     this.shockwaveCooldownMs = 0;
