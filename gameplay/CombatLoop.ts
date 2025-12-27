@@ -982,7 +982,7 @@ export class CombatLoop {
           this.enemies.splice(i, 1);
           SoundEngine.play('explosionLarge');
         } else if (damage > 0) {
-          SoundEngine.play('hit');
+          SoundEngine.play('shieldHit');
         }
       }
     }

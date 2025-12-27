@@ -275,6 +275,8 @@ function InstancedExplosionRenderer({ combatLoop }: { combatLoop: CombatLoop }) 
     useFrame(() => {
         if (!meshRef.current) return;
     });
+
+    return null;
 }
 
 // Track enemy positions for explosion spawning
