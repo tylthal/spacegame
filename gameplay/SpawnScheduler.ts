@@ -25,20 +25,20 @@ export interface SpawnEvent {
  * Max caps are enforced in CombatLoop.
  */
 export const DEFAULT_SPAWN_CURVE: SpawnTier[] = [
-  // Tier 1: 0-45s - Drones only, slow spawn rate
-  { startMs: 0, intervalMs: 2500, weights: { drone: 8, scout: 0, bomber: 0, weaver: 0, shieldedDrone: 0 } },
+  // Tier 1: 0-45s - Drones and occasional Surveyors
+  { startMs: 0, intervalMs: 2500, weights: { drone: 8, scout: 2, bomber: 0, weaver: 0, shieldedDrone: 0 } },
 
-  // Tier 2: 45s-1m30s - Weavers introduced at low rate
-  { startMs: 45000, intervalMs: 2000, weights: { drone: 9, scout: 0, bomber: 0, weaver: 3, shieldedDrone: 0 } },
+  // Tier 2: 45s-1m30s - Weavers introduced
+  { startMs: 45000, intervalMs: 2000, weights: { drone: 8, scout: 3, bomber: 0, weaver: 3, shieldedDrone: 0 } },
 
-  // Tier 3: 1m30s-2m30s - Shielded drones introduced at low rate
-  { startMs: 90000, intervalMs: 1500, weights: { drone: 10, scout: 0, bomber: 0, weaver: 5, shieldedDrone: 2 } },
+  // Tier 3: 1m30s-2m30s - Shielded drones introduced
+  { startMs: 90000, intervalMs: 1500, weights: { drone: 8, scout: 4, bomber: 0, weaver: 5, shieldedDrone: 2 } },
 
   // Tier 4: 2m30s-3m30s - BOMBERS introduced! Increasing pressure
-  { startMs: 150000, intervalMs: 1200, weights: { drone: 10, scout: 0, bomber: 2, weaver: 7, shieldedDrone: 4 } },
+  { startMs: 150000, intervalMs: 1200, weights: { drone: 8, scout: 4, bomber: 2, weaver: 6, shieldedDrone: 4 } },
 
-  // Tier 5: 3m30s+ - Full intensity with bombers
-  { startMs: 210000, intervalMs: 1000, weights: { drone: 10, scout: 0, bomber: 3, weaver: 8, shieldedDrone: 6 } },
+  // Tier 5: 3m30s+ - Full intensity
+  { startMs: 210000, intervalMs: 1000, weights: { drone: 8, scout: 5, bomber: 3, weaver: 7, shieldedDrone: 5 } },
 ];
 
 export class SpawnScheduler {

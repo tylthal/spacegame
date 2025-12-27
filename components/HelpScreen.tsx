@@ -90,53 +90,51 @@ function StoryTab() {
         <div className="space-y-4 tall:space-y-6 md:space-y-8">
             <section>
                 <h2 className="text-lg tall:text-xl md:text-2xl font-display font-bold text-y2k-yellow mb-2 tall:mb-3 md:mb-4">
-                    THE YEAR IS 2099
+                    ORBITAL DEFENSE // AEGIS-7
                 </h2>
                 <div className="space-y-3 tall:space-y-4 md:space-y-5 text-sm tall:text-base md:text-lg font-body text-y2k-silver leading-relaxed">
                     <p>
-                        Earth's orbital defense grid has fallen. A rogue AI designated <span className="text-y2k-yellow">NEXUS-7</span> has
-                        seized control of humanity's autonomous drone fleet, turning our own machines against us.
+                        The year is <span className="text-y2k-cyan">2142</span>. You are stationed on <span className="text-y2k-yellow">Aegis-7</span>,
+                        a critical orbital platform protecting the Proxima Hyperlane. It is the only thing standing between the
+                        evacuation ships and the void.
                     </p>
                     <p>
-                        You are Commander <span className="text-y2k-cyan">ZERO</span>, the last human pilot stationed aboard
-                        the <span className="text-y2k-yellow">Aegis Station</span> — Earth's final line of defense. When NEXUS-7
-                        disabled all automated systems, you alone retained the Neural Link interface required
-                        to operate the station's weapons manually.
+                        Two weeks ago, the <span className="text-y2k-red">Autarchy</span>—a massive autonomous mining fleet—went rogue.
+                        Corrupted by a cosmic anomaly, their directives have shifted from "collect ore" to "refine all matter,"
+                        including the station and everyone inside it.
                     </p>
                     <p>
-                        The drone swarm approaches. Wave after wave of hostile machines, their numbers endless.
-                        Your mission: <span className="text-y2k-red">survive</span> as long as possible, and take as many
-                        of them with you as you can.
+                        With the station's automated targeting offline, you must use the distinct <span className="text-y2k-yellow">"Hand of God"</span> neural interface
+                        to manually control the defense grid. Your hands are the weapons. Hold the line, Commander.
                     </p>
                 </div>
             </section>
 
             <section className="border-l-2 tall:border-l-4 border-y2k-cyan pl-3 tall:pl-4 md:pl-6 py-2 bg-black/50">
                 <p className="text-sm tall:text-base md:text-lg font-mono text-y2k-cyan italic text-shadow-soft">
-                    "The Neural Link bypasses traditional controls. Your hands become the weapon.
-                    Point to aim. Pinch to fire. Your survival depends on your reflexes alone."
+                    "The efficiency of the Autarchy is terrifying. They don't hate us. To them, we are just impurities in the ore."
                 </p>
                 <p className="text-sm tall:text-base md:text-lg font-body text-y2k-silver/80 mt-2">
-                    — Dr. Elena Reyes, Neural Interface Division
+                    — Field Report 9, Sector 7G
                 </p>
             </section>
 
             <section>
                 <h3 className="text-base tall:text-lg md:text-xl font-display font-bold text-y2k-white mb-2 tall:mb-3">
-                    MISSION OBJECTIVE
+                    MISSION DIRECTIVES
                 </h3>
                 <ul className="space-y-2 tall:space-y-3 text-base tall:text-lg md:text-xl font-body text-y2k-silver">
                     <li className="flex items-start gap-2">
                         <span className="text-y2k-yellow">▸</span>
-                        <span>Destroy incoming hostile drones before they reach the station</span>
+                        <span>Repel the Autarchy mining swarms</span>
                     </li>
                     <li className="flex items-start gap-2">
                         <span className="text-y2k-yellow">▸</span>
-                        <span>Protect the Aegis Station's hull integrity at all costs</span>
+                        <span>Protect the Zero-Point Reactor (Hull Integrity)</span>
                     </li>
                     <li className="flex items-start gap-2">
                         <span className="text-y2k-yellow">▸</span>
-                        <span>Maximize your score to honor humanity's last stand</span>
+                        <span>Use neural gestures to override weapon locks</span>
                     </li>
                 </ul>
             </section>
@@ -279,51 +277,52 @@ function SpinningEnemy({ kind }: { kind: EnemyKind }) {
 /** Enemies Tab */
 function EnemiesTab() {
     // Only active enemies in the current spawn curve
-    const enemies: {
-        kind: EnemyKind;
-        name: string;
-        points: number;
-        description: string;
-        threat: string;
-        threatColor: string;
-        unlockInfo?: string;
-    }[] = [
-            {
-                kind: 'drone',
-                name: 'DRONE',
-                points: GAME_CONFIG.scoring.drone,
-                description: 'Standard attack drone. Fast and numerous, but fragile. The backbone of the NEXUS swarm. Flies straight toward the station. Impact deals 5% damage.',
-                threat: 'LOW',
-                threatColor: 'text-green-400',
-            },
-            {
-                kind: 'weaver',
-                name: 'WEAVER',
-                points: GAME_CONFIG.scoring.weaver,
-                description: 'Evasive disc craft with spinning blades. Moves in a corkscrew spiral pattern, making it difficult to track and hit. Impact deals 5% damage.',
-                threat: 'MEDIUM',
-                threatColor: 'text-y2k-cyan',
-                unlockInfo: 'Appears after 45 seconds',
-            },
-            {
-                kind: 'shieldedDrone',
-                name: 'SHIELDED DRONE',
-                points: GAME_CONFIG.scoring.shieldedDrone,
-                description: 'Armored drone protected by an energy shield. Shield absorbs 4 hits before overloading (watch for the flash!), then 1 more hit destroys the core. Missiles can strip the shield instantly but won\'t damage the core. Impact deals 15% damage.',
-                threat: 'HIGH',
-                threatColor: 'text-red-400',
-                unlockInfo: 'Appears after 1 minute 30 seconds',
-            },
-            {
-                kind: 'bomber',
-                name: 'BOMBER',
-                points: GAME_CONFIG.scoring.bomber,
-                description: 'Heavy assault craft (5 HP). Fires white and blue plasma bombs every 10s (5% dmg). Shooting down projectiles protects the station and earns +50 PTS. Impact deals 15% damage.',
-                threat: 'EXTREME',
-                threatColor: 'text-orange-500',
-                unlockInfo: 'Appears after 2 minutes 30 seconds',
-            },
-        ];
+    const enemies: EnemyInfo[] = [
+        {
+            kind: 'drone',
+            name: 'WORKER POD',
+            points: GAME_CONFIG.scoring.drone,
+            description: 'Repurposed debris collectors. They lack weapons but swarm in massive numbers, accelerating to impact speeds to fracture the hull like ore.',
+            threat: 'LOW',
+            threatColor: 'text-y2k-silver',
+        },
+        {
+            kind: 'scout',
+            name: 'SURVEYOR',
+            points: GAME_CONFIG.scoring.scout,
+            description: 'High-speed mineral scanner. Moves in erratic strafing patterns to map weak points. Hard to track with standard sensors.',
+            threat: 'MEDIUM',
+            threatColor: 'text-y2k-cyan',
+            unlockInfo: 'Common unit',
+        },
+        {
+            kind: 'weaver',
+            name: 'BINDER UNIT',
+            points: GAME_CONFIG.scoring.weaver,
+            description: 'Construction bot that fires industrial welding plasma. Its corkscrew movement was designed for strut assembly, now used to evade fire.',
+            threat: 'MEDIUM',
+            threatColor: 'text-y2k-cyan',
+            unlockInfo: 'Appears after 45 seconds',
+        },
+        {
+            kind: 'shieldedDrone',
+            name: 'FOREMAN',
+            points: GAME_CONFIG.scoring.shieldedDrone,
+            description: 'Heavily shielded oversight unit. Its containment field absorbs 4 hits before failure. A priority target directing the swarm.',
+            threat: 'HIGH',
+            threatColor: 'text-red-400',
+            unlockInfo: 'Appears after 1 minute 30 seconds',
+        },
+        {
+            kind: 'bomber',
+            name: 'ORE HAULER',
+            points: GAME_CONFIG.scoring.bomber,
+            description: 'Heavy transport carrying unstable volatile isotopes. Slow but heavily armored (5 HP). If it reaches the station, the payload detonation is catastrophic.',
+            threat: 'EXTREME',
+            threatColor: 'text-orange-500',
+            unlockInfo: 'Appears after 2 minutes 30 seconds',
+        },
+    ];
 
     return (
         <div className="space-y-4 tall:space-y-6 md:space-y-8">
@@ -332,7 +331,7 @@ function EnemiesTab() {
                     HOSTILE UNITS
                 </h2>
                 <p className="text-sm tall:text-base md:text-lg font-body text-y2k-silver mb-3 tall:mb-4 md:mb-6">
-                    NEXUS-7 deploys hostile drone types. Learn their patterns to survive longer.
+                    The Autarchy has repurposed its mining fleet for combat. Study their patterns to survive.
                 </p>
             </section>
 

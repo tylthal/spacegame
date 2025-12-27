@@ -16,21 +16,21 @@ export const GAME_CONFIG = {
         fireIntervalMs: 125,
         enemyRadius: {
             drone: 1.5,
-            scout: 2.0,
+            scout: 1.3, // Smaller target
             bomber: 2.5,
             weaver: 1.8,
             shieldedDrone: 1.8,
         } as Record<EnemyKind, number>,
         enemySpeedPerMs: {
             drone: 0.02,
-            scout: 0.015,
+            scout: 0.035, // High speed surveyor
             bomber: 0.01,
             weaver: 0.025,
             shieldedDrone: 0.018, // Slightly slower than drone
         } as Record<EnemyKind, number>,
         enemyDamage: {
             drone: 5,
-            scout: 8,
+            scout: 10, // Higher collision damage due to velocity
             bomber: 15,
             weaver: 5,
             shieldedDrone: 15, // High damage - priority target

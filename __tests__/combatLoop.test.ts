@@ -26,8 +26,8 @@ describe('CombatLoop integration', () => {
     // After 30s, weavers start spawning
     expect(summary.spawns.weaver).toBeGreaterThan(0);
 
-    // Current curve doesn't spawn scouts or bombers
-    expect(summary.spawns.scout).toBe(0);
+    // Current curve spawns scouts (surveyors) but not bombers yet
+    expect(summary.spawns.scout).toBeGreaterThan(0);
     expect(summary.spawns.bomber).toBe(0);
     // Max active enemies should never exceed the limit (6 drones + 2 weavers = 8)
     expect(summary.active).toBeLessThanOrEqual(8);
