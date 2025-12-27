@@ -197,6 +197,14 @@ function ControlsTab() {
                     gestureColor="yellow"
                     description="Show both palms to the camera and hold for 0.6 seconds to pause the game."
                 />
+
+                {/* Hull Repair */}
+                <ControlCard
+                    title="HULL REPAIR"
+                    gesture="Thumbs Up (Both Hands)"
+                    gestureColor="green"
+                    description="Give a THUMBS UP with BOTH hands to activate emergency hull repair. Heals 3 HP per second while active. ALL WEAPONS ARE DISABLED during repair — enemies keep coming! Use wisely."
+                />
             </div>
 
             <section className="bg-y2k-silver/10 p-3 tall:p-4 md:p-6 border border-y2k-silver/30">

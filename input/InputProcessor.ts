@@ -9,8 +9,8 @@ import {
   SIGNATURE_MATCH_THRESHOLD,
 } from './HandSignature';
 
-// Gestures: pinch (shooting), fist (gripping/shockwave), palm (stop/pause), point (default/aiming)
-type Gesture = 'pinch' | 'fist' | 'palm' | 'point';
+// Gestures: pinch (shooting), fist (gripping/shockwave), palm (stop/pause), point (default/aiming), thumbsUp (healing)
+type Gesture = 'pinch' | 'fist' | 'palm' | 'point' | 'thumbsUp';
 
 export interface VirtualMousepadConfig {
   origin: { x: number; y: number };
@@ -452,6 +452,16 @@ export class InputProcessor {
 
     if (pinchDistance <= this.gestureConfig.pinchThreshold) {
       return 'pinch';
+    }
+
+    // THUMBS UP DETECTION:
+    // Thumb extended (far from wrist) but other fingers curled (close to wrist)
+    const thumbDistance = this.normalizedDistance(thumbTip, wrist, boundingDiagonal);
+    const fingersCurled = curlDistances.every(d => d <= 0.45); // All 4 fingers curled
+    const thumbExtended = thumbDistance >= 0.5; // Thumb sticking out
+
+    if (thumbExtended && fingersCurled) {
+      return 'thumbsUp';
     }
 
     // EXPLICIT PALM DETECTION:

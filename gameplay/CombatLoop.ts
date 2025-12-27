@@ -148,10 +148,12 @@ export class CombatLoop {
 
   // Firing state
   private _isFiring = false;
-  public get isFiring(): boolean { return this._isFiring && !this._isOverheated; }
+  // Weapons are disabled while healing (both hands thumbs-up)
+  public get isFiring(): boolean { return this._isFiring && !this._isOverheated && !this._isHealing; }
 
-  // Missile state (fist gesture)
+  // Missile state (fist gesture) - also disabled while healing
   private _isFiringMissile = false;
+  public get isFiringMissileActive(): boolean { return this._isFiringMissile && !this._isHealing; }
   private missileCooldownMs = 0;
   private readonly missileCooldownDuration = 5000; // 5 seconds between missiles
   private readonly missileSpeed = 0.08; // Slower than bullets (0.18)
@@ -174,6 +176,12 @@ export class CombatLoop {
   }
   public get isShockwaveActive(): boolean { return this.shockwaveActive; }
   public get currentShockwaveRadius(): number { return this.shockwaveRadius; }
+
+  // Healing state (thumbs-up gesture)
+  private _isHealing = false;
+  private healAccumulator = 0; // Accumulates ms until we heal 1 HP
+  private readonly healRatePerSecond = 3; // 3 HP per second
+  public get isHealing(): boolean { return this._isHealing; }
 
   // Public missile state for UI
   public get missileReady(): boolean { return this.missileCooldownMs <= 0; }
@@ -292,6 +300,14 @@ export class CombatLoop {
 
   public setFiringShockwave(firing: boolean) {
     this._isFiringShockwave = firing;
+  }
+
+  public setHealing(healing: boolean) {
+    this._isHealing = healing;
+    // Reset accumulator when starting to heal
+    if (healing) {
+      this.healAccumulator = 0;
+    }
   }
 
   tick(deltaMs: number): CombatTickResult {
@@ -490,6 +506,18 @@ export class CombatLoop {
       this.updateShockwave(deltaMs);
     }
 
+    // HEALING LOGIC: 3 HP per second when active
+    // Weapons are disabled during healing (checked in spawnBullets/spawnMissiles)
+    if (this._isHealing && this.hull < this.options.hull) {
+      this.healAccumulator += deltaMs;
+      // 1000ms / 3 HP = ~333ms per HP
+      const msPerHP = 1000 / this.healRatePerSecond;
+      while (this.healAccumulator >= msPerHP) {
+        this.healAccumulator -= msPerHP;
+        this.hull = Math.min(this.options.hull, this.hull + 1);
+      }
+    }
+
     this.spawnBullets();
     this.spawnMissiles();
     this.applyStationDamage();
@@ -525,6 +553,7 @@ export class CombatLoop {
       missileReady: this.missileReady,
       missileCooldownProgress: this.missileCooldownProgress,
       shockwaveProgress: this.shockwaveProgress,
+      isHealing: this._isHealing,
       currentTier: tierIndex,
     };
   }

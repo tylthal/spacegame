@@ -252,7 +252,11 @@ const App: React.FC = () => {
       const bothFists = event.hands.left?.gesture === 'fist' && event.hands.right?.gesture === 'fist';
       combatLoop.setFiringShockwave(bothFists);
 
-      // 5. Update wireframe debug data (only when visible to save performance)
+      // 6. Healing - "Thumbs Up" (both hands thumbs-up gesture)
+      const bothThumbsUp = event.hands.left?.gesture === 'thumbsUp' && event.hands.right?.gesture === 'thumbsUp';
+      combatLoop.setHealing(bothThumbsUp);
+
+      // 7. Update wireframe debug data (only when visible to save performance)
       if (showWireframe) {
         setWireframeData({
           allHands: event.allHands,
@@ -293,6 +297,7 @@ const App: React.FC = () => {
     missileReady: true,
     missileCooldownProgress: 1,
     shockwaveProgress: 1,
+    isHealing: false,
   });
 
   useEffect(() => {
@@ -330,6 +335,7 @@ const App: React.FC = () => {
         missileReady: summary.missileReady,
         missileCooldownProgress: summary.missileCooldownProgress,
         shockwaveProgress: summary.shockwaveProgress,
+        isHealing: summary.isHealing,
       });
     }, 100);
     return () => clearInterval(interval);
@@ -537,6 +543,19 @@ const App: React.FC = () => {
         className={`pointer-events-none fixed inset-0 z-50 border-[4px] md:border-[8px] border-red-600/60 shadow-[inset_0_0_15px_rgba(220,38,38,0.4)] transition-opacity duration-75 ${damageFlash ? 'opacity-100' : 'opacity-0'
           }`}
       />
+
+      {/* Healing Overlay - Green pulsing border with sparkles */}
+      <div
+        className={`pointer-events-none fixed inset-0 z-50 border-[4px] md:border-[8px] border-emerald-500/70 
+                    shadow-[inset_0_0_30px_rgba(16,185,129,0.5),inset_0_0_60px_rgba(16,185,129,0.3)]
+                    transition-opacity duration-300 ${hudState.isHealing ? 'opacity-100 animate-pulse' : 'opacity-0'}`}
+      >
+        {/* Sparkle corners */}
+        <div className="absolute top-2 left-2 w-4 h-4 bg-emerald-400/80 rounded-full blur-sm animate-ping" />
+        <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-400/80 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.2s' }} />
+        <div className="absolute bottom-2 left-2 w-4 h-4 bg-emerald-400/80 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.4s' }} />
+        <div className="absolute bottom-2 right-2 w-4 h-4 bg-emerald-400/80 rounded-full blur-sm animate-ping" style={{ animationDelay: '0.6s' }} />
+      </div>
 
       {/* Hand Wireframe Debug Overlay (toggle with W key) */}
       {showWireframe && wireframeData.allHands && (

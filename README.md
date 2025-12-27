@@ -12,6 +12,7 @@ You are the last line of defense for a space station under attack. Enemy drones 
 - **Left Hand (Pinch)**: Fire your laser - pinch thumb and index finger together to shoot
 - **Left Hand (Fist)**: Launch missile - close your fist to fire a homing missile with area damage
 - **Both Hands (Power Slam)**: Shockwave - clench both fists to release a defensive shockwave
+- **Both Hands (Thumbs Up)**: Hull Repair - heals 3 HP/sec but disables all weapons
 - **Both Hands (Palm)**: Pause - hold both palms open to pause the game
 
 ## Quickstart
