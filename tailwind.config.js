@@ -30,9 +30,17 @@ export default {
           black: '#000000', // Void
           red: '#FF003C', // System Error
           white: '#F0F0F0', // Static
-          silver: '#C0C0C0', // Old hardware
+          silver: '#D8D8D8', // Brighter silver for readability
           cyan: '#00FFFF', // Cyber Blue
         }
+      },
+      // Text shadows for readability over 3D backgrounds
+      textShadow: {
+        'none': 'none',
+        'glow': '0 0 8px currentColor, 0 0 16px currentColor',
+        'soft': '0 2px 4px rgba(0,0,0,0.9)',
+        'hard': '2px 2px 0 rgba(0,0,0,1)',
+        'outline': '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
       },
       animation: {
         'glitch': 'glitch 0.2s linear infinite',
@@ -61,5 +69,17 @@ export default {
       }
     }
   },
-  plugins: [],
+  plugins: [
+    // Text shadow plugin
+    function ({ matchUtilities, theme }) {
+      matchUtilities(
+        {
+          'text-shadow': (value) => ({
+            textShadow: value,
+          }),
+        },
+        { values: theme('textShadow') }
+      )
+    },
+  ],
 };

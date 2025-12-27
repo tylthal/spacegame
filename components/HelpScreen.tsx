@@ -76,7 +76,7 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({ onBack }) => {
 
             {/* Footer */}
             <div className="flex-shrink-0 p-2 tall:p-3 md:p-4 border-t border-y2k-silver/20 text-center">
-                <p className="text-[8px] tall:text-[10px] md:text-xs font-mono text-y2k-silver/50 tracking-widest">
+                <p className="text-[10px] tall:text-xs md:text-sm font-mono text-y2k-silver/70 tracking-widest">
                     ORBITAL DEFENSE v0.9.2 // NEURAL LINK REQUIRED
                 </p>
             </div>
@@ -111,21 +111,21 @@ function StoryTab() {
                 </div>
             </section>
 
-            <section className="border-l-2 tall:border-l-4 border-y2k-cyan pl-3 tall:pl-4 md:pl-6 py-2">
-                <p className="text-[10px] tall:text-xs md:text-sm font-mono text-y2k-cyan italic">
+            <section className="border-l-2 tall:border-l-4 border-y2k-cyan pl-3 tall:pl-4 md:pl-6 py-2 bg-black/50">
+                <p className="text-xs tall:text-sm md:text-base font-mono text-y2k-cyan italic text-shadow-soft">
                     "The Neural Link bypasses traditional controls. Your hands become the weapon.
                     Point to aim. Pinch to fire. Your survival depends on your reflexes alone."
                 </p>
-                <p className="text-[8px] tall:text-[10px] md:text-xs font-mono text-y2k-silver/70 mt-1 tall:mt-2">
+                <div className="text-xs tall:text-sm md:text-base font-body text-y2k-silver space-y-2 tall:space-y-3 md:space-y-4 leading-relaxed">
                     — Dr. Elena Reyes, Neural Interface Division
-                </p>
+                </div>
             </section>
 
             <section>
                 <h3 className="text-base tall:text-lg md:text-xl font-display font-bold text-y2k-white mb-2 tall:mb-3">
                     MISSION OBJECTIVE
                 </h3>
-                <ul className="space-y-1 tall:space-y-2 text-xs tall:text-sm md:text-base font-body text-y2k-silver">
+                <ul className="space-y-1.5 tall:space-y-2 text-sm tall:text-base md:text-lg font-body text-y2k-silver">
                     <li className="flex items-start gap-2">
                         <span className="text-y2k-yellow">▸</span>
                         <span>Destroy incoming hostile drones before they reach the station</span>
@@ -152,7 +152,7 @@ function ControlsTab() {
                 <h2 className="text-lg tall:text-xl md:text-2xl font-display font-bold text-y2k-yellow mb-2 tall:mb-3 md:mb-4">
                     NEURAL LINK CONTROLS
                 </h2>
-                <p className="text-xs tall:text-sm md:text-base font-body text-y2k-silver mb-3 tall:mb-4 md:mb-6">
+                <p className="text-sm tall:text-base md:text-lg font-body text-y2k-silver mb-3 tall:mb-4 md:mb-6">
                     The game uses your webcam to track hand movements. Hold both hands in view of the camera.
                 </p>
             </section>
@@ -195,7 +195,7 @@ function ControlsTab() {
                 <h3 className="text-sm tall:text-base md:text-lg font-display font-bold text-y2k-white mb-2 tall:mb-3">
                     CALIBRATION
                 </h3>
-                <p className="text-[10px] tall:text-xs md:text-sm font-body text-y2k-silver">
+                <p className="text-xs tall:text-sm md:text-base font-body text-y2k-silver">
                     At the start of each session, you'll calibrate your hand tracking. Hold both hands steady
                     in a comfortable position. This sets your "neutral zone" for accurate aiming.
                 </p>
@@ -223,10 +223,10 @@ function ControlCard({ title, gesture, gestureColor, description }: {
             <h4 className="text-sm tall:text-base md:text-lg font-display font-bold text-y2k-white">
                 {title}
             </h4>
-            <p className={`text-[10px] tall:text-xs md:text-sm font-mono ${colorClasses[gestureColor]} mb-1`}>
+            <p className={`text-xs tall:text-sm md:text-base font-mono ${colorClasses[gestureColor]} mb-1 text-shadow-soft`}>
                 Gesture: {gesture}
             </p>
-            <p className="text-[10px] tall:text-xs md:text-sm font-body text-y2k-silver">
+            <p className="text-xs tall:text-sm md:text-base font-body text-y2k-silver">
                 {description}
             </p>
         </div>
