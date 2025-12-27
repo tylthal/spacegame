@@ -170,32 +170,42 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onPractice, o
             </div>
 
             {/* Right side - Orbital Station 3D - allows overflow for dramatic composition */}
-            <div className="flex-1 hidden md:block pointer-events-none overflow-visible" style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', inset: '-50%', width: '200%', height: '200%' }}>
-                    <Canvas
-                        camera={{ position: [35, 15, 35], fov: 50, near: 0.1, far: 300 }}
-                        shadows
-                        style={{ background: 'transparent' }}
-                    >
-                        {/* Dramatic side lighting for shadows */}
-                        <ambientLight intensity={0.6} />
-                        <directionalLight
-                            position={[-25, 20, 10]}
-                            intensity={4}
-                            color="#fff8e0"
-                            castShadow
-                            shadow-mapSize={[1024, 1024]}
-                        />
-                        <directionalLight position={[10, -5, -15]} intensity={0.8} color="#4488ff" />
-                        <pointLight position={[0, 0, 0]} intensity={3.0} color="#00aaff" distance={40} />
+            {/* On md+: Takes right half of screen */}
+            {/* On mobile: Shows as centered background behind content */}
+            <div
+                className="absolute inset-0 md:relative md:flex-1 pointer-events-none overflow-visible -z-10 md:z-0"
+                style={{ position: 'relative' }}
+            >
+                <div
+                    className="absolute inset-0 md:inset-[-50%] md:w-[200%] md:h-[200%] flex items-center justify-center"
+                    style={{ opacity: 0.4 }} // Subtle on mobile as background
+                >
+                    <div className="w-full h-full md:opacity-100" style={{ minHeight: '100%' }}>
+                        <Canvas
+                            camera={{ position: [35, 15, 35], fov: 50, near: 0.1, far: 300 }}
+                            shadows
+                            style={{ background: 'transparent' }}
+                        >
+                            {/* Dramatic side lighting for shadows */}
+                            <ambientLight intensity={0.6} />
+                            <directionalLight
+                                position={[-25, 20, 10]}
+                                intensity={4}
+                                color="#fff8e0"
+                                castShadow
+                                shadow-mapSize={[1024, 1024]}
+                            />
+                            <directionalLight position={[10, -5, -15]} intensity={0.8} color="#4488ff" />
+                            <pointLight position={[0, 0, 0]} intensity={3.0} color="#00aaff" distance={40} />
 
-                        {/* Station - conditional rendering based on device capability */}
-                        <group position={[0, 5, 0]}>
-                            <group scale={isLowPower ? 3 : 2.5}>
-                                {isLowPower ? <SimpleStation /> : <OrbitalStation />}
+                            {/* Station - conditional rendering based on device capability */}
+                            <group position={[0, 5, 0]}>
+                                <group scale={isLowPower ? 3 : 2.5}>
+                                    {isLowPower ? <SimpleStation /> : <OrbitalStation />}
+                                </group>
                             </group>
-                        </group>
-                    </Canvas>
+                        </Canvas>
+                    </div>
                 </div>
             </div>
         </div>
