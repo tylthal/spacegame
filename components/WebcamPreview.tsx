@@ -67,7 +67,7 @@ export function WebcamPreview({ onStreamReady, onError }: WebcamPreviewProps) {
             {/* Mirror the video for natural interaction - Semi-transparent to see gameplay behind */}
             <video
                 ref={videoRef}
-                className="w-full h-full object-cover scale-x-[-1] contrast-[1.3] brightness-110 saturate-[1.2] opacity-60"
+                className="w-full h-full object-cover scale-x-[-1] contrast-[1.3] brightness-110 saturate-[1.2]"
                 playsInline
                 muted
             />
