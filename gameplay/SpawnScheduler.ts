@@ -19,6 +19,7 @@ export interface SpawnEvent {
  * - Drones: 80% → 100%
  * - Weavers: 0% → 85%  
  * - Shielded: 0% → 60%
+ * - Bombers: 0% → 30% (introduced at 2m30s)
  * 
  * Weights represent relative spawn probabilities when the scheduler picks an enemy.
  * Max caps are enforced in CombatLoop.
@@ -33,11 +34,11 @@ export const DEFAULT_SPAWN_CURVE: SpawnTier[] = [
   // Tier 3: 1m30s-2m30s - Shielded drones introduced at low rate
   { startMs: 90000, intervalMs: 1500, weights: { drone: 10, scout: 0, bomber: 0, weaver: 5, shieldedDrone: 2 } },
 
-  // Tier 4: 2m30s-3m30s - Increasing pressure
-  { startMs: 150000, intervalMs: 1200, weights: { drone: 10, scout: 0, bomber: 0, weaver: 7, shieldedDrone: 4 } },
+  // Tier 4: 2m30s-3m30s - BOMBERS introduced! Increasing pressure
+  { startMs: 150000, intervalMs: 1200, weights: { drone: 10, scout: 0, bomber: 2, weaver: 7, shieldedDrone: 4 } },
 
-  // Tier 5: 3m30s+ - Full intensity
-  { startMs: 210000, intervalMs: 1000, weights: { drone: 10, scout: 0, bomber: 0, weaver: 8, shieldedDrone: 6 } },
+  // Tier 5: 3m30s+ - Full intensity with bombers
+  { startMs: 210000, intervalMs: 1000, weights: { drone: 10, scout: 0, bomber: 3, weaver: 8, shieldedDrone: 6 } },
 ];
 
 export class SpawnScheduler {

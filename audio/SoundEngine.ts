@@ -29,6 +29,8 @@ export type SoundType =
     // Phase 3: Enemies
     | 'weaverSpawn'
     | 'shieldedSpawn'
+    | 'bomberSpawn'
+    | 'enemyFire'
     | 'explosionSmall'
     | 'explosionLarge';
 
@@ -176,6 +178,12 @@ class SoundEngineClass {
                 break;
             case 'shieldedSpawn':
                 this.playShieldedSpawn(ctx, now);
+                break;
+            case 'bomberSpawn':
+                this.playBomberSpawn(ctx, now);
+                break;
+            case 'enemyFire':
+                this.playEnemyFire(ctx, now);
                 break;
             case 'explosionSmall':
                 this.playExplosionSmall(ctx, now);
@@ -784,6 +792,66 @@ class SoundEngineClass {
 
         osc.start(now);
         osc.stop(now + 0.5);
+    }
+
+    /** Ominous deep drone for Bomber spawn */
+    private playBomberSpawn(ctx: AudioContext, now: number): void {
+        // Deep rumbling bass
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(60, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.6);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 150;
+
+        // Add subtle tremolo
+        const tremolo = ctx.createOscillator();
+        tremolo.frequency.value = 8;
+        const tremoloGain = ctx.createGain();
+        tremoloGain.gain.value = 0.1;
+        tremolo.connect(tremoloGain);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+        tremoloGain.connect(gain.gain);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain!);
+
+        osc.start(now);
+        osc.stop(now + 0.6);
+        tremolo.start(now);
+        tremolo.stop(now + 0.6);
+    }
+
+    /** Distinctive enemy weapon fire - different from player laser */
+    private playEnemyFire(ctx: AudioContext, now: number): void {
+        // Low-pitched aggressive zap (inverse of player laser)
+        const osc = ctx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        // Notch filter for alien sound
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 400;
+        filter.Q.value = 2;
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain!);
+
+        osc.start(now);
+        osc.stop(now + 0.12);
     }
 
     /** Small pop for drones/missiles */

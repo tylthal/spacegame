@@ -86,24 +86,27 @@ export const GAME_CONFIG = {
         shieldedDrone: 500, // High points due to difficulty
     },
 
-    // Difficulty settings - affect enemy movement speed and spawn caps
+    // Difficulty settings - affect enemy movement speed, spawn caps, and bomber limits
     // Multipliers are intentionally dramatic for clear gameplay difference
     difficulty: {
         easy: {
             speedMultiplier: 0.5, // Half speed - very forgiving
             enemyCapMultiplier: 0.6, // 40% fewer enemies on screen
+            maxBombers: 1, // Only 1 bomber at a time
             label: 'EASY',
             description: 'Slower, fewer enemies',
         },
         normal: {
             speedMultiplier: 1.0,
             enemyCapMultiplier: 1.0,
+            maxBombers: 2, // Up to 2 bombers
             label: 'NORMAL',
             description: 'Standard challenge',
         },
         hard: {
             speedMultiplier: 1.6, // 60% faster - intense
             enemyCapMultiplier: 1.3, // 30% more enemies on screen
+            maxBombers: 3, // Up to 3 bombers - relentless
             label: 'HARD',
             description: 'Fast enemies, more swarms',
         },

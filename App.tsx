@@ -376,10 +376,11 @@ const App: React.FC = () => {
         <DifficultyScreen
           inputProcessor={inputProcessor}
           onSelect={(difficulty: Difficulty) => {
-            // Apply difficulty speed multiplier
+            // Apply difficulty settings
             const config = GAME_CONFIG.difficulty[difficulty];
             combatLoop.setSpeedMultiplier(config.speedMultiplier);
             combatLoop.setEnemyCapMultiplier(config.enemyCapMultiplier);
+            combatLoop.setMaxBombers(config.maxBombers);
             // Start the game
             setPhase('PLAYING');
           }}

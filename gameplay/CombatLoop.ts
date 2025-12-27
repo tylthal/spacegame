@@ -19,6 +19,7 @@ export interface EnemyInstance {
   shield?: number;       // Shield HP (default: 0)
   maxShield?: number;    // For visual opacity calculation
   lastHitTime?: number;  // For hit flash effect timing
+  lastFireTime?: number; // For bomber firing cooldown
 }
 
 export interface Bullet {
@@ -34,6 +35,14 @@ export interface Missile {
   velocity: Vector3;
   active: boolean;
   detonationTriggeredAt?: number; // Timestamp when something entered trigger radius
+}
+
+// Enemy bullets (fired by bombers toward player)
+export interface EnemyBullet {
+  id: number;
+  position: Vector3;
+  velocity: Vector3;
+  active: boolean;
 }
 
 /**
@@ -57,7 +66,7 @@ const DEFAULT_COMBAT_OPTIONS: CombatOptions = {
   hull: 100,
   fireIntervalMs: 125,
   enemyRadius: { drone: 1.5, scout: 2.0, bomber: 2.5, weaver: 1.8, shieldedDrone: 1.8 },
-  enemySpeedPerMs: { drone: 0.02, scout: 0.015, bomber: 0.01, weaver: 0.012, shieldedDrone: 0.012 },
+  enemySpeedPerMs: { drone: 0.02, scout: 0.015, bomber: 0.008, weaver: 0.012, shieldedDrone: 0.012 },
   enemyDamage: { drone: 5, scout: 8, bomber: 15, weaver: 7, shieldedDrone: 15 },
   spawnRadius: 400, // Enemies spawn far in the distance
   bulletSpeed: 0.18, // Faster bullets = less lead required when aiming
@@ -70,9 +79,11 @@ interface SpawnTierCaps {
   maxDrones: number;
   maxWeavers: number;
   maxShielded: number;
+  maxBombers: number;
   droneSpawnChance: number;   // 0-1 probability
   weaverSpawnChance: number;
   shieldedSpawnChance: number;
+  bomberSpawnChance: number;
 }
 
 // Time thresholds in ms
@@ -81,19 +92,22 @@ const TIER_THRESHOLDS = [0, 45000, 90000, 150000, 210000]; // 0s, 45s, 1m30s, 2m
 // Caps and spawn probabilities per tier
 const TIER_CAPS: SpawnTierCaps[] = [
   // Tier 1: 0-45s - Drones only
-  { maxDrones: 3, maxWeavers: 0, maxShielded: 0, droneSpawnChance: 0.8, weaverSpawnChance: 0, shieldedSpawnChance: 0 },
+  { maxDrones: 3, maxWeavers: 0, maxShielded: 0, maxBombers: 0, droneSpawnChance: 0.8, weaverSpawnChance: 0, shieldedSpawnChance: 0, bomberSpawnChance: 0 },
   // Tier 2: 45s-1m30s - Weavers introduced
-  { maxDrones: 4, maxWeavers: 1, maxShielded: 0, droneSpawnChance: 0.9, weaverSpawnChance: 0.3, shieldedSpawnChance: 0 },
+  { maxDrones: 4, maxWeavers: 1, maxShielded: 0, maxBombers: 0, droneSpawnChance: 0.9, weaverSpawnChance: 0.3, shieldedSpawnChance: 0, bomberSpawnChance: 0 },
   // Tier 3: 1m30s-2m30s - Shielded introduced
-  { maxDrones: 5, maxWeavers: 1, maxShielded: 1, droneSpawnChance: 1.0, weaverSpawnChance: 0.5, shieldedSpawnChance: 0.2 },
-  // Tier 4: 2m30s-3m30s - Increasing pressure
-  { maxDrones: 6, maxWeavers: 2, maxShielded: 1, droneSpawnChance: 1.0, weaverSpawnChance: 0.7, shieldedSpawnChance: 0.4 },
+  { maxDrones: 5, maxWeavers: 1, maxShielded: 1, maxBombers: 0, droneSpawnChance: 1.0, weaverSpawnChance: 0.5, shieldedSpawnChance: 0.2, bomberSpawnChance: 0 },
+  // Tier 4: 2m30s-3m30s - Bombers introduced!
+  { maxDrones: 6, maxWeavers: 2, maxShielded: 1, maxBombers: 1, droneSpawnChance: 1.0, weaverSpawnChance: 0.7, shieldedSpawnChance: 0.4, bomberSpawnChance: 0.2 },
   // Tier 5: 3m30s+ - Full intensity
-  { maxDrones: 7, maxWeavers: 3, maxShielded: 2, droneSpawnChance: 1.0, weaverSpawnChance: 0.85, shieldedSpawnChance: 0.6 },
+  { maxDrones: 7, maxWeavers: 3, maxShielded: 2, maxBombers: 2, droneSpawnChance: 1.0, weaverSpawnChance: 0.85, shieldedSpawnChance: 0.6, bomberSpawnChance: 0.4 },
 ];
 
 const WEAVER_SPAWN_COOLDOWN_MS = 3000; // 3 seconds between weaver spawns
 const SHIELDED_DRONE_SPAWN_COOLDOWN_MS = 4000; // 4 seconds between shielded drone spawns
+const BOMBER_SPAWN_COOLDOWN_MS = 5000; // 5 seconds between bomber spawns
+const BOMBER_FIRE_INTERVAL_MS = 2000; // Bomber fires every 2 seconds
+const BOMBER_BULLET_SPEED = 0.05; // Slower than player bullets
 
 export interface CombatTickResult {
   timestamp: number;
@@ -106,6 +120,7 @@ export class CombatLoop {
   private readonly enemies: EnemyInstance[] = [];
   private readonly bullets: Bullet[] = [];
   private readonly missiles: Missile[] = [];
+  private readonly enemyBullets: EnemyBullet[] = []; // Bullets fired BY enemies (bombers)
   private readonly kills: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0, weaver: 0, shieldedDrone: 0 };
   private readonly spawns: Record<EnemyKind, number> = { drone: 0, scout: 0, bomber: 0, weaver: 0, shieldedDrone: 0 };
 
@@ -113,6 +128,7 @@ export class CombatLoop {
   public get activeEnemies(): ReadonlyArray<EnemyInstance> { return this.enemies; }
   public get activeBullets(): ReadonlyArray<Bullet> { return this.bullets; }
   public get activeMissiles(): ReadonlyArray<Missile> { return this.missiles; }
+  public get activeEnemyBullets(): ReadonlyArray<EnemyBullet> { return this.enemyBullets; }
 
   // Player state - Raw cursor position (0..1 range)
   // Used for inverse projection targeting
@@ -173,12 +189,18 @@ export class CombatLoop {
   }
   public get enemyCapMultiplier(): number { return this._enemyCapMultiplier; }
 
+  // Difficulty-based bomber cap (overrides tier cap)
+  private _maxBombersByDifficulty = 2; // Default: normal (2)
+  public setMaxBombers(max: number): void { this._maxBombersByDifficulty = max; }
+
   private hull: number;
   private elapsedMs = 0;
   private enemyId = 0;
   private bulletId = 0;
+  private enemyBulletId = 0;
   private weaverSpawnCooldown = 0; // Stagger weaver spawns
   private shieldedDroneSpawnCooldown = 0; // Stagger shielded drone spawns
+  private bomberSpawnCooldown = 0; // Stagger bomber spawns
 
   constructor(
     private readonly scheduler: SpawnScheduler,
@@ -199,12 +221,14 @@ export class CombatLoop {
     this.enemies.length = 0;
     this.bullets.length = 0;
     this.missiles.length = 0;
+    this.enemyBullets.length = 0;
     this.bulletPool.length = 0;
     this.missilePool.length = 0;
     this.hull = this.options.hull;
     this.elapsedMs = 0;
     this.enemyId = 0;
     this.bulletId = 0;
+    this.enemyBulletId = 0;
     this.missileId = 0;
     this.missileCooldownMs = 0;
     this._heat = 0;
@@ -224,6 +248,7 @@ export class CombatLoop {
     this.spawns.shieldedDrone = 0;
     this.weaverSpawnCooldown = 0;
     this.shieldedDroneSpawnCooldown = 0;
+    this.bomberSpawnCooldown = 0;
     this.scheduler.reset();
   }
 
@@ -239,12 +264,15 @@ export class CombatLoop {
     if (deltaMs < 0) throw new Error('deltaMs must be non-negative');
     this.elapsedMs += deltaMs;
 
-    // Update weaver spawn cooldown
+    // Update spawn cooldowns
     if (this.weaverSpawnCooldown > 0) {
       this.weaverSpawnCooldown = Math.max(0, this.weaverSpawnCooldown - deltaMs);
     }
     if (this.shieldedDroneSpawnCooldown > 0) {
       this.shieldedDroneSpawnCooldown = Math.max(0, this.shieldedDroneSpawnCooldown - deltaMs);
+    }
+    if (this.bomberSpawnCooldown > 0) {
+      this.bomberSpawnCooldown = Math.max(0, this.bomberSpawnCooldown - deltaMs);
     }
 
     // Spawn Logic - Strategy A "Slow Burn" with progressive caps and probability
@@ -270,6 +298,8 @@ export class CombatLoop {
       const scaledMaxDrones = Math.max(1, Math.floor(tier.maxDrones * this._enemyCapMultiplier));
       const scaledMaxWeavers = Math.floor(tier.maxWeavers * this._enemyCapMultiplier);
       const scaledMaxShielded = Math.floor(tier.maxShielded * this._enemyCapMultiplier);
+      // Bomber cap is overridden by difficulty setting (1/2/3 for easy/normal/hard)
+      const scaledMaxBombers = Math.min(tier.maxBombers, this._maxBombersByDifficulty);
 
       // 2. Check Specific Caps AND Probability
       if (event.kind === 'drone') {
@@ -299,6 +329,16 @@ export class CombatLoop {
         this.shieldedDroneSpawnCooldown = SHIELDED_DRONE_SPAWN_COOLDOWN_MS;
       }
 
+      if (event.kind === 'bomber') {
+        const currentBombers = this.enemies.filter(e => e.kind === 'bomber').length;
+        if (currentBombers >= scaledMaxBombers || this.bomberSpawnCooldown > 0) {
+          continue;
+        }
+        // Probability check
+        if (this.rng.next() > tier.bomberSpawnChance) continue;
+        this.bomberSpawnCooldown = BOMBER_SPAWN_COOLDOWN_MS;
+      }
+
       // 3. Spawn
       const enemy = this.createEnemy(event.kind);
       this.enemies.push(enemy);
@@ -308,6 +348,8 @@ export class CombatLoop {
         SoundEngine.play('weaverSpawn');
       } else if (enemy.kind === 'shieldedDrone') {
         SoundEngine.play('shieldedSpawn');
+      } else if (enemy.kind === 'bomber') {
+        SoundEngine.play('bomberSpawn');
       }
     }
 
@@ -316,6 +358,36 @@ export class CombatLoop {
     const bulletCollisions = this.advanceBullets(deltaMs);
     const missileCollisions = this.advanceMissiles(deltaMs);
     const destroyed = [...bulletCollisions, ...missileCollisions];
+
+    // Bomber firing logic - fire at player every 2 seconds
+    for (const enemy of this.enemies) {
+      if (enemy.kind === 'bomber' && enemy.lastFireTime !== undefined) {
+        if (this.elapsedMs - enemy.lastFireTime >= BOMBER_FIRE_INTERVAL_MS) {
+          enemy.lastFireTime = this.elapsedMs;
+          // Fire bullet toward camera (player is at z=0)
+          const dx = 0 - enemy.position.x;
+          const dy = 0 - enemy.position.y;
+          const dz = 0 - enemy.position.z;
+          const dist = Math.hypot(dx, dy, dz);
+          if (dist > 0) {
+            this.enemyBullets.push({
+              id: this.enemyBulletId++,
+              position: { ...enemy.position },
+              velocity: {
+                x: (dx / dist) * BOMBER_BULLET_SPEED,
+                y: (dy / dist) * BOMBER_BULLET_SPEED,
+                z: (dz / dist) * BOMBER_BULLET_SPEED,
+              },
+              active: true,
+            });
+            SoundEngine.play('enemyFire');
+          }
+        }
+      }
+    }
+
+    // Advance enemy bullets and check for player hits
+    this.advanceEnemyBullets(deltaMs);
 
     // Heat Logic
     if (this._isFiring && !this._isOverheated) {
@@ -431,11 +503,17 @@ export class CombatLoop {
     let shield: number | undefined;
     let maxShield: number | undefined;
     let health: number | undefined;
+    let lastFireTime: number | undefined;
 
     if (kind === 'shieldedDrone') {
       shield = 4;    // Takes 4 hits to overload shield
       maxShield = 4; // For visual opacity calculation
       health = 1;    // Then 1 more hit to destroy
+    }
+
+    if (kind === 'bomber') {
+      health = 5;    // Bomber takes 5 hits to destroy
+      lastFireTime = this.elapsedMs; // Start with fire cooldown
     }
 
     return {
@@ -449,6 +527,7 @@ export class CombatLoop {
       shield,
       maxShield,
       health,
+      lastFireTime,
     };
   }
 
@@ -473,6 +552,37 @@ export class CombatLoop {
 
         enemy.position.x += spiralX;
         enemy.position.y += spiralY;
+      }
+    }
+  }
+
+  // Advance enemy bullets and check for player hits
+  private advanceEnemyBullets(deltaMs: number): void {
+    for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
+      const bullet = this.enemyBullets[i];
+      if (!bullet.active) {
+        this.enemyBullets.splice(i, 1);
+        continue;
+      }
+
+      // Move bullet
+      bullet.position.x += bullet.velocity.x * deltaMs;
+      bullet.position.y += bullet.velocity.y * deltaMs;
+      bullet.position.z += bullet.velocity.z * deltaMs;
+
+      // Check if bullet reached player (z > -5 means it's past the camera/player)
+      if (bullet.position.z > -5) {
+        // Hit the player! Deal 1 damage to hull
+        this.hull = Math.max(0, this.hull - 1);
+        bullet.active = false;
+        SoundEngine.play('playerHit');
+        this.enemyBullets.splice(i, 1);
+        continue;
+      }
+
+      // Remove bullet if too far away (off screen or behind spawn)
+      if (bullet.position.z > 50 || bullet.position.z < -500) {
+        this.enemyBullets.splice(i, 1);
       }
     }
   }

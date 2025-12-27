@@ -23,6 +23,10 @@ const HULL_PINK = { r: 0.18, g: 0.08, b: 0.15 };
 const HULL_ORANGE = { r: 0.22, g: 0.12, b: 0.08 };
 const HULL_PURPLE = { r: 0.15, g: 0.08, b: 0.18 };
 const HULL_GREEN = { r: 0.08, g: 0.18, b: 0.1 };
+// New bomber colors
+const HULL_YELLOW = { r: 0.7, g: 0.55, b: 0.1 };  // Yellow outer shell
+const HULL_STEEL = { r: 0.35, g: 0.35, b: 0.38 }; // Stainless steel body
+const LIGHT_ORANGE_CORE = { r: 6.0, g: 3.0, b: 0.5 }; // Orange inner glow (HDR)
 
 // Accent lights (increased HDR values for glow via bloom)
 const LIGHT_CYAN = { r: 0.5, g: 4.0, b: 4.0 };
@@ -218,73 +222,102 @@ function createScoutGeometry(): THREE.BufferGeometry {
 }
 
 /**
- * BOMBER - Heavy hexagonal hull with weapon pods
- * Hull: Dark orange-tinted | Lights: Orange HDR | Jets: Orange-white HDR
+ * BOMBER - Based on user sketch: wide horizontal oval body,
+ * gun barrel coming out front, yellow sleeves covering outer third on each side with orange underglow.
+ * Hull: Gray wide oval body | Sleeves: Yellow covering outer thirds | Jets: Orange-white
  */
 function createBomberGeometry(): THREE.BufferGeometry {
     const geometries: THREE.BufferGeometry[] = [];
 
-    // === HULL ===
+    // === MAIN OVAL BODY (gray, wide horizontal ellipse) ===
+    // Wide horizontal oval - stretched on X axis
     geometries.push(createColoredGeometry(
-        new THREE.CylinderGeometry(0.5, 0.6, 1.8, 6), HULL_ORANGE,
-        [0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 1]
+        new THREE.SphereGeometry(0.6, 16, 12), HULL_STEEL,
+        [0, 0, 0], [0, 0, 0], [1.8, 0.5, 0.8]  // Wide X, flat Y, medium Z
     ));
+    // Ring detail around body center
     geometries.push(createColoredGeometry(
-        new THREE.BoxGeometry(0.7, 0.1, 1.4), HULL_DARK,
-        [0, 0.45, 0], [0, 0, 0], [1, 1, 1]
-    ));
-    geometries.push(createColoredGeometry(
-        new THREE.ConeGeometry(0.25, 0.8, 6), HULL_DARK,
-        [0, 0, 1.3], [Math.PI / 2, 0, 0], [1, 1, 1]
-    ));
-    geometries.push(createColoredGeometry(
-        new THREE.BoxGeometry(0.2, 0.15, 0.6), HULL_DARK,
-        [-0.55, -0.2, 0.4], [0, 0, 0], [1, 1, 1]
-    ));
-    geometries.push(createColoredGeometry(
-        new THREE.BoxGeometry(0.2, 0.15, 0.6), HULL_DARK,
-        [0.55, -0.2, 0.4], [0, 0, 0], [1, 1, 1]
+        new THREE.TorusGeometry(0.5, 0.04, 8, 20), HULL_DARK,
+        [0, 0, 0], [Math.PI / 2, 0, 0], [1.6, 1, 0.8]
     ));
 
-    // === ACCENT LIGHTS (HDR) ===
+    // === GUN BARREL (front center, pointing forward +Z) ===
+    // Main barrel
     geometries.push(createColoredGeometry(
-        new THREE.SphereGeometry(0.06, 6, 4), LIGHT_ORANGE,
-        [-0.55, -0.2, 0.9], [0, 0, 0], [1, 1, 1]
+        new THREE.CylinderGeometry(0.1, 0.13, 1.0, 8), HULL_DARK,
+        [0, 0, 0.9], [Math.PI / 2, 0, 0], [1, 1, 1]
     ));
+    // Barrel tip ring
     geometries.push(createColoredGeometry(
-        new THREE.SphereGeometry(0.06, 6, 4), LIGHT_ORANGE,
-        [0.55, -0.2, 0.9], [0, 0, 0], [1, 1, 1]
+        new THREE.TorusGeometry(0.12, 0.025, 6, 12), HULL_STEEL,
+        [0, 0, 1.4], [Math.PI / 2, 0, 0], [1, 1, 1]
     ));
+    // Muzzle glow
     geometries.push(createColoredGeometry(
-        new THREE.BoxGeometry(0.8, 0.04, 0.06), LIGHT_ORANGE,
-        [0, 0.5, 0], [0, 0, 0], [1, 1, 1]
+        new THREE.SphereGeometry(0.07, 8, 6), LIGHT_ORANGE,
+        [0, 0, 1.45], [0, 0, 0], [1, 1, 1]
     ));
 
-    // === ENGINE JETS (HDR) ===
-    const enginePositions: [number, number, number][] = [
-        [0, 0, -1.1],
-        [-0.35, -0.15, -0.9],
-        [0.35, -0.15, -0.9],
-    ];
-    enginePositions.forEach((pos, i) => {
-        const size = i === 0 ? 0.18 : 0.12;
-        geometries.push(createColoredGeometry(
-            new THREE.CylinderGeometry(size, size * 1.2, 0.4, 8), HULL_DARK,
-            pos, [Math.PI / 2, 0, 0], [1, 1, 1]
-        ));
-        geometries.push(createColoredGeometry(
-            new THREE.ConeGeometry(size * 0.9, 0.5, 8), JET_ORANGE,
-            [pos[0], pos[1], pos[2] - 0.35], [-Math.PI / 2, 0, 0], [1, 1, 1]
-        ));
-        geometries.push(createColoredGeometry(
-            new THREE.SphereGeometry(size * 0.7, 8, 6), JET_WHITE,
-            [pos[0], pos[1], pos[2] - 0.2], [0, 0, 0], [1, 1, 0.5]
-        ));
-    });
+    // === LEFT YELLOW SLEEVE (same oval shape, scaled up, outer third) ===
+    // Same oval shape as body but slightly larger, positioned to cover left outer third
+    // Uses partial sphere (phiStart/phiLength) to only show the outer portion
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.62, 16, 12, Math.PI * 0.6, Math.PI * 0.4), HULL_YELLOW,
+        [0, 0.03, 0], [0, 0, 0], [1.85, 0.55, 0.85]  // Slightly larger than body
+    ));
+    // Orange underglow (HDR glow underneath the left sleeve)
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.55, 12, 8, Math.PI * 0.65, Math.PI * 0.35), LIGHT_ORANGE_CORE,
+        [0, -0.08, 0], [0, 0, 0], [1.75, 0.35, 0.8]
+    ));
+    // Bright inner glow strip
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.5, 10, 6, Math.PI * 0.7, Math.PI * 0.3), JET_ORANGE,
+        [0, -0.12, 0], [0, 0, 0], [1.6, 0.25, 0.75]
+    ));
+
+    // === RIGHT YELLOW SLEEVE (same oval shape, scaled up, outer third) ===
+    // Same oval shape as body but slightly larger, positioned to cover right outer third
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.62, 16, 12, 0, Math.PI * 0.4), HULL_YELLOW,
+        [0, 0.03, 0], [0, 0, 0], [1.85, 0.55, 0.85]  // Slightly larger than body
+    ));
+    // Orange underglow (HDR glow underneath the right sleeve)
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.55, 12, 8, 0, Math.PI * 0.35), LIGHT_ORANGE_CORE,
+        [0, -0.08, 0], [0, 0, 0], [1.75, 0.35, 0.8]
+    ));
+    // Bright inner glow strip
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.5, 10, 6, 0, Math.PI * 0.3), JET_ORANGE,
+        [0, -0.12, 0], [0, 0, 0], [1.6, 0.25, 0.75]
+    ));
+
+    // === ENGINE (back center, -Z direction) ===
+    // Engine housing
+    geometries.push(createColoredGeometry(
+        new THREE.CylinderGeometry(0.25, 0.35, 0.4, 12), HULL_DARK,
+        [0, 0, -0.7], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    // Engine nozzle ring
+    geometries.push(createColoredGeometry(
+        new THREE.TorusGeometry(0.3, 0.04, 8, 16), HULL_STEEL,
+        [0, 0, -0.85], [Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    // Engine jet trail
+    geometries.push(createColoredGeometry(
+        new THREE.ConeGeometry(0.28, 0.8, 12), JET_ORANGE,
+        [0, 0, -1.35], [-Math.PI / 2, 0, 0], [1, 1, 1]
+    ));
+    // Bright core
+    geometries.push(createColoredGeometry(
+        new THREE.SphereGeometry(0.2, 10, 8), JET_WHITE,
+        [0, 0, -0.95], [0, 0, 0], [1, 1, 0.6]
+    ));
 
     const merged = BufferGeometryUtils.mergeGeometries(geometries, false);
     if (!merged) throw new Error('Failed to merge bomber geometries');
-    merged.scale(1.5, 1.5, 1.5);
+    merged.scale(1.6, 1.6, 1.6);
     geometries.forEach(g => g.dispose());
     return merged;
 }
