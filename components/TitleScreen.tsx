@@ -168,13 +168,14 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onPractice, o
 
             {/* Right side - Orbital Station 3D - allows overflow for dramatic composition */}
             {/* On md+: Takes right half of screen */}
-            {/* On mobile: Shows as centered background behind content */}
+            {/* On mobile: Shows as large centered background, oversized for impact */}
             <div
                 className="absolute inset-0 md:relative md:flex-1 pointer-events-none overflow-visible"
                 style={{ zIndex: -1 }}
             >
+                {/* Mobile: 150% size centered, Desktop: 200% for dramatic overflow */}
                 <div
-                    className="absolute inset-0 md:inset-[-50%] md:w-[200%] md:h-[200%] flex items-center justify-center opacity-40 md:opacity-100"
+                    className="absolute inset-[-25%] w-[150%] h-[150%] md:inset-[-50%] md:w-[200%] md:h-[200%] flex items-center justify-center opacity-50 md:opacity-100"
                 >
                     <div className="w-full h-full" style={{ minHeight: '100%' }}>
                         <Canvas
