@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Canvas } from '@react-three/fiber';
 import { SoundEngine, MusicEngine } from '../audio';
+import { OrbitalStation } from '../infrastructure/three/assets/OrbitalStation';
 
 interface TitleScreenProps {
     onStart: () => void;
@@ -65,10 +67,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onHelp }) => 
     };
 
     return (
-        <div className="fixed inset-0 flex flex-col items-center justify-center z-50 pointer-events-none">
-
-            {/* Main Title Card - compact for landscape */}
-            <div className="relative z-10 flex flex-col items-start justify-center text-left p-2 tall:p-4 md:p-12 w-full max-w-4xl pointer-events-auto">
+        <div className="fixed inset-0 flex z-50">
+            {/* Left side - Title and buttons */}
+            <div className="flex-1 flex flex-col items-start justify-center text-left p-2 tall:p-4 md:p-12 pointer-events-auto">
 
                 {/* SYSTEM HEADER - hidden on small landscape */}
                 <div className="hidden tall:flex flex-row items-center space-x-2 sm:space-x-4 mb-1 tall:mb-2 md:mb-4">
@@ -127,13 +128,41 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onHelp }) => 
                     )}
                 </div>
 
+                {/* Version */}
+                <div className="mt-4 tall:mt-6 md:mt-12 text-slate-600 font-mono text-[8px] tall:text-[10px] md:text-xs tracking-widest uppercase hidden tall:block">
+                    v0.9.2 // NEURAL LINK: ACTIVE
+                </div>
             </div>
 
-            {/* Version / Credits - hidden on landscape */}
-            <div className="absolute bottom-2 tall:bottom-4 md:bottom-6 text-slate-600 font-mono text-[8px] tall:text-[10px] md:text-xs tracking-widest uppercase hidden tall:block">
-                v0.9.2 // NEURAL LINK: ACTIVE
+            {/* Right side - Orbital Station 3D - allows overflow for dramatic composition */}
+            <div className="flex-1 hidden md:block pointer-events-none overflow-visible" style={{ position: 'relative' }}>
+                <div style={{ position: 'absolute', inset: '-50%', width: '200%', height: '200%' }}>
+                    <Canvas
+                        camera={{ position: [35, 15, 35], fov: 50, near: 0.1, far: 300 }}
+                        shadows
+                        style={{ background: 'transparent' }}
+                    >
+                        {/* Dramatic side lighting for shadows */}
+                        <ambientLight intensity={0.6} />
+                        <directionalLight
+                            position={[-25, 20, 10]}
+                            intensity={4}
+                            color="#fff8e0"
+                            castShadow
+                            shadow-mapSize={[1024, 1024]}
+                        />
+                        <directionalLight position={[10, -5, -15]} intensity={0.8} color="#4488ff" />
+                        <pointLight position={[0, 0, 0]} intensity={3.0} color="#00aaff" distance={40} />
+
+                        {/* Station - large, positioned up-left for dramatic composition */}
+                        <group position={[0, 5, 0]}>
+                            <group scale={2.5}>
+                                <OrbitalStation />
+                            </group>
+                        </group>
+                    </Canvas>
+                </div>
             </div>
         </div>
     );
 };
-
