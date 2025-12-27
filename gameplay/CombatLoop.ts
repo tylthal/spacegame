@@ -14,11 +14,13 @@ export interface EnemyInstance {
   wavePhase?: number;
   waveAmplitude?: number; // How far it spirals from trajectory
   waveFrequency?: number; // How fast it spirals
-  // Health/Shield system (optional for backwards compat)
+  // Health/Shield system
   health?: number;       // Core HP (default: 1)
   shield?: number;       // Shield HP (default: 0)
   maxShield?: number;    // For visual opacity calculation
   lastHitTime?: number;  // For hit flash effect timing
+  // Status Effects
+  lastShockwaveHit?: number; // Timestamp of last shockwave hit to prevent double-hits per wave
   lastFireTime?: number; // For bomber firing cooldown
   isCharging?: boolean;  // Visual cue for bomber firing
   shieldDownTime?: number; // Timestamp when shield broke
@@ -156,7 +158,23 @@ export class CombatLoop {
   private readonly missileProximityRadius = 8; // Detonation proximity
   private readonly missileBlastRadius = 15; // Area damage radius
   private missileId = 0;
+  private missileId = 0;
   private readonly missilePool: Missile[] = [];
+
+  // Shockwave state (prayer gesture)
+  private _isFiringShockwave = false;
+  private shockwaveCooldownMs = 0; // Starts at 0 (ready)
+  private shockwaveActive = false;
+  private shockwaveRadius = 0;
+  private shockwaveStartTime = 0;
+
+  public get shockwaveReady(): boolean { return this.shockwaveCooldownMs <= 0; }
+  public get shockwaveProgress(): number {
+    if (this.shockwaveCooldownMs <= 0) return 1;
+    return 1 - (this.shockwaveCooldownMs / GAME_CONFIG.shockwave.cooldownMs);
+  }
+  public get isShockwaveActive(): boolean { return this.shockwaveActive; }
+  public get currentShockwaveRadius(): number { return this.shockwaveRadius; }
 
   // Public missile state for UI
   public get missileReady(): boolean { return this.missileCooldownMs <= 0; }
@@ -238,7 +256,11 @@ export class CombatLoop {
     this.bulletId = 0;
     this.enemyBulletId = 0;
     this.missileId = 0;
+    this.missileId = 0;
     this.missileCooldownMs = 0;
+    this.shockwaveCooldownMs = 0;
+    this.shockwaveActive = false;
+    this.shockwaveRadius = 0;
     this._heat = 0;
     this._isOverheated = false;
     this._isFiring = false;
@@ -268,6 +290,10 @@ export class CombatLoop {
 
   public setFiringMissile(firing: boolean) {
     this._isFiringMissile = firing;
+  }
+
+  public setFiringShockwave(firing: boolean) {
+    this._isFiringShockwave = firing;
   }
 
   tick(deltaMs: number): CombatTickResult {
@@ -453,6 +479,19 @@ export class CombatLoop {
       this.missileCooldownMs = Math.max(0, this.missileCooldownMs - deltaMs);
     }
 
+    // Shockwave cooldown & Activation
+    if (this.shockwaveCooldownMs > 0) {
+      this.shockwaveCooldownMs = Math.max(0, this.shockwaveCooldownMs - deltaMs);
+    }
+
+    if (this._isFiringShockwave && this.shockwaveReady && !this.shockwaveActive) {
+      this.activateShockwave();
+    }
+
+    if (this.shockwaveActive) {
+      this.updateShockwave(deltaMs);
+    }
+
     this.spawnBullets();
     this.spawnMissiles();
     this.applyStationDamage();
@@ -487,6 +526,7 @@ export class CombatLoop {
       isOverheated: this._isOverheated,
       missileReady: this.missileReady,
       missileCooldownProgress: this.missileCooldownProgress,
+      shockwaveProgress: this.shockwaveProgress,
       currentTier: tierIndex,
     };
   }
@@ -877,6 +917,82 @@ export class CombatLoop {
       }
     }
     return destroyed;
+  }
+
+  private activateShockwave(): void {
+    this.shockwaveActive = true;
+    this.shockwaveRadius = 0;
+    this.shockwaveStartTime = this.elapsedMs;
+    this.shockwaveCooldownMs = GAME_CONFIG.shockwave.cooldownMs;
+    SoundEngine.play('shockwave'); // Need to add this sound type
+  }
+
+  private updateShockwave(deltaMs: number): void {
+    this.shockwaveRadius += GAME_CONFIG.shockwave.speed * deltaMs;
+
+    // Shockwave is a 2D screen wipe - hits everything regardless of Z depth
+    // We check X/Y distance from center (0, 0) only
+    const destroyed: EnemyInstance[] = [];
+
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const enemy = this.enemies[i];
+
+      // Avoid double hits per wave
+      if (enemy.lastShockwaveHit === this.shockwaveStartTime) continue;
+
+      // 2D distance from screen center (ignoring Z - wave hits everything on screen)
+      const dx = enemy.position.x;
+      const dy = enemy.position.y;
+      const dist2D = Math.hypot(dx, dy);
+
+      // Also check if the wave has "passed" the enemy's Z position
+      // Wave expands from Z=5 towards -Z. Enemy at Z=-100 is ~105 units away.
+      // But we want a SCREEN wipe, so we use 2D + ensure wave is "far enough" in Z
+      // Simplification: Just use 2D distance. Wave covers full screen depth.
+
+      if (dist2D < this.shockwaveRadius) {
+        // HIT!
+        enemy.lastShockwaveHit = this.shockwaveStartTime;
+
+        // Apply 5 damage
+        let damage = GAME_CONFIG.shockwave.damage;
+
+        // First strip shields
+        if (enemy.shield !== undefined && enemy.shield > 0) {
+          const shieldDamage = Math.min(enemy.shield, damage);
+          enemy.shield -= shieldDamage;
+          damage -= shieldDamage;
+
+          if (enemy.shield <= 0) {
+            enemy.shieldDownTime = this.elapsedMs;
+            SoundEngine.play('shieldBreak');
+          } else {
+            SoundEngine.play('shieldHit');
+          }
+        }
+
+        // Remaining damage to health
+        if (damage > 0) {
+          const currentHealth = enemy.health ?? 1;
+          enemy.health = currentHealth - damage;
+        }
+
+        // Check if dead
+        if ((enemy.health ?? 1) <= 0) {
+          this.kills[enemy.kind]++;
+          destroyed.push(enemy);
+          this.enemies.splice(i, 1);
+          SoundEngine.play('explosionLarge');
+        } else if (damage > 0) {
+          SoundEngine.play('hit');
+        }
+      }
+    }
+
+    // End wave when it's expanded past max radius
+    if (this.shockwaveRadius > GAME_CONFIG.shockwave.maxRadius) {
+      this.shockwaveActive = false;
+    }
   }
 
   private readonly bulletPool: Bullet[] = [];

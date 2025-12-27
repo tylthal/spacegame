@@ -182,6 +182,14 @@ function ControlsTab() {
                     description="Make a fist to launch a homing missile. Missiles have a 3-second cooldown but deal massive area damage. Perfect for groups!"
                 />
 
+                {/* Shockwave */}
+                <ControlCard
+                    title="SHOCKWAVE (ULTIMATE)"
+                    gesture="Prayer (Hands Together)"
+                    gestureColor="indigo"
+                    description="Press your palms together (fingers up) to unleash a devastating shockwave! An expanding wave of energy sweeps across the screen, dealing 5 damage to ALL enemies. Destroys drones instantly and strips shields from tougher foes. 60 second cooldown. Watch the purple 🙏 indicator on the right side of your screen."
+                />
+
                 {/* Pause */}
                 <ControlCard
                     title="PAUSE GAME"
@@ -208,7 +216,9 @@ function ControlsTab() {
 function ControlCard({ title, gesture, gestureColor, description }: {
     title: string;
     gesture: string;
-    gestureColor: 'cyan' | 'green' | 'red' | 'yellow';
+    title: string;
+    gesture: string;
+    gestureColor: 'cyan' | 'green' | 'red' | 'yellow' | 'indigo';
     description: string;
 }) {
     const colorClasses = {
@@ -216,6 +226,7 @@ function ControlCard({ title, gesture, gestureColor, description }: {
         green: 'border-green-400 text-green-400',
         red: 'border-y2k-red text-y2k-red',
         yellow: 'border-y2k-yellow text-y2k-yellow',
+        indigo: 'border-indigo-400 text-indigo-400',
     };
 
     return (

@@ -9,6 +9,7 @@ export interface GameHUDProps {
     isOverheated: boolean;
     missileReady: boolean;
     missileCooldownProgress: number;
+    shockwaveProgress?: number;
 }
 
 const formatTime = (ms: number): string => {
@@ -34,6 +35,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     isOverheated,
     missileReady,
     missileCooldownProgress,
+    shockwaveProgress = 1,
 }) => {
     const hullPercent = Math.max(0, Math.min(100, hull));
     const isDanger = hullPercent <= 25;
@@ -202,6 +204,26 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                     </div>
                     <div className="hidden md:block text-xs font-mono text-y2k-white/70 mt-1 text-center uppercase tracking-widest text-shadow-soft">
                         Fist to Fire
+                    </div>
+                </div>
+            </div>
+
+            {/* Middle Right: Shockwave Ultimate (vertical center, right edge) */}
+            <div className="absolute top-1/2 -translate-y-1/2 right-1 tall:right-2 md:right-4 w-24 tall:w-28 md:w-44">
+                <div className={`bg-black/90 border tall:border-2 p-1.5 tall:p-2 md:p-3 transition-colors ${shockwaveProgress >= 1 ? 'border-indigo-400' : 'border-indigo-400/50'}`}>
+                    <div className="flex justify-between items-center mb-0.5">
+                        <span className={`text-[9px] tall:text-[10px] md:text-sm font-mono uppercase text-shadow-soft ${shockwaveProgress >= 1 ? 'text-indigo-400' : 'text-indigo-400/80'}`}>
+                            {shockwaveProgress >= 1 ? '🙏 READY' : '🙏 ...'}
+                        </span>
+                    </div>
+                    <div className="h-2 tall:h-2.5 md:h-3 bg-black border border-y2k-white/40 overflow-hidden">
+                        <div
+                            className={`h-full transition-all duration-100 ${shockwaveProgress >= 1 ? 'bg-indigo-400' : 'bg-indigo-500/60'}`}
+                            style={{ width: `${shockwaveProgress * 100}%` }}
+                        />
+                    </div>
+                    <div className="hidden md:block text-xs font-mono text-y2k-white/70 mt-1 text-center uppercase tracking-widest text-shadow-soft">
+                        Prayer to Fire
                     </div>
                 </div>
             </div>

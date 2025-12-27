@@ -1,5 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
 import { Group, Mesh, Vector3, Object3D, InstancedMesh, PerspectiveCamera } from 'three';
 import { CombatLoop } from '../../gameplay/CombatLoop';
 import { useSpaceshipAsset, AssetId } from './assets/AssetLoader';
@@ -191,6 +192,89 @@ function InstancedMissileRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
             />
         </instancedMesh>
     );
+}
+
+// Render Expanding Shockwave with multiple fading ripples
+function ShockwaveRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
+    const groupRef = useRef<Group>(null);
+    const ringsRef = useRef<Mesh[]>([]);
+    const NUM_RINGS = 8; // More rings for trailing effect
+    const RING_SPACING = 5; // Tighter spacing for smoother trail
+    const MAX_RADIUS = 150;
+
+    useFrame(() => {
+        if (!groupRef.current) return;
+
+        if (!combatLoop.isShockwaveActive) {
+            groupRef.current.visible = false;
+            return;
+        }
+
+        groupRef.current.visible = true;
+        const baseRadius = combatLoop.currentShockwaveRadius;
+
+        // Position group at camera location
+        groupRef.current.position.set(0, 0, 5);
+
+        // Update each ring - outer rings (lower index) are leading edge
+        // Inner rings (higher index) trail behind
+        ringsRef.current.forEach((ring, i) => {
+            if (!ring) return;
+
+            // Leading ring is at baseRadius, trailing rings are smaller
+            const ringRadius = Math.max(0.1, baseRadius - (i * RING_SPACING));
+
+            // Only show if ring has started expanding
+            if (ringRadius < 0.1) {
+                ring.visible = false;
+                return;
+            }
+            ring.visible = true;
+            ring.scale.setScalar(ringRadius);
+
+            // Fade based on how expanded this ring is (0 = just started, 1 = max)
+            const fadeProgress = ringRadius / MAX_RADIUS;
+            const material = ring.material as THREE.MeshStandardMaterial;
+
+            // Opacity: starts at 1.0, fades to 0 at max radius
+            // Trailing rings (higher i) are also fainter
+            material.opacity = Math.max(0, (1 - fadeProgress * 0.8) - (i * 0.08));
+
+            // Brightness: leading edge is brightest
+            material.emissiveIntensity = Math.max(0.3, 4 - (i * 0.3) - (fadeProgress * 2));
+        });
+    });
+
+    return (
+        <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]}>
+            {Array.from({ length: NUM_RINGS }).map((_, i) => (
+                <mesh
+                    key={i}
+                    ref={(el) => { if (el) ringsRef.current[i] = el; }}
+                >
+                    {/* Leading rings thicker, trailing rings thinner */}
+                    <torusGeometry args={[1, 0.2 - (i * 0.02), 16, 100]} />
+                    <meshStandardMaterial
+                        color="#FFFFFF"
+                        emissive="#AADDFF"
+                        emissiveIntensity={4}
+                        transparent
+                        opacity={1}
+                        side={2}
+                    />
+                </mesh>
+            ))}
+        </group>
+    );
+}
+
+function InstancedExplosionRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
+    const meshRef = useRef<InstancedMesh>(null);
+    const dummy = useRef(new Object3D());
+
+    useFrame(() => {
+        if (!meshRef.current) return;
+    });
 }
 
 // Track enemy positions for explosion spawning
@@ -433,7 +517,8 @@ export function GameScene({ combatLoop, isRunning = true }: { combatLoop?: Comba
 
             {/* Enemy Bullets - Instanced Red Plasma */}
             {combatLoop && <InstancedEnemyBulletRenderer combatLoop={combatLoop} />}
-
+            {combatLoop && <ShockwaveRenderer combatLoop={combatLoop} />}
+            {combatLoop && <InstancedExplosionRenderer combatLoop={combatLoop} />}
             {/* Missiles - Larger projectiles with area damage */}
             {combatLoop && <InstancedMissileRenderer combatLoop={combatLoop} />}
 

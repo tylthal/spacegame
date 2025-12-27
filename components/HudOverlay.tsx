@@ -4,7 +4,9 @@ export interface HudOverlayProps {
   score: number;
   hull: number;
   lives: number;
+  lives: number;
   multiplier?: number;
+  shockwaveProgress?: number; // 0..1 (1 = ready)
   ariaLabel?: string;
 }
 
@@ -56,7 +58,7 @@ const StatBadge: React.FC<{ label: string; value: string | number; hint?: string
   </div>
 );
 
-const HudOverlay: React.FC<HudOverlayProps> = ({ score, hull, lives, multiplier = 1, ariaLabel = 'Player HUD' }) => {
+const HudOverlay: React.FC<HudOverlayProps> = ({ score, hull, lives, multiplier = 1, shockwaveProgress = 1, ariaLabel = 'Player HUD' }) => {
   return (
     <section
       className="absolute inset-0 pointer-events-none p-4 md:p-6 flex flex-col justify-between z-10"
@@ -104,21 +106,43 @@ const HudOverlay: React.FC<HudOverlayProps> = ({ score, hull, lives, multiplier 
             ))}
           </div>
         </div>
-      </header>
 
-      {/* Bottom Area (Guidance or contextual info) */}
+        {/* Shockwave Indicator */}
+        <div className="flex items-center gap-2 bg-slate-950/60 backdrop-blur border border-white/10 px-3 py-1.5 md:px-4 md:py-2 rounded-full">
+          <span className="text-[10px] uppercase tracking-widest text-indigo-400">Ult</span>
+          <div className="w-5 h-5 relative">
+            <svg viewBox="0 0 24 24" className="w-full h-full -rotate-90">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" fill="none" strokeWidth="3" className="text-slate-800" />
+              <circle
+                cx="12" cy="12" r="10"
+                stroke="currentColor"
+                fill="none"
+                strokeWidth="3"
+                className={`${shockwaveProgress >= 1 ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'text-indigo-500'}`}
+                strokeDasharray="63"
+                strokeDashoffset={63 * (1 - shockwaveProgress)}
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </header>
+
+      {/* Bottom Area (Guidance or contextual info) */ }
       <div className="hidden md:block self-start bg-slate-950/50 backdrop-blur-sm border border-white/5 p-4 rounded-xl max-w-sm pointer-events-auto">
         <p className="text-xs text-slate-300 leading-relaxed font-mono">
           <span className="text-cyan-400 block mb-1"> SYSTEM DIAGNOSTIC </span>
           Visual layer hydrated. Post-processing active.
+          Visual layer hydrated. Post-processing active.
           Input monitoring engaged.
+          <span className="block mt-2 text-indigo-300">ULTIMATE: PRAYER GESTURE (HANDS TOGETHER)</span>
         </p>
       </div>
 
       <p className="sr-only" role="status" aria-live="polite">
         Score {formatNumber(score)}. Lives {lives}. Hull {clampHull(hull)} percent. Multiplier {multiplier.toFixed(1)}x.
       </p>
-    </section>
+    </section >
   );
 };
 

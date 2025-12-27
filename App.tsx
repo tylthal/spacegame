@@ -248,6 +248,9 @@ const App: React.FC = () => {
       const leftHandFist = event.hands.left?.gesture === 'fist';
       combatLoop.setFiringMissile(leftHandFist || false);
 
+      // 5. Shockwave - Prayer gesture (aggregate)
+      combatLoop.setFiringShockwave(event.gesture === 'prayer');
+
       // 5. Update wireframe debug data (only when visible to save performance)
       if (showWireframe) {
         setWireframeData({
@@ -288,6 +291,7 @@ const App: React.FC = () => {
     isOverheated: false,
     missileReady: true,
     missileCooldownProgress: 1,
+    shockwaveProgress: 1,
   });
 
   useEffect(() => {
@@ -324,6 +328,7 @@ const App: React.FC = () => {
         isOverheated: summary.isOverheated,
         missileReady: summary.missileReady,
         missileCooldownProgress: summary.missileCooldownProgress,
+        shockwaveProgress: summary.shockwaveProgress,
       });
     }, 100);
     return () => clearInterval(interval);

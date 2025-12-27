@@ -35,7 +35,8 @@ export type SoundType =
     | 'enemyFire'
     | 'bomberProjectileHit'
     | 'explosionSmall'
-    | 'explosionLarge';
+    | 'explosionLarge'
+    | 'shockwave';
 
 class SoundEngineClass {
     private audioContext: AudioContext | null = null;
@@ -197,6 +198,9 @@ class SoundEngineClass {
             case 'explosionLarge':
                 this.playExplosionLarge(ctx, now);
                 break;
+            case 'shockwave':
+                this.playShockwave(ctx, now);
+                break;
         }
     }
 
@@ -303,6 +307,126 @@ class SoundEngineClass {
         osc.start(now);
         noise.stop(now + 0.2);
         osc.stop(now + 0.2);
+    }
+
+    /** Small, quick explosion */
+    private playExplosionSmall(ctx: AudioContext, now: number): void {
+        // Noise burst
+        const bufferSize = ctx.sampleRate * 0.15;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.5, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+        // Low rumble
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.15);
+
+        const oscGain = ctx.createGain();
+        oscGain.gain.setValueAtTime(0.4, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+        noise.connect(noiseGain);
+        osc.connect(oscGain);
+        noiseGain.connect(this.masterGain!);
+        oscGain.connect(this.masterGain!);
+
+        noise.start(now);
+        osc.start(now);
+        noise.stop(now + 0.15);
+        osc.stop(now + 0.15);
+    }
+
+    /** Large, sustained explosion */
+    private playExplosionLarge(ctx: AudioContext, now: number): void {
+        const osc = ctx.createOscillator();
+        const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.8, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < noiseBuffer.length; i++) {
+            output[i] = Math.random() * 2 - 1;
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = noiseBuffer;
+
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, now);
+        osc.frequency.exponentialRampToValueAtTime(10, now + 0.6);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, now);
+        filter.frequency.exponentialRampToValueAtTime(50, now + 0.6);
+
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+
+        osc.connect(gain);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain!);
+
+        osc.start(now);
+        osc.stop(now + 0.6);
+        noise.start(now);
+        noise.stop(now + 0.6);
+    }
+
+    /** Deep Boom + Sweep for Shockwave */
+    private playShockwave(ctx: AudioContext, now: number): void {
+        // Deep sub-bass boom
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(20, now + 1.0);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.8, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+
+        // White noise sweep
+        const bufferSize = ctx.sampleRate * 1.5;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(200, now);
+        filter.frequency.linearRampToValueAtTime(2000, now + 0.5); // Sweep up
+        filter.frequency.exponentialRampToValueAtTime(100, now + 1.5); // Then fade down
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.0, now);
+        noiseGain.gain.linearRampToValueAtTime(0.5, now + 0.2);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain!);
+
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.masterGain!);
+
+        osc.start(now);
+        osc.stop(now + 1.5);
+        noise.start(now);
+        noise.stop(now + 1.5);
     }
 
     /** Deep rocket launch with bass rumble and filtered noise */

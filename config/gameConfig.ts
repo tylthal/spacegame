@@ -69,6 +69,13 @@ export const GAME_CONFIG = {
         blastRadius: 30,
     },
 
+    shockwave: {
+        cooldownMs: 60000,
+        damage: 5,
+        speed: 0.05, // slower expansion for longer visual effect
+        maxRadius: 150, // covers screen
+    },
+
     // Pause gesture detection
     pause: {
         /** Hold time required for both-palm pause gesture */
