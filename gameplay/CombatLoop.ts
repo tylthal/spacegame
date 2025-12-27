@@ -615,6 +615,12 @@ export class CombatLoop {
       waveFrequency = 0.0005 + this.rng.next() * 0.001; // 0.0005-0.0015 cycles/ms (slower spin)
     }
 
+    if (kind === 'scout') {
+      wavePhase = this.rng.next() * Math.PI * 2;
+      waveAmplitude = 3.0 + this.rng.next() * 3.0; // Wide 3-6 unit strafe
+      waveFrequency = 0.003 + this.rng.next() * 0.002; // Fast oscillation
+    }
+
     // Initialize shield for shielded drones
     let shield: number | undefined;
     let maxShield: number | undefined;
@@ -654,6 +660,15 @@ export class CombatLoop {
       enemy.position.x += enemy.velocity.x * adjustedDelta;
       enemy.position.y += enemy.velocity.y * adjustedDelta;
       enemy.position.z += enemy.velocity.z * adjustedDelta;
+
+      // Scout Strafing (Lateral Zig-Zag)
+      if (enemy.kind === 'scout' && enemy.wavePhase !== undefined &&
+        enemy.waveAmplitude !== undefined && enemy.waveFrequency !== undefined) {
+        enemy.wavePhase += enemy.waveFrequency * adjustedDelta;
+        // Strafe left/right (X axis) using cosine to create sine wave path
+        const strafe = Math.cos(enemy.wavePhase) * enemy.waveAmplitude * 0.015 * adjustedDelta;
+        enemy.position.x += strafe;
+      }
 
       // Weaver corkscrew movement (spirals around trajectory line)
       if (enemy.kind === 'weaver' && enemy.wavePhase !== undefined &&
