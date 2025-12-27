@@ -92,7 +92,7 @@ function StoryTab() {
                 <h2 className="text-lg tall:text-xl md:text-2xl font-display font-bold text-y2k-yellow mb-2 tall:mb-3 md:mb-4">
                     THE YEAR IS 2099
                 </h2>
-                <div className="space-y-2 tall:space-y-3 md:space-y-4 text-xs tall:text-sm md:text-base font-body text-y2k-silver leading-relaxed">
+                <div className="space-y-3 tall:space-y-4 md:space-y-5 text-sm tall:text-base md:text-lg font-body text-y2k-silver leading-relaxed">
                     <p>
                         Earth's orbital defense grid has fallen. A rogue AI designated <span className="text-y2k-yellow">NEXUS-7</span> has
                         seized control of humanity's autonomous drone fleet, turning our own machines against us.
@@ -112,20 +112,20 @@ function StoryTab() {
             </section>
 
             <section className="border-l-2 tall:border-l-4 border-y2k-cyan pl-3 tall:pl-4 md:pl-6 py-2 bg-black/50">
-                <p className="text-xs tall:text-sm md:text-base font-mono text-y2k-cyan italic text-shadow-soft">
+                <p className="text-sm tall:text-base md:text-lg font-mono text-y2k-cyan italic text-shadow-soft">
                     "The Neural Link bypasses traditional controls. Your hands become the weapon.
                     Point to aim. Pinch to fire. Your survival depends on your reflexes alone."
                 </p>
-                <div className="text-xs tall:text-sm md:text-base font-body text-y2k-silver space-y-2 tall:space-y-3 md:space-y-4 leading-relaxed">
+                <p className="text-sm tall:text-base md:text-lg font-body text-y2k-silver/80 mt-2">
                     — Dr. Elena Reyes, Neural Interface Division
-                </div>
+                </p>
             </section>
 
             <section>
                 <h3 className="text-base tall:text-lg md:text-xl font-display font-bold text-y2k-white mb-2 tall:mb-3">
                     MISSION OBJECTIVE
                 </h3>
-                <ul className="space-y-1.5 tall:space-y-2 text-sm tall:text-base md:text-lg font-body text-y2k-silver">
+                <ul className="space-y-2 tall:space-y-3 text-base tall:text-lg md:text-xl font-body text-y2k-silver">
                     <li className="flex items-start gap-2">
                         <span className="text-y2k-yellow">▸</span>
                         <span>Destroy incoming hostile drones before they reach the station</span>
@@ -195,7 +195,7 @@ function ControlsTab() {
                 <h3 className="text-sm tall:text-base md:text-lg font-display font-bold text-y2k-white mb-2 tall:mb-3">
                     CALIBRATION
                 </h3>
-                <p className="text-xs tall:text-sm md:text-base font-body text-y2k-silver">
+                <p className="text-sm tall:text-base md:text-lg font-body text-y2k-silver">
                     At the start of each session, you'll calibrate your hand tracking. Hold both hands steady
                     in a comfortable position. This sets your "neutral zone" for accurate aiming.
                 </p>
@@ -220,13 +220,13 @@ function ControlCard({ title, gesture, gestureColor, description }: {
 
     return (
         <div className={`border-l-2 tall:border-l-4 ${colorClasses[gestureColor]} pl-3 tall:pl-4 md:pl-6 py-2 tall:py-3`}>
-            <h4 className="text-sm tall:text-base md:text-lg font-display font-bold text-y2k-white">
+            <h4 className="text-base tall:text-lg md:text-xl font-display font-bold text-y2k-white">
                 {title}
             </h4>
-            <p className={`text-xs tall:text-sm md:text-base font-mono ${colorClasses[gestureColor]} mb-1 text-shadow-soft`}>
+            <p className={`text-sm tall:text-base md:text-lg font-mono ${colorClasses[gestureColor]} mb-1 text-shadow-soft`}>
                 Gesture: {gesture}
             </p>
-            <p className="text-xs tall:text-sm md:text-base font-body text-y2k-silver">
+            <p className="text-sm tall:text-base md:text-lg font-body text-y2k-silver">
                 {description}
             </p>
         </div>
@@ -305,7 +305,7 @@ function EnemiesTab() {
                 <h2 className="text-lg tall:text-xl md:text-2xl font-display font-bold text-y2k-yellow mb-2 tall:mb-3 md:mb-4">
                     HOSTILE UNITS
                 </h2>
-                <p className="text-xs tall:text-sm md:text-base font-body text-y2k-silver mb-3 tall:mb-4 md:mb-6">
+                <p className="text-sm tall:text-base md:text-lg font-body text-y2k-silver mb-3 tall:mb-4 md:mb-6">
                     NEXUS-7 deploys hostile drone types. Learn their patterns to survive longer.
                 </p>
             </section>
@@ -335,18 +335,18 @@ function EnemiesTab() {
                                     <h3 className="text-base tall:text-lg md:text-xl font-display font-bold text-y2k-white">
                                         {enemy.name}
                                     </h3>
-                                    <span className={`text-[10px] tall:text-xs md:text-sm font-mono ${enemy.threatColor}`}>
+                                    <span className={`text-xs tall:text-sm md:text-base font-mono ${enemy.threatColor}`}>
                                         THREAT: {enemy.threat}
                                     </span>
                                     <span className="text-sm tall:text-base md:text-lg font-display font-bold text-y2k-yellow">
                                         +{enemy.points} PTS
                                     </span>
                                 </div>
-                                <p className="text-[10px] tall:text-xs md:text-sm font-body text-y2k-silver mb-1">
+                                <p className="text-sm tall:text-base md:text-lg font-body text-y2k-silver mb-1.5">
                                     {enemy.description}
                                 </p>
                                 {enemy.unlockInfo && (
-                                    <p className="text-[9px] tall:text-[10px] md:text-xs font-mono text-y2k-yellow/70">
+                                    <p className="text-xs tall:text-sm md:text-base font-mono text-y2k-yellow/80">
                                         ⚡ {enemy.unlockInfo}
                                     </p>
                                 )}
