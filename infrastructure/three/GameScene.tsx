@@ -1,7 +1,7 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Group, Mesh, Vector3, Object3D, InstancedMesh, PerspectiveCamera } from 'three';
+import { Group, Mesh, Vector3, Object3D, InstancedMesh, PerspectiveCamera, Points } from 'three';
 import { CombatLoop } from '../../gameplay/CombatLoop';
 import { useSpaceshipAsset, AssetId } from './assets/AssetLoader';
 import { GameEffects } from './effects/EffectComposer';
@@ -194,37 +194,53 @@ function InstancedMissileRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
     );
 }
 
-// Render Expanding Shockwave with multiple fading ripples
+// Nova Burst Shockwave with color-shifting rings, streaks, and sparks
 function ShockwaveRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
     const groupRef = useRef<Group>(null);
     const ringsRef = useRef<Mesh[]>([]);
-    const NUM_RINGS = 8; // More rings for trailing effect
-    const RING_SPACING = 5; // Tighter spacing for smoother trail
+    const streaksRef = useRef<Mesh[]>([]);
+    const sparksRef = useRef<Points>(null);
+    const timeRef = useRef(0);
+
+    const NUM_RINGS = 10;
+    const NUM_STREAKS = 16;
+    const NUM_SPARKS = 50;
+    const RING_SPACING = 4;
     const MAX_RADIUS = 150;
 
-    useFrame(() => {
+    // Create spark positions once
+    const sparkPositions = useMemo(() => {
+        const positions = new Float32Array(NUM_SPARKS * 3);
+        for (let i = 0; i < NUM_SPARKS; i++) {
+            const angle = (i / NUM_SPARKS) * Math.PI * 2 + Math.random() * 0.3;
+            positions[i * 3] = Math.cos(angle);
+            positions[i * 3 + 1] = Math.sin(angle);
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
+        }
+        return positions;
+    }, []);
+
+    useFrame((_, delta) => {
         if (!groupRef.current) return;
 
         if (!combatLoop.isShockwaveActive) {
             groupRef.current.visible = false;
+            timeRef.current = 0;
             return;
         }
 
         groupRef.current.visible = true;
+        timeRef.current += delta;
         const baseRadius = combatLoop.currentShockwaveRadius;
+        const time = timeRef.current;
 
-        // Position group at camera location
         groupRef.current.position.set(0, 0, 5);
 
-        // Update each ring - outer rings (lower index) are leading edge
-        // Inner rings (higher index) trail behind
+        // Animate rings with shifting colors
         ringsRef.current.forEach((ring, i) => {
             if (!ring) return;
 
-            // Leading ring is at baseRadius, trailing rings are smaller
             const ringRadius = Math.max(0.1, baseRadius - (i * RING_SPACING));
-
-            // Only show if ring has started expanding
             if (ringRadius < 0.1) {
                 ring.visible = false;
                 return;
@@ -232,31 +248,81 @@ function ShockwaveRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
             ring.visible = true;
             ring.scale.setScalar(ringRadius);
 
-            // Fade based on how expanded this ring is (0 = just started, 1 = max)
             const fadeProgress = ringRadius / MAX_RADIUS;
             const material = ring.material as THREE.MeshStandardMaterial;
 
-            // Opacity: starts at 1.0, fades to 0 at max radius
-            // Trailing rings (higher i) are also fainter
-            material.opacity = Math.max(0, (1 - fadeProgress * 0.8) - (i * 0.08));
+            // Color shift: orange → yellow → white based on time + ring index
+            const colorPhase = (time * 3 + i * 0.5) % 3;
+            if (colorPhase < 1) {
+                // Orange to yellow
+                material.color.setRGB(1, 0.4 + colorPhase * 0.5, colorPhase * 0.2);
+                material.emissive.setRGB(1, 0.6 + colorPhase * 0.3, colorPhase * 0.3);
+            } else if (colorPhase < 2) {
+                // Yellow to white
+                const t = colorPhase - 1;
+                material.color.setRGB(1, 0.9 + t * 0.1, 0.2 + t * 0.8);
+                material.emissive.setRGB(1, 0.9 + t * 0.1, 0.3 + t * 0.7);
+            } else {
+                // White back to orange
+                const t = colorPhase - 2;
+                material.color.setRGB(1, 1 - t * 0.6, 1 - t * 0.8);
+                material.emissive.setRGB(1, 1 - t * 0.4, 1 - t * 0.7);
+            }
 
-            // Brightness: leading edge is brightest
-            material.emissiveIntensity = Math.max(0.3, 4 - (i * 0.3) - (fadeProgress * 2));
+            material.opacity = Math.max(0, (1 - fadeProgress * 0.7) - (i * 0.06));
+            material.emissiveIntensity = Math.max(0.5, 5 - (i * 0.25) - (fadeProgress * 2));
         });
+
+        // Animate streaks - radial lines emanating outward
+        streaksRef.current.forEach((streak, i) => {
+            if (!streak) return;
+            const angle = (i / NUM_STREAKS) * Math.PI * 2;
+            const streakRadius = baseRadius * 1.1;
+
+            streak.visible = baseRadius > 5;
+            streak.scale.set(streakRadius * 0.8, 1, 1);
+            streak.rotation.z = angle;
+
+            const material = streak.material as THREE.MeshBasicMaterial;
+            const colorOffset = time * 2 + i * 0.3;
+            const hue = (0.05 + Math.sin(colorOffset) * 0.05); // Orange-red range
+            material.color.setHSL(hue, 1, 0.6 + Math.sin(colorOffset * 2) * 0.2);
+            material.opacity = Math.max(0, 0.8 - (baseRadius / MAX_RADIUS));
+        });
+
+        // Animate sparks at the edge
+        if (sparksRef.current) {
+            const sparkGeom = sparksRef.current.geometry;
+            const positions = sparkGeom.attributes.position.array as Float32Array;
+
+            for (let i = 0; i < NUM_SPARKS; i++) {
+                const baseAngle = (i / NUM_SPARKS) * Math.PI * 2;
+                const sparkOffset = Math.sin(time * 10 + i * 0.5) * 0.15;
+                const sparkRadius = baseRadius * (1 + sparkOffset);
+
+                positions[i * 3] = Math.cos(baseAngle + time * 0.5) * sparkRadius;
+                positions[i * 3 + 1] = Math.sin(baseAngle + time * 0.5) * sparkRadius;
+                positions[i * 3 + 2] = Math.sin(time * 15 + i) * 2;
+            }
+            sparkGeom.attributes.position.needsUpdate = true;
+
+            const sparkMat = sparksRef.current.material as THREE.PointsMaterial;
+            sparkMat.opacity = Math.max(0, 1 - (baseRadius / MAX_RADIUS) * 0.8);
+        }
     });
 
     return (
         <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]}>
+            {/* Main expanding rings */}
             {Array.from({ length: NUM_RINGS }).map((_, i) => (
                 <mesh
-                    key={i}
+                    key={`ring-${i}`}
                     ref={(el) => { if (el) ringsRef.current[i] = el; }}
                 >
-                    {/* Leading rings thicker, trailing rings thinner */}
-                    <torusGeometry args={[1, 0.2 - (i * 0.02), 16, 100]} />
+                    <torusGeometry args={[1, 0.25 - (i * 0.02), 16, 100]} />
                     <meshStandardMaterial
-                        color="#FFFFFF"
-                        emissive="#AADDFF"
+                        color="#FF6B00"
+                        emissive="#FFD700"
                         emissiveIntensity={4}
                         transparent
                         opacity={1}
@@ -264,6 +330,42 @@ function ShockwaveRenderer({ combatLoop }: { combatLoop: CombatLoop }) {
                     />
                 </mesh>
             ))}
+
+            {/* Radial streaks */}
+            {Array.from({ length: NUM_STREAKS }).map((_, i) => (
+                <mesh
+                    key={`streak-${i}`}
+                    ref={(el) => { if (el) streaksRef.current[i] = el; }}
+                    position={[0, 0, 0]}
+                >
+                    <planeGeometry args={[1, 0.15]} />
+                    <meshBasicMaterial
+                        color="#FFAA00"
+                        transparent
+                        opacity={0.8}
+                        side={2}
+                    />
+                </mesh>
+            ))}
+
+            {/* Edge sparks */}
+            <points ref={sparksRef}>
+                <bufferGeometry>
+                    <bufferAttribute
+                        attach="attributes-position"
+                        count={NUM_SPARKS}
+                        array={sparkPositions}
+                        itemSize={3}
+                    />
+                </bufferGeometry>
+                <pointsMaterial
+                    color="#FFFFFF"
+                    size={2}
+                    transparent
+                    opacity={1}
+                    sizeAttenuation
+                />
+            </points>
         </group>
     );
 }

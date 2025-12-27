@@ -386,20 +386,40 @@ class SoundEngineClass {
         noise.stop(now + 0.6);
     }
 
-    /** Deep Boom + Sweep for Shockwave */
+    /** Nova Burst - Explosive boom + rushing whoosh + rumble */
     private playShockwave(ctx: AudioContext, now: number): void {
-        // Deep sub-bass boom
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(200, now);
-        osc.frequency.exponentialRampToValueAtTime(20, now + 1.0);
+        // INITIAL CRACK - sharp attack
+        const crack = ctx.createOscillator();
+        crack.type = 'sawtooth';
+        crack.frequency.setValueAtTime(400, now);
+        crack.frequency.exponentialRampToValueAtTime(30, now + 0.15);
 
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.8, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+        const crackGain = ctx.createGain();
+        crackGain.gain.setValueAtTime(0.9, now);
+        crackGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
 
-        // White noise sweep
-        const bufferSize = ctx.sampleRate * 1.5;
+        crack.connect(crackGain);
+        crackGain.connect(this.masterGain!);
+        crack.start(now);
+        crack.stop(now + 0.2);
+
+        // DEEP RUMBLE - sustained sub-bass
+        const rumble = ctx.createOscillator();
+        rumble.type = 'sine';
+        rumble.frequency.setValueAtTime(60, now);
+        rumble.frequency.exponentialRampToValueAtTime(25, now + 1.2);
+
+        const rumbleGain = ctx.createGain();
+        rumbleGain.gain.setValueAtTime(0.7, now + 0.05);
+        rumbleGain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+
+        rumble.connect(rumbleGain);
+        rumbleGain.connect(this.masterGain!);
+        rumble.start(now);
+        rumble.stop(now + 1.5);
+
+        // RUSHING WHOOSH - noise burst that swells then fades
+        const bufferSize = ctx.sampleRate * 1.2;
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
@@ -408,28 +428,46 @@ class SoundEngineClass {
         const noise = ctx.createBufferSource();
         noise.buffer = buffer;
 
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(200, now);
-        filter.frequency.linearRampToValueAtTime(2000, now + 0.5); // Sweep up
-        filter.frequency.exponentialRampToValueAtTime(100, now + 1.5); // Then fade down
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.setValueAtTime(3000, now);
+        noiseFilter.frequency.exponentialRampToValueAtTime(200, now + 1.2);
 
         const noiseGain = ctx.createGain();
         noiseGain.gain.setValueAtTime(0.0, now);
-        noiseGain.gain.linearRampToValueAtTime(0.5, now + 0.2);
-        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+        noiseGain.gain.linearRampToValueAtTime(0.6, now + 0.1);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
 
-        osc.connect(gain);
-        gain.connect(this.masterGain!);
-
-        noise.connect(filter);
-        filter.connect(noiseGain);
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
         noiseGain.connect(this.masterGain!);
-
-        osc.start(now);
-        osc.stop(now + 1.5);
         noise.start(now);
-        noise.stop(now + 1.5);
+        noise.stop(now + 1.2);
+
+        // SPARKLE CRACKLE - high-frequency pops for the sparks
+        const sparkleBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.8, ctx.sampleRate);
+        const sparkleData = sparkleBuffer.getChannelData(0);
+        for (let i = 0; i < sparkleBuffer.length; i++) {
+            // Random crackle bursts
+            sparkleData[i] = Math.random() > 0.95 ? (Math.random() * 2 - 1) : sparkleData[Math.max(0, i - 1)] * 0.8;
+        }
+        const sparkle = ctx.createBufferSource();
+        sparkle.buffer = sparkleBuffer;
+
+        const sparkleFilter = ctx.createBiquadFilter();
+        sparkleFilter.type = 'highpass';
+        sparkleFilter.frequency.value = 4000;
+
+        const sparkleGain = ctx.createGain();
+        sparkleGain.gain.setValueAtTime(0.0, now);
+        sparkleGain.gain.linearRampToValueAtTime(0.4, now + 0.15);
+        sparkleGain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+
+        sparkle.connect(sparkleFilter);
+        sparkleFilter.connect(sparkleGain);
+        sparkleGain.connect(this.masterGain!);
+        sparkle.start(now + 0.05);
+        sparkle.stop(now + 0.8);
     }
 
     /** Deep rocket launch with bass rumble and filtered noise */
