@@ -5,6 +5,8 @@
  * Features loopable title theme and battle music.
  */
 
+import { getAudioContext, resumeAudioContext } from './AudioContext';
+
 type MusicTrack = 'title' | 'battle' | 'none';
 
 interface Note {
@@ -44,7 +46,7 @@ class MusicEngineClass {
     /** Initialize audio context */
     private init(): void {
         if (this.audioContext) return;
-        this.audioContext = new AudioContext();
+        this.audioContext = getAudioContext();
         this.masterGain = this.audioContext.createGain();
         this.masterGain.gain.value = this._muted ? 0 : this._volume;
         this.masterGain.connect(this.audioContext.destination);
@@ -54,7 +56,7 @@ class MusicEngineClass {
     private ensureRunning(): void {
         if (!this.audioContext) this.init();
         if (this.audioContext?.state === 'suspended') {
-            this.audioContext.resume();
+            resumeAudioContext();
         }
     }
 

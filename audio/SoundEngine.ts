@@ -5,6 +5,8 @@
  * No external audio files required - all sounds are generated in real-time.
  */
 
+import { getAudioContext, resumeAudioContext } from './AudioContext';
+
 export type SoundType =
     | 'menuHover'
     | 'buttonPress'
@@ -62,7 +64,7 @@ class SoundEngineClass {
 
         try {
             if (!this.audioContext) {
-                this.audioContext = new AudioContext();
+                this.audioContext = getAudioContext();
                 this.masterGain = this.audioContext.createGain();
                 this.masterGain.gain.value = this._volume;
                 this.masterGain.connect(this.audioContext.destination);
@@ -70,7 +72,7 @@ class SoundEngineClass {
 
             // Try to resume if suspended
             if (this.audioContext.state === 'suspended') {
-                this.audioContext.resume().then(() => {
+                resumeAudioContext().then(() => {
                     this._initialized = true;
                 }).catch(() => {
                     // Will retry on next user interaction
@@ -101,7 +103,7 @@ class SoundEngineClass {
         if (!this.audioContext || !this.masterGain) return false;
 
         if (this.audioContext.state === 'suspended') {
-            this.audioContext.resume();
+            resumeAudioContext();
         }
 
         return this.audioContext.state === 'running';
