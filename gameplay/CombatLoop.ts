@@ -726,8 +726,8 @@ export class CombatLoop {
       // 2. Check collisions with PLAYER (Hull Damage)
       // Check if bullet reached player (z > -5 means it's past the camera/player)
       if (bullet.position.z > -5) {
-        // Hit the player! Deal 1 damage to hull
-        this.hull = Math.max(0, this.hull - 1);
+        // Hit the player! Deal 5 damage to hull
+        this.hull = Math.max(0, this.hull - 5);
         bullet.active = false;
         SoundEngine.play('bomberProjectileHit');
         this.enemyBullets.splice(i, 1);
