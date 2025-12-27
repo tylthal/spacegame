@@ -85,13 +85,14 @@ The rebuild will continue layering modules behind tests. Remaining work focuses 
 
 - `InputProcessor` wires to a `HandTracker`, applies One Euro smoothing per-axis/per-landmark, and emits processed events with:
   - `smoothedLandmarks`: filtered coordinates in the source space.
-  - `gesture`: one of `palm`, `pinch`, `fist` based on thumb–index pinch distance and average fingertip curl toward the wrist.
+  - `gesture`: one of `palm`, `pinch`, `fist`, `prayer` based on thumb–index pinch distance and average fingertip curl toward the wrist.
   - `cursor`: normalized virtual mousepad coordinates derived from the index fingertip after smoothing.
   - `stable`: `true` when cursor delta is within the configured tolerance frame-to-frame.
 - Default One Euro parameters: `minCutoff=1.2`, `beta=0.002`, `dCutoff=1` (configurable per processor instance).
 - Gesture thresholds (normalized by the hand bounding-box diagonal):
   - **Pinch**: thumb–index distance ≤ `0.05`.
   - **Fist**: average (index/middle/ring/pinky) fingertip-to-wrist distance ≤ `0.16`.
+  - **Prayer**: both hands detected with palms facing each other, triggers shockwave.
   - **Palm**: fallback when neither threshold triggers.
 
 ### Virtual mousepad transform and calibration tolerance
@@ -148,9 +149,11 @@ Even when below the max cap, each enemy type has a probability check:
 | Drone | 1 | 0 | 5 | 100 | 0.02 |
 | Weaver | 1 | 0 | 7 | 300 | 0.012 |
 | Shielded Drone | 1 | 4 | 15 | 500 | 0.012 |
+| Bomber | 3 | 0 | 15 | 750 | 0.008 |
 
 - **Shielded Drone**: Protected by energy shield (4 hits to overload, then 1 hit to destroy). Shield flashes white when hit with 150ms invincibility frames. Missiles strip shield completely but don't damage core.
 - **Weaver**: Moves in corkscrew/spiral pattern, harder to hit.
+- **Bomber**: Fires projectiles at the player. High priority target due to return fire capability.
 
 - `Collision.segmentHitsSphere` handles fast projectiles with swept collision detection covering both current and previous positions.
 - `CombatLoop` orchestrates deterministic ticks:
@@ -158,6 +161,7 @@ Even when below the max cap, each enemy type has a probability check:
   - `applyDamage()` handles shields → health → destruction flow.
   - Fires a cadence-based shot (default 125ms) using `segmentHitsSphere` to detect hits.
   - Missiles detonate with area damage: max 4 damage to normal enemies, strips shields on shielded enemies.
+  - Shockwave deals damage to all enemies on screen, 60-second cooldown.
   - Advances enemies toward the base, deducting hull when they breach.
   - Exposes summary stats for hull, spawns, kills, and elapsed time.
 

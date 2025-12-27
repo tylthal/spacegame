@@ -101,34 +101,15 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
         isSuccessRef.current = false;
         finalCalibrationOffsetRef.current = { x: 0.5, y: 0.5 };
         lastPinchTimeRef.current = 0;
-        setProgress(0);
-        setIsSuccess(false);
-        setRightPointDetected(false);
-        setLeftPinchDetected(false);
-        setFailureReason(null);
-        setCursorPos({ x: 0.5, y: 0.5 });
-        setIsPinching(false);
-
-        // CRITICAL: Reset all state on mount
-        calibrationStartTimeRef.current = null;
-        positionBufferRef.current = [];
-        lastRightPointRef.current = 0;
-        lastLeftPinchRef.current = 0;
-        lastValidTimeRef.current = 0;
-        leftWristRef.current = null;
-        rightWristRef.current = null;
-        isSuccessRef.current = false;
-        finalCalibrationOffsetRef.current = { x: 0.5, y: 0.5 };
-        lastPinchTimeRef.current = 0;
-        setProgress(0);
-        setIsSuccess(false);
-        setRightPointDetected(false);
-        setLeftPinchDetected(false);
-        setFailureReason(null);
-        setCursorPos({ x: 0.5, y: 0.5 });
-        setIsPinching(false);
         leftLandmarksBufferRef.current = [];
         rightLandmarksBufferRef.current = [];
+        setProgress(0);
+        setIsSuccess(false);
+        setRightPointDetected(false);
+        setLeftPinchDetected(false);
+        setFailureReason(null);
+        setCursorPos({ x: 0.5, y: 0.5 });
+        setIsPinching(false);
 
         const handleHandEvent = (event: ProcessedHandEvent) => {
             const now = Date.now();

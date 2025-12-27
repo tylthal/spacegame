@@ -1,31 +1,72 @@
 # Architecture Overview
 
-The codebase has been reset to a thin React shell so the rebuild can progress without legacy coupling.
+Orbital Defense is a gesture-controlled space shooter built with React, Three.js, and MediaPipe hand tracking.
 
-## Current state
+## System Architecture
 
-- **HUD/menu rebuilt**: An accessible HUD overlay (score, hull, lives) and MENU_Z menu target helpers now live in the shell
-  with Testing Library/Vitest coverage.
-- **Rendering/input still stubbed**: No Three.js or MediaPipe wiring is present yet; the app remains a React UI with
-  placeholder screens representing the future calibration, ready/menu, and gameplay flows.
-- **No global singletons**: Components and helpers stay local and typed so future systems can be dependency-injected.
-- **Guardrails**: Tests fail if legacy modules or paths (old scenes, services, telemetry) reappear.
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         App.tsx                              │
+│  (Top-level orchestrator, phase routing, game loop)         │
+└─────────────────────────────────────────────────────────────┘
+           │                    │                    │
+           ▼                    ▼                    ▼
+    ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+    │   Input     │     │   Gameplay  │     │  Rendering  │
+    │   Stack     │     │   Systems   │     │   Layer     │
+    └─────────────┘     └─────────────┘     └─────────────┘
+```
 
-## Near-term layering strategy
+## Module Structure
 
-1. **Input stack**: Introduce a new hand/input adapter behind a deterministic contract and unit tests. ✅
-2. **Phase manager**: Add a pure-state phase controller and wire the placeholder screens to it. ✅
-3. **Rendering spine**: Reintroduce the render loop and asset management as isolated modules with pooled resources and tests. ✅
-4. **Gameplay + UI**: Layer gameplay systems and HUD components after the spine stabilizes. ✅ (HUD/menu landed; combat systems in place.)
-5. **Telemetry + deployment**: Add diagnostics, smoke checks, and CI deploy guards.
+### Input Layer (`input/`)
+- **HandTracker.ts**: Interface for MediaPipe hand landmark data
+- **InputProcessor.ts**: Gesture classification, One Euro smoothing, cursor mapping
+- **CursorMapper.ts**: Transforms hand position to screen coordinates
+- **HandSignature.ts**: Player identification via hand proportions
+- **Gestures.ts**: Gesture detection utilities
 
-## File layout (clean base)
+### Gameplay Layer (`gameplay/`)
+- **CombatLoop.ts**: Core tick-based simulation - spawning, physics, damage
+- **SpawnScheduler.ts**: Time-based difficulty progression (5 tiers)
+- **Collision.ts**: Swept sphere collision for fast projectiles
+- **Rng.ts**: Seeded random for deterministic testing
 
-- `App.tsx`: Top-level shell that renders the placeholder screens and foundation checklist.
-- `components/PhaseList.tsx`: Shows rebuild checkpoints and their status.
-- `components/PlaceholderScreen.tsx`: Placeholder panel describing what will be built in each phase and the guardrails in place.
-- `__tests__/legacyCleanup.test.ts`: Ensures removed legacy modules stay quarantined.
-- `components/__tests__/AppShell.test.tsx`: UI sanity checks for the placeholder shell.
+### Rendering Layer (`infrastructure/three/`)
+- **GameScene.tsx**: Main 3D scene with enemies, bullets, effects
+- **EnemyMeshes.tsx**: Visual models for each enemy type
+- **Starmap.tsx**: Parallax star background
+- **ShieldBubble.tsx**: Energy shield rendering
 
-This minimal architecture is intentionally small; each upcoming phase should add new modules behind tests without reintroducing
-legacy assets or untyped globals.
+### UI Layer (`components/`)
+- **GameHUD.tsx**: Score, hull, heat, cooldowns overlay
+- **TitleScreen.tsx**: Main menu with 3D station
+- **CalibrationScreen.tsx**: Hand tracking setup
+- **DifficultyScreen.tsx**: Easy/Normal/Hard selection
+- **PauseScreen.tsx / GameOverScreen.tsx**: Game state overlays
+- **HelpScreen.tsx**: Controls and enemy reference
+
+### Phase Management (`phase/`)
+- **PhaseManager.ts**: State machine for game flow
+
+### Audio (`audio/`)
+- **SoundEngine.ts**: Procedural sound effects (Web Audio API)
+- **MusicEngine.ts**: Background music management
+
+### Configuration (`config/`)
+- **gameConfig.ts**: Centralized gameplay tuning values
+
+## Data Flow
+
+1. **MediaPipe** → HandTracker → InputProcessor → ProcessedHandEvent
+2. **ProcessedHandEvent** → App.tsx → CombatLoop.tick()
+3. **CombatLoop** updates enemies, bullets, checks collisions
+4. **GameScene** reads CombatLoop state, renders frame
+5. **GameHUD** displays current stats
+
+## Key Design Decisions
+
+- **No global singletons**: Components receive dependencies via props/hooks
+- **Deterministic simulation**: CombatLoop uses seeded RNG for testing
+- **Config centralization**: All tuning in `gameConfig.ts` and `inputConfig.ts`
+- **Guard tests**: `legacyCleanup.test.ts` prevents reintroduction of removed code
