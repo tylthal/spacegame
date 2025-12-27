@@ -1,166 +1,169 @@
 /**
  * OrbitalStation.tsx
  * 
- * 3D space station model for the title screen.
+ * Detailed 3D space station model for the title screen.
+ * Designed to look like it could house 1000+ people.
  * Features:
- * - Central spire with docking bay and modules
- * - 4 structural spokes with walkways
- * - Rotating habitat ring with windows
- * - Detailed antenna arrays, solar panels, lights
+ * - Massive central spire with command center, labs, and cargo
+ * - 6 structural spokes with crew quarters
+ * - Rotating habitat ring with residential modules
+ * - Secondary inner ring for utilities
+ * - Extensive antenna/comm arrays
+ * - Solar panel farms
+ * - Docking bays and cargo pods
  */
 
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-// Material presets - visible on dark background
-const HULL_DARK = {
-    color: '#4a4a5a',
-    metalness: 0.7,
-    roughness: 0.3,
-};
+// Material presets
+const HULL_DARK = { color: '#4a4a5a', metalness: 0.7, roughness: 0.3 };
+const HULL_MEDIUM = { color: '#6a6a7a', metalness: 0.6, roughness: 0.4 };
+const HULL_LIGHT = { color: '#8a8a9a', metalness: 0.5, roughness: 0.5 };
+const HULL_ACCENT = { color: '#5a5a7a', metalness: 0.8, roughness: 0.2 };
 
-const HULL_MEDIUM = {
-    color: '#6a6a7a',
-    metalness: 0.6,
-    roughness: 0.4,
-};
+const LIGHT_BLUE = { color: '#00ccff', emissive: '#00ccff', emissiveIntensity: 3.0 };
+const LIGHT_AMBER = { color: '#ffcc00', emissive: '#ffaa00', emissiveIntensity: 2.5 };
+const LIGHT_WHITE = { color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 4.0 };
+const LIGHT_RED = { color: '#ff0044', emissive: '#ff0044', emissiveIntensity: 3.0 };
+const LIGHT_GREEN = { color: '#00ff66', emissive: '#00ff66', emissiveIntensity: 2.5 };
+const SOLAR_PANEL = { color: '#1a1a5a', metalness: 0.95, roughness: 0.05 };
 
-const HULL_LIGHT = {
-    color: '#8a8a9a',
-    metalness: 0.5,
-    roughness: 0.5,
-};
-
-const LIGHT_BLUE = {
-    color: '#00ccff',
-    emissive: '#00ccff',
-    emissiveIntensity: 3.0,
-};
-
-const LIGHT_AMBER = {
-    color: '#ffcc00',
-    emissive: '#ffaa00',
-    emissiveIntensity: 2.5,
-};
-
-const LIGHT_WHITE = {
-    color: '#ffffff',
-    emissive: '#ffffff',
-    emissiveIntensity: 4.0,
-};
-
-const LIGHT_RED = {
-    color: '#ff0044',
-    emissive: '#ff0044',
-    emissiveIntensity: 3.0,
-};
-
-const LIGHT_GREEN = {
-    color: '#00ff66',
-    emissive: '#00ff66',
-    emissiveIntensity: 2.5,
-};
-
-/** Central Spire - vertical hub of the station */
+/** Massive Central Spire - command center and core facilities */
 function CentralSpire() {
     return (
         <group>
-            {/* Main spire body - segmented */}
+            {/* Main spire body - multi-segment */}
             <mesh position={[0, 0, 0]}>
-                <cylinderGeometry args={[0.9, 1.3, 5, 12]} />
+                <cylinderGeometry args={[1.2, 1.6, 8, 16]} />
                 <meshStandardMaterial {...HULL_DARK} />
             </mesh>
 
-            {/* Middle ring detail */}
-            <mesh position={[0, 0, 0]}>
-                <cylinderGeometry args={[1.1, 1.1, 0.3, 12]} />
-                <meshStandardMaterial {...HULL_LIGHT} />
-            </mesh>
+            {/* Spire segment rings */}
+            {[-2.5, -1, 0.5, 2].map((y, i) => (
+                <mesh key={`ring-${i}`} position={[0, y, 0]}>
+                    <cylinderGeometry args={[1.4, 1.4, 0.25, 16]} />
+                    <meshStandardMaterial {...HULL_LIGHT} />
+                </mesh>
+            ))}
 
-            {/* Upper command module */}
-            <mesh position={[0, 3, 0]}>
-                <cylinderGeometry args={[0.7, 0.9, 1.5, 12]} />
+            {/* Upper command module - larger */}
+            <mesh position={[0, 4.5, 0]}>
+                <cylinderGeometry args={[1.0, 1.2, 2, 16]} />
                 <meshStandardMaterial {...HULL_MEDIUM} />
             </mesh>
 
             {/* Command dome */}
-            <mesh position={[0, 4, 0]}>
-                <sphereGeometry args={[0.6, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <mesh position={[0, 5.8, 0]}>
+                <sphereGeometry args={[0.8, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
                 <meshStandardMaterial {...HULL_LIGHT} />
             </mesh>
 
-            {/* Antenna mast */}
-            <mesh position={[0, 5, 0]}>
+            {/* Command dome windows */}
+            {Array.from({ length: 8 }).map((_, i) => {
+                const angle = (i * Math.PI * 2) / 8;
+                return (
+                    <mesh key={`dome-win-${i}`} position={[Math.cos(angle) * 0.65, 5.6, Math.sin(angle) * 0.65]} scale={[0.12, 0.2, 0.08]}>
+                        <boxGeometry args={[1, 1, 1]} />
+                        <meshStandardMaterial {...LIGHT_BLUE} />
+                    </mesh>
+                );
+            })}
+
+            {/* Main antenna mast */}
+            <mesh position={[0, 7, 0]}>
+                <cylinderGeometry args={[0.05, 0.05, 2.5, 8]} />
+                <meshStandardMaterial {...HULL_MEDIUM} />
+            </mesh>
+
+            {/* Antenna dishes - 4 facing outward */}
+            {[0, 1, 2, 3].map(i => {
+                const angle = (i * Math.PI) / 2 + Math.PI / 4;
+                return (
+                    <group key={`dish-${i}`} position={[Math.cos(angle) * 0.4, 6.8, Math.sin(angle) * 0.4]} rotation={[0.4, angle, 0]}>
+                        <mesh>
+                            <coneGeometry args={[0.25, 0.12, 12]} />
+                            <meshStandardMaterial {...HULL_LIGHT} />
+                        </mesh>
+                        <mesh position={[0, 0.08, 0]}>
+                            <sphereGeometry args={[0.05, 6, 4]} />
+                            <meshStandardMaterial {...LIGHT_WHITE} />
+                        </mesh>
+                    </group>
+                );
+            })}
+
+            {/* Antenna beacon */}
+            <mesh position={[0, 8.3, 0]}>
+                <sphereGeometry args={[0.15, 8, 6]} />
+                <meshStandardMaterial {...LIGHT_RED} />
+            </mesh>
+
+            {/* Lower cargo/docking section */}
+            <mesh position={[0, -4.5, 0]}>
+                <cylinderGeometry args={[1.5, 1.2, 2, 16]} />
+                <meshStandardMaterial {...HULL_MEDIUM} />
+            </mesh>
+
+            {/* Cargo bay extensions - 4 pods */}
+            {[0, 1, 2, 3].map(i => {
+                const angle = (i * Math.PI) / 2;
+                return (
+                    <group key={`cargo-${i}`} position={[Math.cos(angle) * 1.8, -4.5, Math.sin(angle) * 1.8]} rotation={[0, -angle, 0]}>
+                        <mesh>
+                            <boxGeometry args={[0.8, 1.5, 0.6]} />
+                            <meshStandardMaterial {...HULL_DARK} />
+                        </mesh>
+                        <mesh position={[0, 0, 0.35]} scale={[0.5, 0.8, 0.1]}>
+                            <boxGeometry args={[1, 1, 1]} />
+                            <meshStandardMaterial {...LIGHT_AMBER} />
+                        </mesh>
+                    </group>
+                );
+            })}
+
+            {/* Docking ports - 6 around lower section */}
+            {Array.from({ length: 6 }).map((_, i) => {
+                const angle = (i * Math.PI * 2) / 6;
+                return (
+                    <group key={`dock-${i}`}>
+                        <mesh position={[Math.cos(angle) * 1.5, -3.5, Math.sin(angle) * 1.5]} rotation={[0, -angle, Math.PI / 2]}>
+                            <cylinderGeometry args={[0.25, 0.3, 0.5, 8]} />
+                            <meshStandardMaterial {...HULL_LIGHT} />
+                        </mesh>
+                        <mesh position={[Math.cos(angle) * 1.8, -3.5, Math.sin(angle) * 1.8]}>
+                            <sphereGeometry args={[0.08, 6, 4]} />
+                            <meshStandardMaterial {...(i % 2 === 0 ? LIGHT_GREEN : LIGHT_RED)} />
+                        </mesh>
+                    </group>
+                );
+            })}
+
+            {/* Lower antenna array */}
+            <mesh position={[0, -6, 0]}>
                 <cylinderGeometry args={[0.04, 0.04, 2, 6]} />
                 <meshStandardMaterial {...HULL_MEDIUM} />
             </mesh>
 
-            {/* Antenna dishes */}
-            <mesh position={[0.3, 4.8, 0]} rotation={[0, 0, 0.5]}>
-                <coneGeometry args={[0.15, 0.1, 8]} />
-                <meshStandardMaterial {...HULL_LIGHT} />
-            </mesh>
-            <mesh position={[-0.3, 5.2, 0]} rotation={[0, 0, -0.5]}>
-                <coneGeometry args={[0.12, 0.08, 8]} />
-                <meshStandardMaterial {...HULL_LIGHT} />
-            </mesh>
-
-            {/* Antenna beacon */}
-            <mesh position={[0, 6, 0]}>
-                <sphereGeometry args={[0.12, 8, 6]} />
-                <meshStandardMaterial {...LIGHT_RED} />
-            </mesh>
-
-            {/* Docking bay section (lower) */}
-            <mesh position={[0, -3, 0]}>
-                <cylinderGeometry args={[1.2, 1.0, 1.5, 12]} />
-                <meshStandardMaterial {...HULL_MEDIUM} />
-            </mesh>
-
-            {/* Docking ports - 4 around */}
-            {[0, 1, 2, 3].map(i => {
-                const angle = (i * Math.PI) / 2;
+            {/* Spire windows - 8 columns, 6 rows */}
+            {Array.from({ length: 8 }).map((_, col) => {
+                const angle = (col * Math.PI * 2) / 8;
                 return (
-                    <mesh key={`dock-${i}`} position={[Math.cos(angle) * 1.2, -3, Math.sin(angle) * 1.2]} rotation={[0, -angle, Math.PI / 2]}>
-                        <cylinderGeometry args={[0.2, 0.25, 0.4, 8]} />
-                        <meshStandardMaterial {...HULL_LIGHT} />
-                    </mesh>
+                    <group key={`win-col-${col}`} rotation={[0, angle, 0]}>
+                        {[-2.5, -1.5, -0.5, 0.5, 1.5, 2.5].map((y, row) => (
+                            <mesh key={`win-${row}`} position={[1.25, y, 0]} scale={[0.06, 0.2, 0.15]}>
+                                <boxGeometry args={[1, 1, 1]} />
+                                <meshStandardMaterial {...LIGHT_AMBER} />
+                            </mesh>
+                        ))}
+                    </group>
                 );
             })}
-
-            {/* Docking lights */}
-            {[0, 1, 2, 3].map(i => {
-                const angle = (i * Math.PI) / 2;
-                return (
-                    <mesh key={`dock-light-${i}`} position={[Math.cos(angle) * 1.4, -3, Math.sin(angle) * 1.4]}>
-                        <sphereGeometry args={[0.08, 6, 4]} />
-                        <meshStandardMaterial {...LIGHT_GREEN} />
-                    </mesh>
-                );
-            })}
-
-            {/* Lower antenna */}
-            <mesh position={[0, -4.5, 0]}>
-                <cylinderGeometry args={[0.03, 0.03, 2, 6]} />
-                <meshStandardMaterial {...HULL_MEDIUM} />
-            </mesh>
-
-            {/* Spire windows - multiple rows */}
-            {[0, 1, 2, 3, 4, 5].map(i => (
-                <group key={`spire-window-row-${i}`} rotation={[0, (i * Math.PI) / 3, 0]}>
-                    {[-1.5, -0.5, 0.5, 1.5].map(y => (
-                        <mesh key={`window-${y}`} position={[1.0, y, 0]} scale={[0.08, 0.25, 0.2]}>
-                            <boxGeometry args={[1, 1, 1]} />
-                            <meshStandardMaterial {...LIGHT_AMBER} />
-                        </mesh>
-                    ))}
-                </group>
-            ))}
 
             {/* Command module windows */}
-            {[0, 1, 2, 3, 4, 5].map(i => (
-                <mesh key={`cmd-window-${i}`} position={[Math.cos((i * Math.PI) / 3) * 0.75, 3, Math.sin((i * Math.PI) / 3) * 0.75]} scale={[0.06, 0.15, 0.15]}>
+            {Array.from({ length: 8 }).map((_, i) => (
+                <mesh key={`cmd-win-${i}`} position={[Math.cos((i * Math.PI * 2) / 8) * 1.05, 4.5, Math.sin((i * Math.PI * 2) / 8) * 1.05]} scale={[0.08, 0.3, 0.15]}>
                     <boxGeometry args={[1, 1, 1]} />
                     <meshStandardMaterial {...LIGHT_BLUE} />
                 </mesh>
@@ -169,9 +172,9 @@ function CentralSpire() {
     );
 }
 
-/** Structural Spokes - geometry only (rotation handled by parent) */
+/** 6 Structural Spokes with crew quarters */
 function SpokesGeometry() {
-    const spokeCount = 4;
+    const spokeCount = 6;
     return (
         <group>
             {Array.from({ length: spokeCount }).map((_, i) => {
@@ -180,46 +183,63 @@ function SpokesGeometry() {
                 const z = Math.sin(angle);
                 return (
                     <group key={`spoke-${i}`}>
-                        {/* Main spoke beam */}
-                        <mesh position={[x * 4, 0, z * 4]} rotation={[0, -angle + Math.PI / 2, 0]}>
-                            <boxGeometry args={[0.5, 0.5, 7]} />
+                        {/* Main spoke beam - thicker */}
+                        <mesh position={[x * 4.5, 0, z * 4.5]} rotation={[0, -angle + Math.PI / 2, 0]}>
+                            <boxGeometry args={[0.6, 0.6, 8]} />
                             <meshStandardMaterial {...HULL_DARK} />
                         </mesh>
 
                         {/* Upper support beam */}
-                        <mesh position={[x * 4, 0.4, z * 4]} rotation={[0, -angle + Math.PI / 2, 0]}>
-                            <boxGeometry args={[0.2, 0.15, 7.5]} />
+                        <mesh position={[x * 4.5, 0.5, z * 4.5]} rotation={[0, -angle + Math.PI / 2, 0]}>
+                            <boxGeometry args={[0.25, 0.15, 8.5]} />
                             <meshStandardMaterial {...HULL_MEDIUM} />
                         </mesh>
 
                         {/* Lower support beam */}
-                        <mesh position={[x * 4, -0.4, z * 4]} rotation={[0, -angle + Math.PI / 2, 0]}>
-                            <boxGeometry args={[0.2, 0.15, 7.5]} />
+                        <mesh position={[x * 4.5, -0.5, z * 4.5]} rotation={[0, -angle + Math.PI / 2, 0]}>
+                            <boxGeometry args={[0.25, 0.15, 8.5]} />
                             <meshStandardMaterial {...HULL_MEDIUM} />
                         </mesh>
 
-                        {/* Spoke windows */}
-                        {[-2, -1, 0, 1, 2].map(offset => (
-                            <mesh key={`spoke-win-${offset}`} position={[x * (4 + offset * 0.6), 0.35, z * (4 + offset * 0.6)]} scale={[0.12, 0.15, 0.12]}>
-                                <boxGeometry args={[1, 1, 1]} />
-                                <meshStandardMaterial {...LIGHT_AMBER} />
+                        {/* Crew quarters modules - 3 per spoke */}
+                        {[-1.5, 0, 1.5].map((offset, j) => (
+                            <group key={`crew-${j}`} position={[x * (4.5 + offset), 0, z * (4.5 + offset)]}>
+                                <mesh>
+                                    <boxGeometry args={[0.8, 0.9, 0.5]} />
+                                    <meshStandardMaterial {...HULL_MEDIUM} />
+                                </mesh>
+                                {/* Module windows */}
+                                <mesh position={[0, 0.1, 0.28]} scale={[0.5, 0.4, 0.1]}>
+                                    <boxGeometry args={[1, 1, 1]} />
+                                    <meshStandardMaterial {...LIGHT_AMBER} />
+                                </mesh>
+                            </group>
+                        ))}
+
+                        {/* Running lights along spoke */}
+                        {[-2.5, 0, 2.5].map((offset, j) => (
+                            <mesh key={`light-${j}`} position={[x * (4.5 + offset), 0.4, z * (4.5 + offset)]}>
+                                <sphereGeometry args={[0.06, 6, 4]} />
+                                <meshStandardMaterial {...LIGHT_BLUE} />
                             </mesh>
                         ))}
 
                         {/* Spoke junction module */}
-                        <mesh position={[x * 7.2, 0, z * 7.2]}>
-                            <boxGeometry args={[0.8, 0.8, 0.8]} />
+                        <mesh position={[x * 8.2, 0, z * 8.2]}>
+                            <boxGeometry args={[1.0, 1.0, 1.0]} />
                             <meshStandardMaterial {...HULL_LIGHT} />
                         </mesh>
 
-                        {/* Junction lights */}
-                        <mesh position={[x * 7.5, 0.3, z * 7.5]}>
-                            <sphereGeometry args={[0.1, 6, 4]} />
-                            <meshStandardMaterial {...LIGHT_BLUE} />
+                        {/* Junction windows */}
+                        <mesh position={[x * 8.5, 0, z * 8.5]} scale={[0.3, 0.5, 0.1]}>
+                            <boxGeometry args={[1, 1, 1]} />
+                            <meshStandardMaterial {...LIGHT_AMBER} />
                         </mesh>
-                        <mesh position={[x * 7.5, -0.3, z * 7.5]}>
-                            <sphereGeometry args={[0.1, 6, 4]} />
-                            <meshStandardMaterial {...LIGHT_BLUE} />
+
+                        {/* Junction nav lights */}
+                        <mesh position={[x * 8.4, 0.6, z * 8.4]}>
+                            <sphereGeometry args={[0.08, 6, 4]} />
+                            <meshStandardMaterial {...(i % 2 === 0 ? LIGHT_RED : LIGHT_GREEN)} />
                         </mesh>
                     </group>
                 );
@@ -228,66 +248,81 @@ function SpokesGeometry() {
     );
 }
 
-/** Rotating Ring AND Spokes - rotate together */
+/** Rotating Ring with 24 residential hab modules + inner utility ring */
 function RotatingRingAndSpokes() {
     const ringRef = useRef<THREE.Group>(null);
 
     useFrame((_, delta) => {
         if (ringRef.current) {
-            ringRef.current.rotation.y += delta * 0.1;
+            ringRef.current.rotation.y += delta * 0.08;
         }
     });
 
     return (
         <group ref={ringRef}>
-            {/* Include Spokes inside rotating group */}
             <SpokesGeometry />
+
+            {/* Main habitat ring - thicker */}
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[8, 1.0, 16, 72]} />
+                <torusGeometry args={[9, 1.2, 20, 96]} />
                 <meshStandardMaterial {...HULL_DARK} />
             </mesh>
 
             {/* Inner structural ring */}
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[7.2, 0.3, 8, 72]} />
+                <torusGeometry args={[8, 0.4, 12, 96]} />
                 <meshStandardMaterial {...HULL_MEDIUM} />
             </mesh>
 
             {/* Outer structural ring */}
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[8.8, 0.2, 8, 72]} />
+                <torusGeometry args={[10, 0.25, 10, 96]} />
                 <meshStandardMaterial {...HULL_LIGHT} />
             </mesh>
 
-            {/* Ring segment modules - 16 hab sections */}
-            {Array.from({ length: 16 }).map((_, i) => {
-                const angle = (i * Math.PI * 2) / 16;
-                const x = Math.cos(angle) * 8;
-                const z = Math.sin(angle) * 8;
+            {/* Inner utility ring */}
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[5, 0.5, 12, 64]} />
+                <meshStandardMaterial {...HULL_ACCENT} />
+            </mesh>
+
+            {/* 24 Residential hab modules */}
+            {Array.from({ length: 24 }).map((_, i) => {
+                const angle = (i * Math.PI * 2) / 24;
+                const x = Math.cos(angle) * 9;
+                const z = Math.sin(angle) * 9;
                 return (
-                    <group key={`hab-section-${i}`} position={[x, 0, z]} rotation={[0, -angle, 0]}>
-                        {/* Hab module bulge */}
+                    <group key={`hab-${i}`} position={[x, 0, z]} rotation={[0, -angle, 0]}>
+                        {/* Hab module body */}
                         <mesh>
-                            <boxGeometry args={[1.5, 1.2, 0.6]} />
+                            <boxGeometry args={[2.0, 1.6, 0.8]} />
                             <meshStandardMaterial {...HULL_MEDIUM} />
                         </mesh>
 
-                        {/* Module windows - 3 per section */}
-                        {[-0.4, 0, 0.4].map((offset, j) => (
-                            <mesh key={`win-${j}`} position={[offset, 0, 0.35]} scale={[0.2, 0.25, 0.05]}>
+                        {/* Module windows - 4 per hab */}
+                        {[-0.6, -0.2, 0.2, 0.6].map((offset, j) => (
+                            <mesh key={`hab-win-${j}`} position={[offset, 0.2, 0.45]} scale={[0.18, 0.35, 0.05]}>
                                 <boxGeometry args={[1, 1, 1]} />
                                 <meshStandardMaterial {...LIGHT_AMBER} />
                             </mesh>
                         ))}
 
-                        {/* Top airlock/port */}
-                        <mesh position={[0, 0.7, 0]}>
-                            <cylinderGeometry args={[0.15, 0.15, 0.2, 8]} />
+                        {/* Lower windows */}
+                        {[-0.4, 0.4].map((offset, j) => (
+                            <mesh key={`hab-win-low-${j}`} position={[offset, -0.4, 0.45]} scale={[0.25, 0.2, 0.05]}>
+                                <boxGeometry args={[1, 1, 1]} />
+                                <meshStandardMaterial {...LIGHT_BLUE} />
+                            </mesh>
+                        ))}
+
+                        {/* Airlock */}
+                        <mesh position={[0, 0.9, 0]}>
+                            <cylinderGeometry args={[0.18, 0.18, 0.25, 8]} />
                             <meshStandardMaterial {...HULL_LIGHT} />
                         </mesh>
 
-                        {/* Module nav lights */}
-                        <mesh position={[0.6, 0.5, 0.2]}>
+                        {/* Nav lights */}
+                        <mesh position={[0.85, 0.7, 0.3]}>
                             <sphereGeometry args={[0.05, 6, 4]} />
                             <meshStandardMaterial {...(i % 2 === 0 ? LIGHT_RED : LIGHT_GREEN)} />
                         </mesh>
@@ -295,83 +330,107 @@ function RotatingRingAndSpokes() {
                 );
             })}
 
-            {/* Ring ribbing/framework - 36 ribs */}
-            {Array.from({ length: 36 }).map((_, i) => {
-                const angle = (i * Math.PI * 2) / 36;
-                const x = Math.cos(angle) * 8;
-                const z = Math.sin(angle) * 8;
+            {/* Ring structural ribs - 48 */}
+            {Array.from({ length: 48 }).map((_, i) => {
+                const angle = (i * Math.PI * 2) / 48;
+                const x = Math.cos(angle) * 9;
+                const z = Math.sin(angle) * 9;
                 return (
                     <mesh key={`rib-${i}`} position={[x, 0, z]} rotation={[0, -angle, Math.PI / 2]}>
-                        <boxGeometry args={[2.2, 0.08, 0.08]} />
+                        <boxGeometry args={[2.8, 0.1, 0.1]} />
                         <meshStandardMaterial {...HULL_LIGHT} />
                     </mesh>
                 );
             })}
 
-            {/* Ring windows between hab sections - 72 small windows */}
-            {Array.from({ length: 72 }).map((_, i) => {
-                const angle = (i * Math.PI * 2) / 72;
-                const x = Math.cos(angle) * 8;
-                const z = Math.sin(angle) * 8;
+            {/* Inter-row windows - 96 small */}
+            {Array.from({ length: 96 }).map((_, i) => {
+                const angle = (i * Math.PI * 2) / 96;
+                const x = Math.cos(angle) * 9;
+                const z = Math.sin(angle) * 9;
                 return (
-                    <mesh
-                        key={`ring-win-${i}`}
-                        position={[x, 0, z]}
-                        rotation={[0, -angle + Math.PI / 2, 0]}
-                        scale={[0.1, 0.15, 0.04]}
-                    >
+                    <mesh key={`small-win-${i}`} position={[x, 0, z]} rotation={[0, -angle + Math.PI / 2, 0]} scale={[0.08, 0.12, 0.04]}>
                         <boxGeometry args={[1, 1, 1]} />
-                        <meshStandardMaterial {...(i % 3 === 0 ? LIGHT_BLUE : LIGHT_AMBER)} />
+                        <meshStandardMaterial {...(i % 4 === 0 ? LIGHT_BLUE : LIGHT_AMBER)} />
                     </mesh>
                 );
             })}
 
-            {/* Navigation beacon towers - 8 around ring */}
-            {Array.from({ length: 8 }).map((_, i) => {
-                const angle = (i * Math.PI) / 4;
-                const x = Math.cos(angle) * 8.6;
-                const z = Math.sin(angle) * 8.6;
+            {/* Navigation beacon towers - 12 around ring */}
+            {Array.from({ length: 12 }).map((_, i) => {
+                const angle = (i * Math.PI * 2) / 12;
+                const x = Math.cos(angle) * 10;
+                const z = Math.sin(angle) * 10;
                 return (
                     <group key={`beacon-${i}`} position={[x, 0, z]}>
-                        {/* Beacon mast */}
                         <mesh>
-                            <cylinderGeometry args={[0.04, 0.04, 1.5, 6]} />
+                            <cylinderGeometry args={[0.05, 0.05, 2, 6]} />
                             <meshStandardMaterial {...HULL_MEDIUM} />
                         </mesh>
-                        {/* Beacon light */}
-                        <mesh position={[0, 0.8, 0]}>
-                            <sphereGeometry args={[0.08, 6, 4]} />
+                        <mesh position={[0, 1.1, 0]}>
+                            <sphereGeometry args={[0.1, 8, 6]} />
                             <meshStandardMaterial {...LIGHT_WHITE} />
                         </mesh>
                     </group>
                 );
             })}
 
-            {/* Solar panel arrays - 8 sections */}
-            {Array.from({ length: 8 }).map((_, i) => {
-                const angle = (i * Math.PI) / 4 + Math.PI / 8;
-                const x = Math.cos(angle) * 8;
-                const z = Math.sin(angle) * 8;
+            {/* Large solar panel arrays - 12 sections */}
+            {Array.from({ length: 12 }).map((_, i) => {
+                const angle = (i * Math.PI) / 6 + Math.PI / 12;
+                const x = Math.cos(angle) * 9;
+                const z = Math.sin(angle) * 9;
                 return (
                     <group key={`solar-${i}`} position={[x, 0, z]} rotation={[0, -angle, 0]}>
-                        {/* Solar panel arm */}
-                        <mesh position={[0, 1.6, 0]}>
-                            <cylinderGeometry args={[0.03, 0.03, 0.8, 6]} />
+                        {/* Upper panel arm */}
+                        <mesh position={[0, 2.0, 0]}>
+                            <cylinderGeometry args={[0.04, 0.04, 1.2, 6]} />
                             <meshStandardMaterial {...HULL_MEDIUM} />
                         </mesh>
-                        {/* Solar panel */}
-                        <mesh position={[0, 2.0, 0]} rotation={[0.3, 0, 0]}>
-                            <boxGeometry args={[1.4, 0.03, 0.7]} />
-                            <meshStandardMaterial color="#1a1a5a" metalness={0.95} roughness={0.05} />
+                        {/* Upper panel */}
+                        <mesh position={[0, 2.6, 0]} rotation={[0.35, 0, 0]}>
+                            <boxGeometry args={[1.8, 0.04, 0.9]} />
+                            <meshStandardMaterial {...SOLAR_PANEL} />
+                        </mesh>
+                        {/* Lower panel arm */}
+                        <mesh position={[0, -2.0, 0]}>
+                            <cylinderGeometry args={[0.04, 0.04, 1.2, 6]} />
+                            <meshStandardMaterial {...HULL_MEDIUM} />
                         </mesh>
                         {/* Lower panel */}
-                        <mesh position={[0, -1.6, 0]}>
-                            <cylinderGeometry args={[0.03, 0.03, 0.8, 6]} />
+                        <mesh position={[0, -2.6, 0]} rotation={[-0.35, 0, 0]}>
+                            <boxGeometry args={[1.8, 0.04, 0.9]} />
+                            <meshStandardMaterial {...SOLAR_PANEL} />
+                        </mesh>
+                    </group>
+                );
+            })}
+
+            {/* Inner ring connectors - 8 */}
+            {Array.from({ length: 8 }).map((_, i) => {
+                const angle = (i * Math.PI * 2) / 8;
+                return (
+                    <mesh key={`connector-${i}`} position={[Math.cos(angle) * 6.5, 0, Math.sin(angle) * 6.5]} rotation={[0, -angle + Math.PI / 2, 0]}>
+                        <boxGeometry args={[0.2, 0.2, 3]} />
+                        <meshStandardMaterial {...HULL_DARK} />
+                    </mesh>
+                );
+            })}
+
+            {/* Inner ring utility modules - 8 */}
+            {Array.from({ length: 8 }).map((_, i) => {
+                const angle = (i * Math.PI * 2) / 8 + Math.PI / 8;
+                const x = Math.cos(angle) * 5;
+                const z = Math.sin(angle) * 5;
+                return (
+                    <group key={`util-${i}`} position={[x, 0, z]}>
+                        <mesh>
+                            <boxGeometry args={[0.8, 0.6, 0.8]} />
                             <meshStandardMaterial {...HULL_MEDIUM} />
                         </mesh>
-                        <mesh position={[0, -2.0, 0]} rotation={[-0.3, 0, 0]}>
-                            <boxGeometry args={[1.4, 0.03, 0.7]} />
-                            <meshStandardMaterial color="#1a1a5a" metalness={0.95} roughness={0.05} />
+                        <mesh position={[0, 0, 0.42]} scale={[0.4, 0.35, 0.05]}>
+                            <boxGeometry args={[1, 1, 1]} />
+                            <meshStandardMaterial {...LIGHT_BLUE} />
                         </mesh>
                     </group>
                 );
@@ -384,18 +443,16 @@ function RotatingRingAndSpokes() {
 export function OrbitalStation() {
     const stationRef = useRef<THREE.Group>(null);
 
-    // Gentle station sway
     useFrame((state) => {
         if (stationRef.current) {
-            stationRef.current.rotation.x = 0.5 + Math.sin(state.clock.elapsedTime * 0.15) * 0.03;
-            stationRef.current.rotation.z = Math.cos(state.clock.elapsedTime * 0.12) * 0.02;
+            stationRef.current.rotation.x = 0.5 + Math.sin(state.clock.elapsedTime * 0.12) * 0.02;
+            stationRef.current.rotation.z = Math.cos(state.clock.elapsedTime * 0.1) * 0.015;
         }
     });
 
     return (
-        <group ref={stationRef} scale={0.6} rotation={[0.5, Math.PI / 5, 0.1]}>
+        <group ref={stationRef} scale={0.55} rotation={[0.5, Math.PI / 5, 0.1]}>
             <CentralSpire />
-            {/* Spokes and Ring rotate together */}
             <RotatingRingAndSpokes />
         </group>
     );
