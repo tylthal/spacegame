@@ -7,6 +7,7 @@
 
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import { InstancedMesh, Object3D, Vector3 } from 'three';
 import { getEnemyGeometry, getEnemyMaterial, EnemyType } from './assets/MergedEnemyGeometries';
 import { ShieldBubble } from './effects/ShieldBubble';
@@ -31,6 +32,7 @@ interface Enemy {
     shield?: number;
     maxShield?: number;
     lastHitTime?: number;
+    isCharging?: boolean;
 }
 
 interface InstancedEnemyRendererProps {
@@ -59,6 +61,11 @@ function TypeInstancedMesh({
         if (!meshRef.current) return;
 
         meshRef.current.count = enemies.length;
+        const color = new THREE.Color();
+        const white = new THREE.Color(1, 1, 1);
+        // Orange tint for charging (mixes with vertex colors)
+        // High HDR values (4.0) to force bloom
+        const chargeTint = new THREE.Color(4.0, 1.2, 0.2);
 
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i];
@@ -72,9 +79,19 @@ function TypeInstancedMesh({
 
             dummy.current.updateMatrix();
             meshRef.current.setMatrixAt(i, dummy.current.matrix);
+
+            // Color updates
+            if (enemy.isCharging) {
+                // Flash effect: could be static orange or oscillating
+                // Simple static "Warning" tint
+                meshRef.current.setColorAt(i, chargeTint);
+            } else {
+                meshRef.current.setColorAt(i, white);
+            }
         }
 
         meshRef.current.instanceMatrix.needsUpdate = true;
+        if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
     });
 
     // Use primitive to attach pre-created geometry and material

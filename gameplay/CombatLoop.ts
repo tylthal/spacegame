@@ -20,6 +20,7 @@ export interface EnemyInstance {
   maxShield?: number;    // For visual opacity calculation
   lastHitTime?: number;  // For hit flash effect timing
   lastFireTime?: number; // For bomber firing cooldown
+  isCharging?: boolean;  // Visual cue for bomber firing
 }
 
 export interface Bullet {
@@ -600,7 +601,66 @@ export class CombatLoop {
         enemy.position.x += spiralX;
         enemy.position.y += spiralY;
       }
+
+      // Bomber logic: Fire bullets at player
+      if (enemy.kind === 'bomber' && this.options.hull > 0) {
+        const fireInterval = BOMBER_FIRE_INTERVAL_MS;
+        const now = this.elapsedMs;
+
+        // Initialize if new: Start at 50% cooldown (5s delay)
+        if (enemy.lastFireTime === undefined) {
+          enemy.lastFireTime = now - (fireInterval * 0.5);
+        }
+
+        const lastFire = enemy.lastFireTime!;
+        const nextFireTime = lastFire + fireInterval;
+
+        // Update charging status (flash 1.0s before firing)
+        if (now >= nextFireTime - 1000 && now < nextFireTime) {
+          enemy.isCharging = true;
+        } else {
+          enemy.isCharging = false;
+        }
+
+        if (now >= nextFireTime) {
+          // FIRE!
+          enemy.lastFireTime = now;
+          enemy.isCharging = false; // Reset charge
+
+          // Spawn enemy bullet
+          this.spawnEnemyBullet(enemy.position);
+        }
+      }
     }
+  }
+
+  private spawnEnemyBullet(position: Vector3): void {
+    const id = this.enemyId++; // Reuse enemy ID counter or separate? Separate is better but this works for unique IDs
+    // Target player at (0, 0, 0) approx - actually player is at z=0, camera at z=4?
+    // Player "Hitbox" for bullets is likely near z=0 or z=2.
+    // Game logic says "z > -5" hits player. 
+    // Let's aim at (0, -2, 4) - slightly below center
+
+    const target = { x: 0, y: -2, z: 4 };
+    const dx = target.x - position.x;
+    const dy = target.y - position.y;
+    const dz = target.z - position.z;
+    const dist = Math.hypot(dx, dy, dz);
+
+    const speed = 0.05; // BOMBER_BULLET_SPEED
+
+    this.enemyBullets.push({
+      id: id, // use simple id
+      position: { ...position },
+      velocity: {
+        x: (dx / dist) * speed,
+        y: (dy / dist) * speed,
+        z: (dz / dist) * speed
+      },
+      active: true
+    });
+
+    SoundEngine.play('enemyFire');
   }
 
   // Advance enemy bullets and check for player hits AND player bullet interceptions

@@ -27,6 +27,7 @@ export type SoundType =
     | 'weaponReady'
     | 'missileBeep'
     // Phase 3: Enemies
+    | 'weaverSpawn'
     | 'shieldedSpawn'
     | 'bomberSpawn'
     | 'enemyFire'
