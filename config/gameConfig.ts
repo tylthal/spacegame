@@ -86,22 +86,26 @@ export const GAME_CONFIG = {
         shieldedDrone: 500, // High points due to difficulty
     },
 
-    // Difficulty settings
+    // Difficulty settings - affect enemy movement speed and spawn caps
+    // Multipliers are intentionally dramatic for clear gameplay difference
     difficulty: {
         easy: {
-            speedMultiplier: 0.6,
+            speedMultiplier: 0.5, // Half speed - very forgiving
+            enemyCapMultiplier: 0.6, // 40% fewer enemies on screen
             label: 'EASY',
-            description: 'Slower enemies for beginners',
+            description: 'Slower, fewer enemies',
         },
         normal: {
             speedMultiplier: 1.0,
+            enemyCapMultiplier: 1.0,
             label: 'NORMAL',
             description: 'Standard challenge',
         },
         hard: {
-            speedMultiplier: 1.4,
+            speedMultiplier: 1.6, // 60% faster - intense
+            enemyCapMultiplier: 1.3, // 30% more enemies on screen
             label: 'HARD',
-            description: 'Fast enemies for veterans',
+            description: 'Fast enemies, more swarms',
         },
     },
 } as const;

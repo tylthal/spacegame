@@ -166,6 +166,13 @@ export class CombatLoop {
   }
   public get speedMultiplier(): number { return this._speedMultiplier; }
 
+  // Difficulty enemy cap multiplier (affects max enemies on screen)
+  private _enemyCapMultiplier = 1.0;
+  public setEnemyCapMultiplier(multiplier: number): void {
+    this._enemyCapMultiplier = multiplier;
+  }
+  public get enemyCapMultiplier(): number { return this._enemyCapMultiplier; }
+
   private hull: number;
   private elapsedMs = 0;
   private enemyId = 0;
@@ -255,20 +262,26 @@ export class CombatLoop {
     const tier = TIER_CAPS[tierIndex];
 
     for (const event of spawnEvents) {
-      // 1. Check Global Limit (Safety Cap)
-      if (this.enemies.length >= 15) break;
+      // 1. Check Global Limit (Safety Cap) - scaled by difficulty
+      const scaledGlobalCap = Math.floor(15 * this._enemyCapMultiplier);
+      if (this.enemies.length >= scaledGlobalCap) break;
+
+      // Scale tier caps by difficulty
+      const scaledMaxDrones = Math.max(1, Math.floor(tier.maxDrones * this._enemyCapMultiplier));
+      const scaledMaxWeavers = Math.floor(tier.maxWeavers * this._enemyCapMultiplier);
+      const scaledMaxShielded = Math.floor(tier.maxShielded * this._enemyCapMultiplier);
 
       // 2. Check Specific Caps AND Probability
       if (event.kind === 'drone') {
         const currentDrones = this.enemies.filter(e => e.kind === 'drone').length;
-        if (currentDrones >= tier.maxDrones) continue;
+        if (currentDrones >= scaledMaxDrones) continue;
         // Probability check
         if (this.rng.next() > tier.droneSpawnChance) continue;
       }
 
       if (event.kind === 'weaver') {
         const currentWeavers = this.enemies.filter(e => e.kind === 'weaver').length;
-        if (currentWeavers >= tier.maxWeavers || this.weaverSpawnCooldown > 0) {
+        if (currentWeavers >= scaledMaxWeavers || this.weaverSpawnCooldown > 0) {
           continue;
         }
         // Probability check
@@ -278,7 +291,7 @@ export class CombatLoop {
 
       if (event.kind === 'shieldedDrone') {
         const currentShielded = this.enemies.filter(e => e.kind === 'shieldedDrone').length;
-        if (currentShielded >= tier.maxShielded || this.shieldedDroneSpawnCooldown > 0) {
+        if (currentShielded >= scaledMaxShielded || this.shieldedDroneSpawnCooldown > 0) {
           continue;
         }
         // Probability check
@@ -450,13 +463,13 @@ export class CombatLoop {
       // Weaver corkscrew movement (spirals around trajectory line)
       if (enemy.kind === 'weaver' && enemy.wavePhase !== undefined &&
         enemy.waveAmplitude !== undefined && enemy.waveFrequency !== undefined) {
-        // Update phase based on time
-        enemy.wavePhase += enemy.waveFrequency * deltaMs;
+        // Update phase based on time (also scaled by difficulty)
+        enemy.wavePhase += enemy.waveFrequency * adjustedDelta;
 
         // Calculate corkscrew offset (perpendicular to velocity in both X and Y)
         // This creates a helical spiral around the forward trajectory
-        const spiralX = Math.cos(enemy.wavePhase) * enemy.waveAmplitude * 0.008 * deltaMs;
-        const spiralY = Math.sin(enemy.wavePhase) * enemy.waveAmplitude * 0.008 * deltaMs;
+        const spiralX = Math.cos(enemy.wavePhase) * enemy.waveAmplitude * 0.008 * adjustedDelta;
+        const spiralY = Math.sin(enemy.wavePhase) * enemy.waveAmplitude * 0.008 * adjustedDelta;
 
         enemy.position.x += spiralX;
         enemy.position.y += spiralY;
