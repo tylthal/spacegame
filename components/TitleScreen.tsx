@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { SoundEngine, MusicEngine } from '../audio';
 import { OrbitalStation } from '../infrastructure/three/assets/OrbitalStation';
-import { SimpleStation } from '../infrastructure/three/assets/SimpleStation';
-import { useIsLowPowerDevice } from '../hooks/useIsMobile';
 
 interface TitleScreenProps {
     onStart: () => void;
@@ -16,7 +14,6 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onPractice, o
     const [isHoveringHelp, setIsHoveringHelp] = useState(false);
     const [isHoveringPractice, setIsHoveringPractice] = useState(false);
     const musicStartedRef = useRef(false);
-    const isLowPower = useIsLowPowerDevice(); // Use simplified assets on mobile
 
     // Start title music on first user interaction (click/touch anywhere)
     useEffect(() => {
@@ -197,10 +194,10 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, onPractice, o
                             <directionalLight position={[10, -5, -15]} intensity={0.8} color="#4488ff" />
                             <pointLight position={[0, 0, 0]} intensity={3.0} color="#00aaff" distance={40} />
 
-                            {/* Station - conditional rendering based on device capability */}
+                            {/* Station - always show full model */}
                             <group position={[0, 5, 0]}>
-                                <group scale={isLowPower ? 3 : 2.5}>
-                                    {isLowPower ? <SimpleStation /> : <OrbitalStation />}
+                                <group scale={2.5}>
+                                    <OrbitalStation />
                                 </group>
                             </group>
                         </Canvas>
