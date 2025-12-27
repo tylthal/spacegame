@@ -92,7 +92,7 @@ The rebuild will continue layering modules behind tests. Remaining work focuses 
 - Gesture thresholds (normalized by the hand bounding-box diagonal):
   - **Pinch**: thumb–index distance ≤ `0.05`.
   - **Fist**: average (index/middle/ring/pinky) fingertip-to-wrist distance ≤ `0.16`.
-  - **Prayer**: both hands detected with palms facing each other, triggers shockwave.
+  - **Power Slam**: both hands make fist gesture simultaneously, triggers shockwave.
   - **Palm**: fallback when neither threshold triggers.
 
 ### Virtual mousepad transform and calibration tolerance

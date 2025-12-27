@@ -185,9 +185,9 @@ function ControlsTab() {
                 {/* Shockwave */}
                 <ControlCard
                     title="SHOCKWAVE (ULTIMATE)"
-                    gesture="Prayer (Hands Together)"
+                    gesture="Power Slam (Both Fists)"
                     gestureColor="indigo"
-                    description="Press your palms together (fingers up) to unleash a devastating shockwave! An expanding wave of energy sweeps across the screen, dealing 5 damage to ALL enemies. Destroys drones instantly and strips shields from tougher foes. 60 second cooldown. Watch the purple 🙏 indicator on the right side of your screen."
+                    description="Clench BOTH hands into fists to unleash a devastating shockwave! An expanding wave of energy sweeps the screen, dealing 5 damage to ALL enemies. Destroys drones instantly and strips shields. 60 second cooldown — watch the purple indicator."
                 />
 
                 {/* Pause */}

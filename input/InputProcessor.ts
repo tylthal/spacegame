@@ -9,8 +9,8 @@ import {
   SIGNATURE_MATCH_THRESHOLD,
 } from './HandSignature';
 
-// Gestures: pinch (shooting), fist (gripping), palm (stop/pause), point (default/aiming), prayer (shockwave)
-type Gesture = 'pinch' | 'fist' | 'palm' | 'point' | 'prayer';
+// Gestures: pinch (shooting), fist (gripping/shockwave), palm (stop/pause), point (default/aiming)
+type Gesture = 'pinch' | 'fist' | 'palm' | 'point';
 
 export interface VirtualMousepadConfig {
   origin: { x: number; y: number };
@@ -335,27 +335,11 @@ export class InputProcessor {
       gesture = handData.right.gesture;
     }
 
-    // PRAYER GESTURE DETECTION (Shockwave)
-    // Requires both hands to be visible and close together
+    // SHOCKWAVE GESTURE: "Power Slam" - Both fists clenched
+    // More reliable than prayer - fist detection is robust and hands don't need to touch
     if (handData.left && handData.right) {
-      const leftWrist = handData.left.landmarks[0];
-      const rightWrist = handData.right.landmarks[0];
-
-      // Calculate distance between wrists in normalized coordinates (0..1)
-      const dx = leftWrist.x - rightWrist.x;
-      const dy = leftWrist.y - rightWrist.y;
-      const dist = Math.hypot(dx, dy);
-
-      // If hands are close (touching/praying) AND both are relatively open (palm or point)
-      // distance < 0.2 is about 20% of screen width - distinct "together" pose
-      if (dist < 0.25) {
-        const leftG = handData.left.gesture;
-        const rightG = handData.right.gesture;
-        // Allow palm or point (sometimes praying fingers look like point if side-view)
-        // But definitely not FIST.
-        if ((leftG === 'palm' || leftG === 'point') && (rightG === 'palm' || rightG === 'point')) {
-          gesture = 'prayer';
-        }
+      if (handData.left.gesture === 'fist' && handData.right.gesture === 'fist') {
+        gesture = 'fist'; // Will trigger shockwave in CombatLoop
       }
     }
 

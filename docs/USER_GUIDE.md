@@ -16,7 +16,7 @@ Orbital Defense is a gesture-controlled space shooter. Use your hands to aim and
 | **Point** | Right | Aim - your index finger controls the crosshair |
 | **Pinch** | Left | Fire laser - continuous fire while pinching |
 | **Fist** | Left | Launch missile - homing projectile with area damage |
-| **Prayer** | Both | Shockwave - damages all enemies on screen (60s cooldown) |
+| **Power Slam** | Both | Shockwave - damages all enemies on screen (60s cooldown) |
 | **Both Palms** | Both | Pause game |
 
 ## HUD Elements

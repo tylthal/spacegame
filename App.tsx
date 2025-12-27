@@ -248,8 +248,9 @@ const App: React.FC = () => {
       const leftHandFist = event.hands.left?.gesture === 'fist';
       combatLoop.setFiringMissile(leftHandFist || false);
 
-      // 5. Shockwave - Prayer gesture (aggregate)
-      combatLoop.setFiringShockwave(event.gesture === 'prayer');
+      // 5. Shockwave - "Power Slam" (both fists clenched)
+      const bothFists = event.hands.left?.gesture === 'fist' && event.hands.right?.gesture === 'fist';
+      combatLoop.setFiringShockwave(bothFists);
 
       // 5. Update wireframe debug data (only when visible to save performance)
       if (showWireframe) {
